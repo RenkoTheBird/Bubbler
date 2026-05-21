@@ -5,3 +5,56 @@
 -- CREATE INDEX ON posts
 -- USING hnsw (embedding vector_cosine_ops);
 -- hnsw is required for fast vector lookups
+
+CREATE EXTENSION IF NOT EXISTS vector;
+
+CREATE TABLE users (
+    id UUID NOT NULL,
+    email TEXT NOT NULL,
+    created_at TIME
+);
+
+CREATE TABLE posts (
+    id UUID NOT NULL,
+    user_id INTEGER SERIAL,
+    content TEXT NOT NULL,
+    created_at TIME,
+    embedding(vector) -- ml.embeddings.generate
+)
+
+CREATE TABLE topics (
+    id UUID NOT NULL,
+    name TEXT,
+    parent_topic_id INTEGER
+);
+
+CREATE TABLE post_topics (
+    post_id UUID REFERENCES posts(id),
+    topic_id INTEGER,
+    weight 
+);
+
+CREATE TABLE interactions (
+    id UUID NOT NULL,
+    user_id UUID REFERENCES users(id),
+    post_id UUID REFERENCES posts(id),
+    type, -- like, skip, explore
+    created_at TIME
+);
+
+CREATE TABLE edges (
+    id UUID NOT NULL,
+    from_post_id REFERENCES posts(id),
+    to_post_id REFERENCES posts(id),
+    edge_type -- similar, opposite, topic
+    weight
+);
+
+-- vectorized preferences
+CREATE TABLE user_profiles (
+    user_id REFERENCES users(id),
+    embedding,
+    diversity_tolerance FLOAT -- set by users!
+);
+
+

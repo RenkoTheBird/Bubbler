@@ -1,11 +1,11 @@
 from fastapi import FastAPI
+from backend.app.main import app
 
 '''
 Notes:
 - The post embedding should be passed in, not the post itself (embedding again would be redundant)
 - The "limit" parameter defines the max posts that will appear in the graph
 - In pgvector, the <=> operator defines cosine similarity, NOT null-safe equality
-- App will be defined in future
 '''
 
 @app.get("posts/similar")

@@ -22,6 +22,9 @@ CREATE TABLE posts (
     embedding(vector) -- ml.embeddings.generate
 )
 
+CREATE INDEX ON posts
+USING hnsw (embedding vector_cosine_ops);
+
 CREATE TABLE topics (
     id UUID NOT NULL,
     name TEXT,

@@ -7,18 +7,19 @@
 -- hnsw is required for fast vector lookups
 
 CREATE EXTENSION IF NOT EXISTS vector;
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE users (
     id UUID NOT NULL,
     email TEXT NOT NULL,
-    created_at TIME
+    created_at DATETIME GETDATE()
 );
 
 CREATE TABLE posts (
-    id UUID NOT NULL,
+    id UUID NOT NULL gen_random_uuid(),
     user_id INTEGER SERIAL,
     content TEXT NOT NULL,
-    created_at TIME,
+    created_at DATETIME GETDATE(),
     embedding(vector) -- ml.embeddings.generate
 )
 
@@ -26,7 +27,7 @@ CREATE INDEX ON posts
 USING hnsw (embedding vector_cosine_ops);
 
 CREATE TABLE topics (
-    id UUID NOT NULL,
+    id UUID NOT NULL gen_random_uuid(),
     name TEXT,
     parent_topic_id INTEGER
 );
@@ -38,15 +39,15 @@ CREATE TABLE post_topics (
 );
 
 CREATE TABLE interactions (
-    id UUID NOT NULL,
+    id UUID NOT NULL gen_random_uuid(),
     user_id UUID REFERENCES users(id),
     post_id UUID REFERENCES posts(id),
     type, -- like, skip, explore
-    created_at TIME
+    created_at DATETIME GETDATE()
 );
 
 CREATE TABLE edges (
-    id UUID NOT NULL,
+    id UUID NOT NULL gen_random_uuid(),
     from_post_id REFERENCES posts(id),
     to_post_id REFERENCES posts(id),
     edge_type -- similar, opposite, topic

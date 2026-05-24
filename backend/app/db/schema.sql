@@ -15,22 +15,23 @@ CREATE TABLE users (
     created_at DATETIME GETDATE()
 );
 
-CREATE TABLE posts (
-    id UUID NOT NULL gen_random_uuid(),
-    user_id INTEGER SERIAL,
-    content TEXT NOT NULL,
-    created_at DATETIME GETDATE(),
-    embedding(vector) -- ml.embeddings.generate
-)
-
-CREATE INDEX ON posts
-USING hnsw (embedding vector_cosine_ops);
-
 CREATE TABLE topics (
     id UUID NOT NULL gen_random_uuid(),
     name TEXT,
     parent_topic_id INTEGER
 );
+
+CREATE TABLE posts (
+    id UUID NOT NULL gen_random_uuid(),
+    user_id INTEGER SERIAL,
+    content TEXT NOT NULL,
+    created_at DATETIME GETDATE(),
+    embedding(vector), -- ml.embeddings.generate
+    topic TEXT REFERENCES topics(name)
+)
+
+CREATE INDEX ON posts
+USING hnsw (embedding vector_cosine_ops);
 
 CREATE TABLE post_topics (
     post_id UUID REFERENCES posts(id),

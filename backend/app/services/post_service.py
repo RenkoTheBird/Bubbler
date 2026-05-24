@@ -9,7 +9,7 @@ from ml.embeddings.generate import embed
 @app.get("/users/{id}/posts")
 async def getPosts():
 
-    async with app.state.pool.acquire as conn:
+    async with app.state.pool.acquire() as conn:
         posts = await conn.fetch(
             "SELECT * FROM posts WHERE user_id = $1", id
         )
@@ -24,7 +24,7 @@ async def getPosts():
 async def postPosts(post: str):
     embedded = embed(post)
     
-    async with app.state.pool.acquire as conn:
+    async with app.state.pool.acquire() as conn:
         result = await conn.fetch(
             "INSERT INTO posts (user_id, content, embedding) VALUES ($1, $2, $3)", id, post, embedded
         )

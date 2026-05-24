@@ -1,15 +1,24 @@
 from backend.app.main import app
+from typing import List
 
 '''
 TODO: Goal: get user's daily bubbles (shows upon launching app)
+---- Option 1: take 1 post they liked yesterday 
+---- Option 2: take 1 post from a topic they liked
+Base cosine simlarity on this
 '''
 
 @app.get("users/{id}/session")
-async def getNewSessionPosts(diversityTolerance: int):
-    
-    async with app.state.pool.acquire as conn:
-        pass
+async def getNewSessionPosts(diversityTolerance: int, yesterdayPost: List[float], likedTopic: str):
+    savedVal = 1 - (diversityTolerance * 0.01 + 0.10)
+    val = 1
+    similarityTargets = []
+    for i in range(4):
+        similarityTargets.append(val)
+        val -= savedVal
 
+    async with app.state.pool.acquire() as conn:
+        pass
 
 '''
 How are the posts retrieved?

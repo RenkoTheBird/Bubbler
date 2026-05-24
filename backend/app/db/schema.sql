@@ -58,7 +58,7 @@ CREATE TABLE edges (
 CREATE TABLE user_profiles (
     user_id REFERENCES users(id),
     embedding,
-    diversity_tolerance FLOAT -- set by users!
+    diversity_tolerance INT -- set by users! between 1-75
 );
 
 

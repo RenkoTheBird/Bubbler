@@ -13,12 +13,30 @@ async def getNewSessionPosts(diversityTolerance: int, yesterdayPost: List[float]
     savedVal = 1 - (diversityTolerance * 0.01 + 0.10)
     val = 1
     similarityTargets = []
-    for i in range(4):
+    for i in range(4): # Retrieve 4 posts
         similarityTargets.append(val)
         val -= savedVal
 
+    results = []
+
     async with app.state.pool.acquire() as conn:
-        pass
+        for target in similarityTargets:
+            post = await conn.fetchrow("""
+                                        SELECT *
+                                            1 - (embedding <=> $1::vector) AS similarity
+                                        FROM posts
+                                        WHERE topic = $2
+                                        ORDER BY ABS((1 - (embedding <=> $1::vector)) - $3)
+                                        LIMIT 1
+                                       """,
+                                       yesterdayPost,
+                                       likedTopic,
+                                       target)
+            
+            if post:
+                results.append(dict(post))
+            
+            return results
 
 '''
 How are the posts retrieved?

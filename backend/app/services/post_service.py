@@ -7,7 +7,7 @@ from ml.embeddings.generate import embed
 '''
 
 @app.get("/users/{id}/posts")
-async def getPosts():
+async def getPosts(id: str):
 
     async with app.state.pool.acquire() as conn:
         posts = await conn.fetch(
@@ -21,7 +21,7 @@ async def getPosts():
 '''
 
 @app.post("/users/{id}/posts")
-async def postPosts(post: str):
+async def postPosts(id: str, post: str):
     embedded = embed(post)
     
     async with app.state.pool.acquire() as conn:

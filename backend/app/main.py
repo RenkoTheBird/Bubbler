@@ -1,9 +1,5 @@
 from fastapi import FastAPI
-from backend.app.api.routes import auth
-from backend.app.api.routes import feed
-from backend.app.api.routes import graph
-from backend.app.api.routes import posts
-from backend.app.api.routes import users
+from .api.routes import auth, feed, graph, posts, users
 
 app = FastAPI()
 app.include_router(auth.router, prefix="/auth")

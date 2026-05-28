@@ -33,3 +33,4 @@ async def similarPosts(embeddedPost: list[float], limit: int=4):
         }
         for r in rows
     ]
+

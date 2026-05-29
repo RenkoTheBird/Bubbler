@@ -50,7 +50,7 @@ bubbler/
 │   │   │   │   ├── auth.py
 │   │   │   │   ├── posts.py
 │   │   │   │   ├── feed.py
-│   │   │   │   ├── graph.py   # DAG expansion endpoint
+│   │   │   │   ├── graph.py   # DAG expansion endpoint: Currently removed
 │   │   │   │   └── users.py
 │   │   │
 │   │   ├── core/             # Config & settings

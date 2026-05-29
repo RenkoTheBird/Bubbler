@@ -8,3 +8,9 @@ class FeedService:
         return similarPosts
     
     ### FUTURE: opposite posts, potential interesting topics, etc.
+
+    '''
+    NOTE: Currently this replaces the graph service since there
+          is no need for it at the moment
+          However, it could be added in the future
+    '''

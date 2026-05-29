@@ -8,7 +8,7 @@ Notes:
 '''
 
 @app.get("posts/similar")
-async def similarPosts(embeddedPost: list[float], limit: int=4):
+async def getSimilarPosts(embeddedPost: list[float], limit: int=4):
 
     async with app.state.pool.acquire() as conn:
         rows = await conn.fetch(

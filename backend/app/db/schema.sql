@@ -11,6 +11,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE users (
     id UUID NOT NULL,
+    username TEXT NOT NULL,
     email TEXT NOT NULL,
     created_at DATETIME GETDATE()
 );

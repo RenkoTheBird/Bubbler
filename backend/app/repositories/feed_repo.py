@@ -1,4 +1,3 @@
-from backend.app.main import app
 from typing import List
 
 class FeedRepository:

@@ -6,9 +6,9 @@ class PostService:
         self.repo = repo
 
     async def getUserPosts(self):
-        return await self.repo.getPosts()
+        return await self.repo.getUserPosts()
         # ranking/filtering skipped because the database calls do that - 
         # but make sure to embed the post!
     
     async def postUserPosts(self):
-        return await self.repo.postPosts()
+        return await self.repo.postUserPosts()

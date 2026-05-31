@@ -6,6 +6,5 @@ class Post:
     id: int
     user_id: int
     content: str
-    emebdding: Optional[List[float]] = None
+    embedding: Optional[List[float]] = None
 
-    

@@ -1,5 +1,5 @@
-from backend.app.main import app
 from typing import List
+from app.models.post import Post
 
 class PostRepository:
 
@@ -7,20 +7,28 @@ class PostRepository:
         self.pool = pool
 
     # Posts for the graph are retrieved in feed_service.py
-    async def getPosts(id: str):
+    async def getUserPosts(self, id: str):
 
-        async with app.state.pool.acquire() as conn:
+        async with self.pool.acquire() as conn:
             posts = await conn.fetch(
                 "SELECT * FROM posts WHERE user_id = $1", id
             )
         
-        return posts
+        return [self._map_row(posts) for post in posts]
 
-    async def postPosts(id: str, post: str, embeddedPost: List[float]):
+    async def postUserPosts(self, id: str, post: str, embeddedPost: List[float]):
         
-        async with app.state.pool.acquire() as conn:
+        async with self.pool.acquire() as conn:
             result = await conn.fetch(
                 "INSERT INTO posts (user_id, content, embedding) VALUES ($1, $2, $3)", id, post, embeddedPost
             )
 
-        return result
+        return self._map_row(result)
+    
+    def _map_row(self, row) -> Post:
+        return Post(
+            id=row["id"],
+            user_id=row["user_id"],
+            content=row["content"],
+            embedding=row["embedding"]
+        )

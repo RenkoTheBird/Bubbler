@@ -1,6 +1,4 @@
-from backend.app.main import app
 from typing import List
-from app.models.post import Post
 '''
 GOAL: When viewing user profile, retrieve their data
 '''

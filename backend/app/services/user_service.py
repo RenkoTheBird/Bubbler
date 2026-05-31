@@ -1,15 +1,20 @@
-class userService:
-    def __init__(self, repo: ServiceRepository):
+class UserService:
+    def __init__(self, repo: UserRepository):
         self.repo = repo
     
-    def getProfileInfo(self):
-        info = self.repo.getProfileInfo()
-        return info
+    async def getProfileInfo(self):
+        return await self.repo.getProfileInfo()
     
-    def getNewSessionPosts(self):
-        posts = self.repo.getNewSessionPosts()
-        return posts
+    async def getNewSessionPosts(self):
+        return await self.repo.getNewSessionPosts()
+    
+    async def getUserPosts(self):
+        return await self.repo.getPosts()
+        # ranking/filtering skipped because the database calls do that
+    
+    async def postUserPosts(self):
+        return await self.repo.postPosts()
 
-    def putEmail(self):
-        email = self.repo.putEmail()
-        return email
+    async def putEmail(self):
+        return await self.repo.putEmail()
+    

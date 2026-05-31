@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends
+from ...services.user_service import UserService 
 
 router = APIRouter()
 
@@ -11,11 +12,11 @@ def getNewSessionPosts(service: UserService = Depends()):
     return service.getNewSessionPosts()
 
 @router.get("/{id}/posts")
-async def getUserPosts(id: int, service: PostService = Depends()):
+async def getUserPosts(id: int, service: UserService = Depends()):
     return service.getUserPosts(id)
 
 @router.post("/{id}/posts")
-def postUserPosts(id: int, service: PostService = Depends()):
+def postUserPosts(id: int, service: UserService = Depends()):
     return service.postUserPosts(id)
 
 @router.put("/{id}/profile/email")

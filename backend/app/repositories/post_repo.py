@@ -6,7 +6,6 @@ from ml.embeddings.generate import embed
 - Posts for the graph are retrieved in similarity_service.py
 '''
 
-@app.get("/users/{id}/posts")
 async def getPosts(id: str):
 
     async with app.state.pool.acquire() as conn:

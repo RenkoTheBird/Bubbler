@@ -1,3 +1,5 @@
+from ..repositories.auth_repo import AuthRepo
+
 class AuthService:
     def __init__(self, repo: AuthRepo):
         self.repo = repo

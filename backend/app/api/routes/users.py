@@ -7,10 +7,6 @@ router = APIRouter()
 def getProfileInfo(service: UserService = Depends()):
     return service.getProfileInfo()
 
-@router.get("/{id}/session")
-def getNewSessionPosts(service: UserService = Depends()):
-    return service.getNewSessionPosts()
-
 @router.get("/{id}/posts")
 async def getUserPosts(id: int, service: UserService = Depends()):
     return service.getUserPosts(id)

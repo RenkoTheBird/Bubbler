@@ -1,8 +1,11 @@
 from fastapi import APIRouter, Depends
+from ...services.auth_service import AuthService
 
 '''
 NOTE: This section should handle login and registration routing
 '''
+
+router = APIRouter()
 
 # Post login info to check it against registered info
 @router.post("login")

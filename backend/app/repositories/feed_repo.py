@@ -6,7 +6,7 @@ class FeedRepository:
     def __init__(self, pool):
         self.pool = pool
 
-    async def getSimilarPosts(self, embeddedPost: list[float], limit: int=4):
+    async def getSimilarPosts(self, embeddedPost: List[float], limit: int=4):
 
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(

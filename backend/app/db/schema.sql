@@ -13,7 +13,8 @@ CREATE TABLE users (
     id INTEGER SERIAL NOT NULL,
     username TEXT NOT NULL,
     email TEXT NOT NULL,
-    created_at DATETIME GETDATE()
+    password_hash TEXT NOT NULL,
+    created_at DATETIME 
 );
 
 CREATE TABLE topics (

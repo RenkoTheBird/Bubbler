@@ -13,5 +13,6 @@ def postLoginInfo(service: AuthService = Depends()):
     return service.postLoginInfo()
 
 # Post new registration info
+@router.post("register")
 def postRegistrationInfo(service: AuthService = Depends()):
     return service.postRegistrationInfo()

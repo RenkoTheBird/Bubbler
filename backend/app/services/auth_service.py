@@ -1,14 +1,19 @@
 from ..repositories.auth_repo import AuthRepo
+import datetime
+import bcrypt
 
 class AuthService:
     def __init__(self, repo: AuthRepo):
         self.repo = repo
 
-    def postLoginInfo(self):
-        login = self.repo.postLoginInfo()
-        return login # checks success
+    async def postLoginInfo(self):
+        return await self.repo.postLoginInfo()
 
-    def postRegistrationInfo(self):
-        register = self.repo.postRegistrationInfo()
-        # add new login info to database
-        return register
+    async def postRegistrationInfo(self, id: int, username: str, email: str, password: str):
+        # get current time to fill in "created_at"
+        time = datetime.datetime.now()
+        # hash the password
+        password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
+        # add login info to database
+        return await self.repo.postRegistrationInfo(id, username, email, password_hash, time)
+    

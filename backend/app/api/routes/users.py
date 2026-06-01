@@ -4,9 +4,9 @@ from ...services.user_service import UserService
 router = APIRouter()
 
 @router.get("/{id}/profile")
-def getProfileInfo(service: UserService = Depends()):
+def getProfileInfo(id: str, service: UserService = Depends()):
     return service.getProfileInfo()
 
 @router.put("/{id}/profile/email")
-def putEmail(service: UserService = Depends()):
+def putEmail(id: str, service: UserService = Depends()):
     return service.putEmail()

@@ -4,9 +4,9 @@ from ...services.post_service import PostService
 router = APIRouter()
 
 @router.get("/{id}/posts")
-async def getUserPosts(id: int, service: PostService = Depends()):
+async def getUserPosts(id: str, service: PostService = Depends()):
     return service.getUserPosts(id)
 
 @router.post("/{id}/posts")
-def postUserPosts(id: int, service: PostService = Depends()):
+def postUserPosts(id: str, service: PostService = Depends()):
     return service.postUserPosts(id)

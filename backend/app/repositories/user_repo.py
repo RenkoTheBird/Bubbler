@@ -8,7 +8,7 @@ class UserRepository:
     def __init__(self, pool):
         self.pool = pool
     
-    async def getProfileInfo(self, id: str):
+    async def getProfileInfo(self, id: int):
 
         async with self.pool.acquire() as conn:
             data = await conn.fetch(
@@ -20,7 +20,7 @@ class UserRepository:
     '''
     GOAL: allow user to change their email
     '''
-    async def putEmail(self, email: str, id: str):
+    async def putEmail(self, email: str, id: int):
 
         async with self.pool.acquire() as conn:
             data = await conn.fetch(

@@ -9,10 +9,10 @@ router = APIRouter()
 
 # Post login info to check it against registered info
 @router.post("login/{id}")
-def postLoginInfo(id: str, service: AuthService = Depends()):
+def postLoginInfo(id: int, service: AuthService = Depends()):
     return service.postLoginInfo()
 
 # Post new registration info
 @router.post("register/{id}")
-def postRegistrationInfo(id: str, service: AuthService = Depends()):
+def postRegistrationInfo(id: int, service: AuthService = Depends()):
     return service.postRegistrationInfo()

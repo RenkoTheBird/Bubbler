@@ -7,7 +7,8 @@ class PostRepository:
         self.pool = pool
 
     # Posts for the graph are retrieved in feed_service.py
-    async def getUserPosts(self, id: str):
+    # id here is user id
+    async def getUserPosts(self, id: int):
 
         async with self.pool.acquire() as conn:
             posts = await conn.fetch(
@@ -16,7 +17,7 @@ class PostRepository:
         
         return [self._map_row(posts) for post in posts]
 
-    async def postUserPosts(self, id: str, post: str, embeddedPost: List[float]):
+    async def postUserPosts(self, id: int, post: str, embeddedPost: List[float]):
         
         async with self.pool.acquire() as conn:
             result = await conn.fetch(

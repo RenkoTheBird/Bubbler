@@ -4,5 +4,5 @@ from dataclasses import dataclass
 # preferences are located here 
 @dataclass
 class UserProfile:
-    user_id: str
+    user_id: int
     diversity_tolerance: int

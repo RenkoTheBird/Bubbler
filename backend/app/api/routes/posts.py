@@ -8,5 +8,5 @@ async def getUserPosts(id: int, service: PostService = Depends()):
     return service.getUserPosts(id)
 
 @router.post("/{id}/posts")
-def postUserPosts(id: int, service: PostService = Depends()):
+def postUserPosts(id: int, post: str, service: PostService = Depends()):
     return service.postUserPosts(id)

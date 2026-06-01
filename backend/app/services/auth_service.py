@@ -8,7 +8,10 @@ class AuthService:
 
     async def postLoginInfo(self, id: int, email: str, password: str):
         password_hash = hash_password(password)
-        return await self.repo.postLoginInfo(id, email, password_hash)
+        em, pw = await self.repo.postLoginInfo(id, email, password_hash)
+        if (em == email and password_hash == pw):
+            return True # login successful
+        return False # bad credentials
 
     async def postRegistrationInfo(self, id: int, username: str, email: str, password: str):
         # get current time to fill in "created_at"

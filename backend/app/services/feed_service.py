@@ -1,4 +1,5 @@
 from ..repositories.feed_repo import FeedRepository
+from typing import List
 
 class FeedService:
     def __init__(self, repo: FeedRepository):

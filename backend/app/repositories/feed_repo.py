@@ -58,7 +58,7 @@ class FeedRepository:
                 if post:
                     results.append(dict(post))
                 
-                return results
+            return results
 
 '''
 Notes:

@@ -1,8 +1,7 @@
-from dataclasses import dataclass
+from pydantic import BaseModel
 
 # this class is distinct from users, 
 # preferences are located here 
-@dataclass
-class UserProfile:
+class UserProfile(BaseModel):
     user_id: int
     diversity_tolerance: int

@@ -1,7 +1,6 @@
-from dataclasses import dataclass
+from pydantic import BaseModel
 
-@dataclass
-class Edge:
+class Edge(BaseModel):
     id: str
     from_post_id: str
     to_post_id: str

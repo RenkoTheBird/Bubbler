@@ -1,7 +1,6 @@
-from dataclasses import dataclass
+from pydantic import BaseModel
 
-@dataclass
-class PostTopic:
+class PostTopic(BaseModel):
     post_id: str
     topic_id: str
     weight: float

@@ -1,8 +1,7 @@
-from dataclasses import dataclass
+from pydantic import BaseModel
 import datetime
 
-@dataclass
-class Interaction:
+class Interaction(BaseModel):
     id: str
     user_id: str
     post_id: str

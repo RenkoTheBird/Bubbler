@@ -1,7 +1,6 @@
-from dataclasses import dataclass
+from pydantic import BaseModel
 
-@dataclass
-class Topic:
+class Topic(BaseModel):
     id: str
     name: str
     parent_topic_id: int

@@ -1,9 +1,8 @@
-from dataclasses import dataclass
+from pydantic import BaseModel
 from typing import List, Optional
 import datetime
 
-@dataclass
-class Post:
+class Post(BaseModel):
     id: int
     user_id: int
     content: str

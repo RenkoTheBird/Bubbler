@@ -10,8 +10,8 @@ class AuthRepository:
         # Grab the email and password stored with user id and send it back to service
         async with self.pool.acquire() as conn:
             result = await conn.fetch("""SELECT email, password_hash FROM users WHERE id=$1""", id)
-        # TODO: ensure we check what this returns (format)
-        return result
+        
+        return [self._map_row(result) for res in result]
 
     async def postRegistrationInfo(self, id: int, username: str, email: str, password_hash: str, time: datetime.datetime):
         
@@ -23,3 +23,9 @@ class AuthRepository:
             )
         
         return result
+    
+    def _map_user(self, row) -> User:
+        return User (
+            email=row["email"],
+            password_hash=row["password_hash"]
+        )

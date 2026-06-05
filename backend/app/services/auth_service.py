@@ -1,6 +1,7 @@
 from ..repositories.auth_repo import AuthRepo
 import datetime
 from ..core.security import hash_password
+import bcrypt
 
 class AuthService:
     def __init__(self, repo: AuthRepo):
@@ -9,7 +10,7 @@ class AuthService:
     async def postLoginInfo(self, id: int, email: str, password: str):
         password_hash = hash_password(password)
         em, pw = await self.repo.postLoginInfo(id, email, password_hash)
-        if (em == email and password_hash == pw):
+        if (bcrypt.compare(pw, password_hash)):
             return True # login successful
         return False # bad credentials
 

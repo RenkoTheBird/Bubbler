@@ -1,18 +1,19 @@
 from ..repositories.feed_repo import FeedRepository
 from typing import List
-from ....ml.embeddings.generate import embed
+from .embedding_service import EmbeddingService
 from ..services.graph_service import GraphService
 from ..services.ranking_service import RankingService
 
 class FeedService:
-    def __init__(self, repo: FeedRepository, GraphService: GraphService, RankingService: RankingService):
+    def __init__(self, repo: FeedRepository, GraphService: GraphService, RankingService: RankingService, EmbeddingService: EmbeddingService):
         self.repo = repo
         self.GraphService = GraphService
         self.RankingService = RankingService
+        self.EmbeddingService = EmbeddingService
 
     async def getFeed(self, userInput: str):
         # user input allows user to customize the output
-        embedding = embed(userInput)
+        embedding = EmbeddingService.embed_text(userInput)
         
         # get (four right now) similar posts with pgvector search
         similarPosts = await self.repo.getSimilarPosts(embedding)

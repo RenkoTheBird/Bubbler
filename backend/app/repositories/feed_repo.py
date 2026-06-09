@@ -31,13 +31,12 @@ class FeedRepository:
             for r in rows
         ]
     
-    async def getNewSessionPosts(self, diversityTolerance: int, yesterdayPost: List[float], likedTopic: str):
-        savedVal = 1 - (diversityTolerance * 0.01 + 0.10)
+    async def getNewSessionPosts(self, diversityTolerance: float, yesterdayPost: List[float], likedTopic: str):
         val = 1
         similarityTargets = []
         for i in range(4): # Retrieve 4 posts
             similarityTargets.append(val)
-            val -= savedVal
+            val = max(0, val - diversityTolerance)
 
         results = []
 

@@ -1,42 +1,94 @@
 from ..repositories.feed_repo import FeedRepository
+from ..repositories.user_pref_repo import UserPrefRepository
+from ..repositories.interaction_repo import InteractionRepository
+
 from typing import List
+
 from .embedding_service import EmbeddingService
-from ..services.graph_service import GraphService
-from ..services.ranking_service import RankingService
+from .graph_service import GraphService
+from .ranking_service import RankingService
+from .strategy_service import StrategyService
+from .preference_service import PreferenceService
 
 class FeedService:
-    def __init__(self, repo: FeedRepository, GraphService: GraphService, RankingService: RankingService, EmbeddingService: EmbeddingService):
+    def __init__(self, 
+                 repo: FeedRepository, 
+                 GraphService: GraphService, 
+                 RankingService: RankingService, 
+                 EmbeddingService: EmbeddingService,
+                 StrategyService: StrategyService,
+                 PreferenceService: PreferenceService,
+                 PrefRepo: UserPrefRepository,
+                 InteractionRepo: InteractionRepository
+                 ):
+        
         self.repo = repo
         self.GraphService = GraphService
         self.RankingService = RankingService
         self.EmbeddingService = EmbeddingService
+        self.StrategyService = StrategyService
+        self.PreferenceService = PreferenceService
+        self.PrefRepo = PrefRepo
+        self.InteractionRepo = InteractionRepo
 
-    async def getFeed(self, userInput: str):
-        # user input allows user to customize the output
-        embedding = EmbeddingService.embed_text(userInput)
+    async def getFeed(self, userId: int, userInput: str):
+        # Load & adapt user preferences
+        prefs = await self.PrefRepo.getPrefs(userId)
+        interactions = await self.InteractionRepo.getRecentInteractions(userId)
+        prefs = self.PreferenceService.updateFromInteractions(prefs, interactions)
         
-        # get (four right now) similar posts with pgvector search
-        similarPosts = await self.repo.getSimilarPosts(embedding)
+        # user input allows user to customize the output
+        embedding = EmbeddingService.embedText(userInput)
+        
+        # Multi strategy seeds
+        strategyResults = await self.StrategyService.getCandidates(embedding, prefs)
+
+        # Flatten seeds & keep strategy
+        seeds = []
+
+        for strategyName, posts in strategyResults:
+            for p in posts:
+                p["_strategy"] = strategyName
+                seeds.append(p)
 
         # expand these results via graph
-        expandedIds = await self.GraphService.expandPosts(similarPosts)
+        seedPosts = seeds[:10] # limit expansion size for MVP
+        expandedIds = await self.GraphService.expandPosts(seedPosts)
+        allIds = set(p["id"] for p in seedPosts) | set(expandedIds) # include original seeds
 
-        # fetch the expanded posts
-        expandedPosts = []
-        for postId in expandedIds:
-            posts = await self.repo.getSimilarPosts(embedding, limit=1)
-            expandedPosts.extend(posts)
+        # fetch expanded posts smoothly
+        expandedPosts = self.repo.getPostsByIds(list(allIds))
 
-        # Score and rank the posts
-        scored = []
+        # Attach base similarity if missing
+        seedMap = {p["id"]: p for p in seeds}
+
         for post in expandedPosts:
-            score = self.RankingService.score(post, post.get("similarity", 0))
-            post["score"] = score
-            scored.append(post)
+            if post["id"] in seedMap:
+                post["similarity"] = seedMap[post["id"]].get("similarity", 0)
+                post["_strategy"] = seedMap[post["id"]].get("_strategy", "graph")
+            else:
+                # graph-expanded nodes default lower similarity
+                post["similarity"] = 0.3
+                post["_strategy"] = "graph"
 
-        return self.RankingService.rank(scored)
+        # Apply strategy weights
+        weighted = []
+
+        for post in expandedPosts:
+            strategy = post.get("_strategy", "graph")
+            weight = prefs.strategy_weights.get(strategy, 0.1)
+
+            post["score"] = post["similarity"] * weight
+            weighted.append(post)
+
+        # Apply user preferences
+        ranked = self.RankingService.applyPreferences(prefs, weighted)
+
+        # Finally, sort the posts
+        return ranked[:20]
     
-    async def getNewSessionPosts(self):
-        return await self.repo.getNewSessionPosts()
+    async def getNewSessionPosts(self, userId: int):
+        prefs = await self.PrefRepo.getPrefs(userId)
+        return await self.repo.getNewSessionPosts(prefs.diversityTolerance, [], None)
     
     ### FUTURE: opposite posts, potential interesting topics, etc.

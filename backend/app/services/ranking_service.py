@@ -9,7 +9,7 @@ class RankingService:
         recencyBoost = 1 / (1 + (datetime.datetime.now() - post["created_at"]))
         return similarity * 0.7 + recencyBoost * 0.3
     
-    def apply_preferences(self, prefs, posts: List[str]):
+    def applyPreferences(self, prefs, posts: List[str]):
         filtered = []
 
         for post in posts:

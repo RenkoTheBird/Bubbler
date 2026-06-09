@@ -11,5 +11,5 @@ class PostService:
         # ranking/filtering skipped because the database calls do that - 
     
     async def postUserPosts(self, id, post):
-        embedded = EmbeddingService.embed_text(post)
+        embedded = EmbeddingService.embedText(post)
         return await self.repo.postUserPosts(id, post, embedded)

@@ -1,6 +1,3 @@
-from ..repositories.feed_repo import FeedRepository
-from ..services.graph_service import GraphService
-
 class StrategyService:
 
     def __init__(self, repo = FeedRepository, service = GraphService):

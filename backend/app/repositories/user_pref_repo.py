@@ -1,5 +1,4 @@
 from ..models.user_profile import UserProfile
-from ..db.base import pool
 
 DEFAULT_PREFS = UserProfile(
     user_id=0,
@@ -16,9 +15,11 @@ DEFAULT_PREFS = UserProfile(
 )
 
 class UserPreferencesRepository:
+    def __init__(self, pool):
+        self.pool = pool
 
     async def getPrefs(self, user_id: int) -> UserProfile:
-        async with pool.acquire() as conn:
+        async with self.pool.acquire() as conn:
             rows = await conn.fetchrow("""SELECT * FROM user_profiles WHERE user_id = $1""", user_id)
 
         if not rows:

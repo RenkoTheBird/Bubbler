@@ -1,67 +1,68 @@
----- NOTE: pgvector must be defined as an extension:
--- CREATE EXTENSION IF NOT EXISTS vector;
-
----- Critical for performance
--- CREATE INDEX ON posts
--- USING hnsw (embedding vector_cosine_ops);
--- hnsw is required for fast vector lookups
-
+-- Required extensions
 CREATE EXTENSION IF NOT EXISTS vector;
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
+-- USERS
 CREATE TABLE users (
-    id INTEGER SERIAL NOT NULL,
+    id SERIAL PRIMARY KEY,
     username TEXT NOT NULL,
     email TEXT NOT NULL,
     password_hash TEXT NOT NULL,
-    created_at DATETIME 
+    created_at TIMESTAMP DEFAULT NOW()
 );
 
+-- TOPICS
 CREATE TABLE topics (
-    id UUID NOT NULL gen_random_uuid(),
-    name TEXT,
-    parent_topic_id INTEGER
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT UNIQUE,
+    parent_topic_id UUID REFERENCES topics(id)
 );
 
+-- POSTS
 CREATE TABLE posts (
-    id UUID NOT NULL gen_random_uuid(),
-    user_id INTEGER SERIAL,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id INTEGER REFERENCES users(id),
     content TEXT NOT NULL,
-    created_at DATETIME GETDATE(),
-    embedding(vector), -- ml.embeddings.generate
-    topic TEXT REFERENCES topics(name)
-)
+    created_at TIMESTAMP DEFAULT NOW(),
+    embedding vector,  -- you can specify dimension: vector(1536)
+    topic_id UUID REFERENCES topics(id)
+);
 
-CREATE INDEX ON posts
+-- Vector index for similarity search
+CREATE INDEX posts_embedding_idx
+ON posts
 USING hnsw (embedding vector_cosine_ops);
 
+-- POST-TOPICS (many-to-many with weight)
 CREATE TABLE post_topics (
-    post_id UUID REFERENCES posts(id),
-    topic_id INTEGER,
-    weight 
+    post_id UUID REFERENCES posts(id) ON DELETE CASCADE,
+    topic_id UUID REFERENCES topics(id) ON DELETE CASCADE,
+    weight FLOAT,
+    PRIMARY KEY (post_id, topic_id)
 );
 
+-- INTERACTIONS
 CREATE TABLE interactions (
-    id UUID NOT NULL gen_random_uuid(),
-    user_id UUID REFERENCES users(id),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id INTEGER REFERENCES users(id),
     post_id UUID REFERENCES posts(id),
-    type, -- like, skip, explore
-    created_at DATETIME GETDATE()
+    type TEXT CHECK (type IN ('like', 'skip', 'explore')),
+    created_at TIMESTAMP DEFAULT NOW()
 );
 
+-- EDGES (post graph)
 CREATE TABLE edges (
-    id UUID NOT NULL gen_random_uuid(),
-    from_post_id REFERENCES posts(id),
-    to_post_id REFERENCES posts(id),
-    edge_type -- similar, opposite, topic
-    weight
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    from_post_id UUID REFERENCES posts(id),
+    to_post_id UUID REFERENCES posts(id),
+    edge_type TEXT CHECK (edge_type IN ('similar', 'opposite', 'topic')),
+    weight FLOAT
 );
 
--- vectorized preferences
+-- USER PROFILES (vector preferences)
 CREATE TABLE user_profiles (
-    user_id REFERENCES users(id),
-    embedding,
-    diversity_tolerance INTEGER -- set by users! between 0-65
+    user_id INTEGER PRIMARY KEY REFERENCES users(id),
+    embedding vector,
+    diversity_tolerance FLOAT CHECK (diversity_tolerance BETWEEN 0 AND 1),
+    randomness FLOAT
 );
-
-

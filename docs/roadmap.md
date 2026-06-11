@@ -39,7 +39,7 @@ Each phase builds on the last. Do them **in order**. Within each phase, the step
 
 **Why first:** Right now `backend/app/db/base.py` uses `psycopg2` (synchronous), but your repositories use `async`/`await`. Routes call services without passing `userId`. `user_pref_repo.py` is imported in `feed_service.py` but **does not exist**. Until the foundation works, nothing else will.
 
-### Step 0.1 — Fix `requirements.txt`
+### `DONE` Step 0.1 — Fix `requirements.txt` `DONE`
 
 **File:** `backend/requirements.txt`
 

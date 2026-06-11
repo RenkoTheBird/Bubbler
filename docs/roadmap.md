@@ -128,7 +128,7 @@ app.include_router(posts.router, prefix="/posts", tags=["posts"])
 app.include_router(users.router, prefix="/users", tags=["users"])
 ```
 
-### Step 0.3 — Fix the SQL schema
+### `DONE` Step 0.3 — Fix the SQL schema `DONE`
 
 **File:** `backend/app/db/schema.sql`
 
@@ -201,7 +201,7 @@ CREATE TABLE user_profiles (
 
 Run it against your local Postgres database before continuing.
 
-### Step 0.4 — Create the missing `user_pref_repo.py`
+### `DONE` Step 0.4 — Create the missing `user_pref_repo.py` `DONE`
 
 **Create:** `backend/app/repositories/user_pref_repo.py`
 

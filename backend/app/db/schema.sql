@@ -24,7 +24,7 @@ CREATE TABLE posts (
     user_id INTEGER REFERENCES users(id),
     content TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT NOW(),
-    embedding vector,  -- you can specify dimension: vector(1536)
+    embedding vector(384),  
     topic_id UUID REFERENCES topics(id)
 );
 

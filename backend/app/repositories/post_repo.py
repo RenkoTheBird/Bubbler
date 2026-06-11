@@ -1,16 +1,14 @@
 from typing import List
 from app.models.post import Post
+from ..db.base import pool
 
 class PostRepository:
-
-    def __init__(self, pool):
-        self.pool = pool
 
     # Posts for the graph are retrieved in feed_service.py
     # id here is user id
     async def getUserPosts(self, id: int):
 
-        async with self.pool.acquire() as conn:
+        async with pool.acquire() as conn:
             posts = await conn.fetch(
                 "SELECT * FROM posts WHERE user_id = $1", id
             )
@@ -19,7 +17,7 @@ class PostRepository:
 
     async def postUserPosts(self, id: int, post: str, embeddedPost: List[float]):
         
-        async with self.pool.acquire() as conn:
+        async with pool.acquire() as conn:
             result = await conn.fetch(
                 "INSERT INTO posts (user_id, content, embedding) VALUES ($1, $2, $3)", id, post, embeddedPost
             )

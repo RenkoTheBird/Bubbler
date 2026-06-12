@@ -57,6 +57,33 @@ class FeedRepository:
                     results.append(dict(post))
                 
             return results
+        
+    async def getPostsByIds(self, ids: list):
+        if not ids:
+            return []
+        
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """SELECT id, content, topic, created_at, user_id
+                   FROM posts
+                   ORDER BY RANDOM()
+                   LIMIT $1""",
+                   ids,
+            )
+        
+        return [dict(r) for r in rows]
+    
+    async def getRandomPosts(self, limit: int=10):
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """SELECT id, content, topic, created_at, user_id
+                   FROM posts
+                   ORDER BY RANDOM()
+                   LIMIT $1""",
+                   limit,
+            )
+
+        return [dict(r) for r in rows]
 
 '''
 Notes:

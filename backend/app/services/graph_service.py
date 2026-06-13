@@ -1,4 +1,3 @@
-from ..repositories.graph_repo import GraphRepository
 from typing import List
 
 class GraphService:

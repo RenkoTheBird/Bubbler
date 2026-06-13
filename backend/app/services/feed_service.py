@@ -1,15 +1,3 @@
-from ..repositories.feed_repo import FeedRepository
-from ..repositories.user_pref_repo import UserPrefRepository
-from ..repositories.interaction_repo import InteractionRepository
-
-from typing import List
-
-from .embedding_service import EmbeddingService
-from .graph_service import GraphService
-from .ranking_service import RankingService
-from .strategy_service import StrategyService
-from .preference_service import PreferenceService
-
 class FeedService:
     def __init__(self, 
                  repo: FeedRepository, 

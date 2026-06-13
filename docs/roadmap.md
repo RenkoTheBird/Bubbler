@@ -244,7 +244,7 @@ class UserPrefRepository:
         )
 ```
 
-### Step 0.5 — Add dependency injection (wire services to routes)
+### `DONE` Step 0.5 — Add dependency injection (wire services to routes) `DONE`
 
 **Create:** `backend/app/api/deps.py`
 

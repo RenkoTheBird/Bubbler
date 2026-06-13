@@ -1,5 +1,5 @@
 from ..models.interaction import Interaction
-from ..db.base import pool
 
 class InteractionRepository:
-    pass
+    def __init__(self, pool):
+        self.pool = pool

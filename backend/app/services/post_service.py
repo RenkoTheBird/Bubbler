@@ -1,6 +1,3 @@
-from ..repositories.post_repo import PostRepository
-from .embedding_service import EmbeddingService
-
 class PostService:
     def __init__(self, repo: PostRepository, EmbeddingService: EmbeddingService):
         self.repo = repo

@@ -1,11 +1,12 @@
 from typing import List
-from ..db.base import pool
 
 class FeedRepository:
+    def __init__(self, pool):
+        self.pool = pool
 
     async def getSimilarPosts(self, embeddedPost: List[float], limit: int = 4):
 
-        async with pool.acquire() as conn:
+        async with self.pool.acquire() as conn:
             rows = await conn.fetch(
                 """
                 SELECT
@@ -38,7 +39,7 @@ class FeedRepository:
 
         results = []
 
-        async with pool.acquire() as conn:
+        async with self.pool.acquire() as conn:
             for target in similarityTargets:
                 post = await conn.fetchrow("""
                                             SELECT *
@@ -56,6 +57,33 @@ class FeedRepository:
                     results.append(dict(post))
                 
             return results
+        
+    async def getPostsByIds(self, ids: list):
+        if not ids:
+            return []
+        
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """SELECT id, content, topic, created_at, user_id
+                   FROM posts
+                   ORDER BY RANDOM()
+                   LIMIT $1""",
+                   ids,
+            )
+        
+        return [dict(r) for r in rows]
+    
+    async def getRandomPosts(self, limit: int=10):
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """SELECT id, content, topic, created_at, user_id
+                   FROM posts
+                   ORDER BY RANDOM()
+                   LIMIT $1""",
+                   limit,
+            )
+
+        return [dict(r) for r in rows]
 
 '''
 Notes:

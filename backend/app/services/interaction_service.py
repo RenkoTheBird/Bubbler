@@ -1,5 +1,3 @@
-from ..repositories.interaction_repo import InteractionRepository
-
 class InteractionService:
     def __init__(self, repo: InteractionRepository):
         self.repo = repo

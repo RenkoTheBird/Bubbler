@@ -303,7 +303,7 @@ async def get_session_posts(
     return await service.getNewSessionPosts(user_id)
 ```
 
-### Step 0.6 — Fill in missing repository methods
+### `DONE` Step 0.6 — Fill in missing repository methods `DONE`
 
 **File:** `backend/app/repositories/feed_repo.py`
 

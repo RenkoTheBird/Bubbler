@@ -340,7 +340,7 @@ async def getRandomPosts(self, limit: int = 10):
 
 Also fix `getNewSessionPosts` — the current SQL has a syntax error (`SELECT *` followed by `1 - ...` on the next line without a comma).
 
-### Step 0.7 — Seed fake data so you have something to show
+### `DONE` Step 0.7 — Seed fake data so you have something to show `DONE`
 
 **File:** `scripts/seed_db.py`
 

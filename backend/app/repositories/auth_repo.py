@@ -15,7 +15,7 @@ class AuthRepository:
     async def postRegistrationInfo(self, id: int, username: str, email: str, password_hash: str, time: datetime.datetime):
         
         async with self.pool.acquire() as conn:
-            result = await conn.fetch(
+            result = await conn.execute(
                 """INSERT INTO users (id, username, email, password_hash, created_at) 
                    VALUES ($1, $2, $3, $4, $5)""",
                    id, username, email, password_hash, time

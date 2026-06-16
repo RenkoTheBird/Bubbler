@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct CreateAccountView: View {
+    @EnvironmentObject private var authSession: AuthSession
     
     @State private var email: String = ""
     @State private var password: String = ""
@@ -60,7 +61,8 @@ struct CreateAccountView: View {
                         .background(Color.white.opacity(0.2))
                         .cornerRadius(14)
                         .foregroundColor(.white)
-                        .autocapitalization(.none)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
                         .keyboardType(.emailAddress)
                 }
                 
@@ -89,20 +91,42 @@ struct CreateAccountView: View {
                         .cornerRadius(14)
                         .foregroundColor(.white)
                 }
+
+                if let authError = authSession.authError {
+                    Text(authError)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundColor(.white)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 6)
+                }
                 
                 // Create account button
                 Button(action: {
-                    print("Create account tapped")
+                    Task {
+                        await authSession.createAccount(
+                            email: email,
+                            password: password,
+                            confirmPassword: confirmPassword
+                        )
+                    }
                 }) {
-                    Text("Create Account")
-                        .font(.headline)
-                        .foregroundColor(.blue)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.white)
-                        .cornerRadius(14)
-                        .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
+                    Group {
+                        if authSession.isWorking {
+                            ProgressView()
+                                .tint(.blue)
+                        } else {
+                            Text("Create Account")
+                                .font(.headline)
+                        }
+                    }
+                    .foregroundColor(.blue)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.white)
+                    .cornerRadius(14)
+                    .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
                 }
+                .disabled(authSession.isWorking)
                 .padding(.top, 10)
                 
                 // Back to login

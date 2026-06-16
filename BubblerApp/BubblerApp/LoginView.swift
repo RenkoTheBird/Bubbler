@@ -8,10 +8,10 @@
 import SwiftUI
 
 struct LoginView: View {
+    @EnvironmentObject private var authSession: AuthSession
     
     @State private var email: String = ""
     @State private var password: String = ""
-    @State private var isSecure: Bool = true
     
     var body: some View {
         ZStack {
@@ -64,7 +64,8 @@ struct LoginView: View {
                         .background(Color.white.opacity(0.2))
                         .cornerRadius(14)
                         .foregroundColor(.white)
-                        .autocapitalization(.none)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
                         .keyboardType(.emailAddress)
                 }
                 
@@ -80,20 +81,38 @@ struct LoginView: View {
                         .cornerRadius(14)
                         .foregroundColor(.white)
                 }
+
+                if let authError = authSession.authError {
+                    Text(authError)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundColor(.white)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 6)
+                }
                 
                 // login button
                 Button(action: {
-                    print("Login tapped")
+                    Task {
+                        await authSession.signIn(email: email, password: password)
+                    }
                 }) {
-                    Text("Log In")
-                        .font(.headline)
-                        .foregroundColor(.blue)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.white)
-                        .cornerRadius(14)
-                        .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
+                    Group {
+                        if authSession.isWorking {
+                            ProgressView()
+                                .tint(.blue)
+                        } else {
+                            Text("Log In")
+                                .font(.headline)
+                        }
+                    }
+                    .foregroundColor(.blue)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.white)
+                    .cornerRadius(14)
+                    .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
                 }
+                .disabled(authSession.isWorking)
                 .padding(.top, 10)
                 
                 // Sign up

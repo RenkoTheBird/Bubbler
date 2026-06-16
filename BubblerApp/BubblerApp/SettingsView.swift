@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct SettingsView: View {
+    @EnvironmentObject private var authSession: AuthSession
     
     var body: some View {
         
@@ -48,6 +49,11 @@ struct SettingsView: View {
                         settingsRow(icon: "person.fill", title: "Profile Information")
                         settingsRow(icon: "envelope.fill", title: "Email Settings")
                         settingsRow(icon: "lock.fill", title: "Password & Security")
+                        Button {
+                            authSession.signOut()
+                        } label: {
+                            settingsRow(icon: "rectangle.portrait.and.arrow.right", title: "Log Out")
+                        }
                     }
                     
                     // notifications
@@ -152,4 +158,5 @@ struct SettingsView: View {
 
 #Preview {
     SettingsView()
+        .environmentObject(AuthSession())
 }

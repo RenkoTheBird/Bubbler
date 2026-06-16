@@ -30,6 +30,20 @@ class FeedRepository:
             for r in rows
         ]
     
+    async def getOppositePosts(self, embedding, limit: int = 10):
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT id, content, topic,
+                    1 - (embedding <=> $1) AS similarity
+                FROM posts
+                ORDER BY embedding <=> $1 DESC
+                LIMIT $2
+                """,
+                embedding, limit,
+            )
+        return [dict(r) for r in rows]
+    
     async def getNewSessionPosts(self, diversityTolerance: float, yesterdayPost: List[float], likedTopic: str):
         val = 1
         similarityTargets = []

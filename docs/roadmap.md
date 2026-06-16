@@ -786,7 +786,7 @@ struct AlgorithmSettingsView: View {
 }
 ```
 
-### Step 3.3 — Finish the strategy service TODOs
+### `DONE` Step 3.3 — Finish the strategy service TODOs `DONE`
 
 **File:** `backend/app/services/strategy_service.py`
 

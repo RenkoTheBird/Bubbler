@@ -52,11 +52,7 @@ This document is a step-by-step plan for a **solo developer** building Bubbler. 
 
 Much of Phase 0 from the original roadmap is done. What remains is wiring, fixes, and alignment.
 
-### ✅ Step 0.1 — Fix `requirements.txt` (done)
-
-**File:** `backend/requirements.txt` — already has FastAPI, asyncpg, sentence-transformers, etc.
-
-### Step 0.2 — Move database config out of `main.py`
+### Step 0.1 — Move database config out of `main.py`
 
 **Why:** `backend/app/main.py` still has placeholder credentials (`REPLACE`, `THISTOO`). `backend/app/db/base.py` is empty. You want one place for the connection string.
 
@@ -93,7 +89,7 @@ app.state.pool = await asyncpg.create_pool(
 )
 ```
 
-### 🟡 Step 0.3 — Align schema, models, and seed script (started, needs fixes)
+### 🟡 Step 0.2 — Align schema, models, and seed script (started, needs fixes)
 
 **File:** `backend/app/db/schema.sql` — you updated this to valid PostgreSQL with `vector(384)`, `topic_id`, and `post_topics`. Good.
 
@@ -144,15 +140,7 @@ await conn.execute(
 
 Also add `UNIQUE` on `users.email` if you use `ON CONFLICT (email)` in the seed script.
 
-### ✅ Step 0.4 — `user_pref_repo.py` (done, fix typo above)
-
-**File:** `backend/app/repositories/user_pref_repo.py` — class is named `UserPreferencesRepository` (used in `deps.py`).
-
-### ✅ Step 0.5 — Dependency injection (done)
-
-**File:** `backend/app/api/deps.py` — full wiring for repos and services including `getFeedService`. No changes needed unless you add new services.
-
-### 🟡 Step 0.6 — Repository methods (partially done, fix bugs)
+### 🟡 Step 0.3 — Repository methods (partially done, fix bugs)
 
 **File:** `backend/app/repositories/feed_repo.py`
 
@@ -196,7 +184,7 @@ post = await conn.fetchrow(
 )
 ```
 
-### 🟡 Step 0.7 — Seed script (started, fix schema alignment)
+### 🟡 Step 0.4 — Seed script (started, fix schema alignment)
 
 **File:** `scripts/seed_db.py` — has sample posts and embedding logic. Update to match schema (see Step 0.3), then run:
 
@@ -204,7 +192,7 @@ post = await conn.fetchrow(
 python scripts/seed_db.py
 ```
 
-### Step 0.8 — Fix feed routes and service bugs
+### Step 0.5 — Fix feed routes and service bugs
 
 **File:** `backend/app/api/routes/feed.py` — routes exist but do not pass `user_id` or `await` async methods:
 

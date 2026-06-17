@@ -56,8 +56,7 @@ class FeedRepository:
         async with self.pool.acquire() as conn:
             for target in similarityTargets:
                 post = await conn.fetchrow("""
-                                            SELECT *
-                                                1 - (embedding <=> $1::vector) AS similarity
+                                            SELECT *, 1 - (embedding <=> $1::vector) AS similarity
                                             FROM posts
                                             WHERE topic = $2
                                             ORDER BY ABS((1 - (embedding <=> $1::vector)) - $3)
@@ -78,10 +77,9 @@ class FeedRepository:
         
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(
-                """SELECT id, content, topic, created_at, user_id
-                   FROM posts
-                   ORDER BY RANDOM()
-                   LIMIT $1""",
+                """SELECT id, content, topic_id, created_at, user_id
+                    FROM posts
+                    WHERE id = ANY($1::uuid[])""",
                    ids,
             )
         

@@ -1,72 +1,64 @@
 # Bubbler Roadmap — What to Do Next
 
-This document is a step-by-step plan for a **solo developer** building Bubbler. 
-It uses plain language and points to exact files.
+This document is a step-by-step plan for a **solo developer** building Bubbler. It uses plain language, points to exact files, and is updated to match the **current codebase** (not the original plan).
 
 ---
 
 ## Where You Are Today (Quick Summary)
 
-You have the **right shape** of the project:
-
 | Area | Status |
 |------|--------|
-| Backend folder structure (routes → services → repositories) | ✅ Started |
-| Feed algorithm ideas (similarity, graph expansion, preferences) | ✅ Sketched in code |
-| Database schema idea (posts, edges, interactions, user profiles) | ✅ Drafted |
-| iOS app skeleton (Feed, Post models, API client) | ✅ Started |
-| Everything wired together and running end-to-end | ❌ Not yet |
-| Graph UI (the main product idea) | ❌ Not built |
-| User preference controls in the app | ❌ Not built |
+| Backend folder structure (routes → services → repositories) | ✅ In place |
+| Dependency injection (`backend/app/api/deps.py`) | ✅ Done |
+| `requirements.txt` with real packages | ✅ Done |
+| PostgreSQL schema draft (`backend/app/db/schema.sql`) | ✅ Updated (needs alignment with models) |
+| `UserPreferencesRepository` (`user_pref_repo.py`) | ✅ Created |
+| Feed algorithm services (similarity, graph, ranking, strategy) | 🟡 Written but not fully wired |
+| Edge builder (`edge_builder_repo.py`) | 🟡 Created, not called yet |
+| `main.py` lifespan + asyncpg pool | 🟡 Done, but credentials are still placeholders |
+| iOS app (`BubblerApp/`) with polished UI | ✅ Login, feed, profile, settings screens |
+| Firebase authentication on iOS | ✅ Working (`AuthSession.swift`) |
+| iOS ↔ FastAPI connection | ❌ Not started (`BubblerApp/` has no `APIClient`) |
+| Graph path UI (pick next post from bubbles) | ❌ Not built |
+| Algorithm settings (diversity, randomness, topics) | ❌ UI placeholders only |
+| Backend running end-to-end with seeded data | ❌ Blocked by config + schema mismatches |
 
-**The big picture:** most of the *ideas* live in `backend/app/services/`, but several pieces are incomplete, some files are missing, and the iOS app does not talk to a working backend yet. Your next work should focus on **one small vertical slice** — login → see one post → tap a “next” option → see related posts — before polishing the algorithm.
+**The big picture:** You have made solid progress on **both sides independently** — the backend has services and repos, and the iOS app has a real UI with Firebase login. They are not connected yet. Your next work should be: (1) finish backend foundation, (2) hook the iOS app to the API, (3) replace the mock feed with the graph path loop.
+
+---
+
+## Important: Two Folders to Know About
+
+| Folder | Role today |
+|--------|------------|
+| `BubblerApp/` | **Active Xcode project.** Firebase auth, `FeedView`, `LoginView`, `ProfileView`, `SettingsView`, `BubbleDetail`. This is where iOS work should happen. |
+| `ios-app/` | Older skeleton with `APIClient.swift` and `FeedViewModel.swift`. Useful as a reference, but do not build two apps — copy patterns from here into `BubblerApp/`. |
 
 ---
 
 ## How to Read This Roadmap
 
-Each phase builds on the last. Do them **in order**. Within each phase, the steps are numbered — do those in order too.
-
-- **Estimated effort** is rough, for one person working part-time.
-- **Code blocks** show what to add or change. They are examples, not copy-paste guarantees — adjust names to match your project as you go.
-- Only create or edit files listed in each step unless you discover a small dependency (e.g. a missing import).
+- Phases build on each other. Do them **in order**.
+- ✅ = already done (may still need small fixes noted inline).
+- 🟡 = started but incomplete.
+- Steps without a marker are still to do.
+- Code blocks are examples — adjust to match your file as you go.
 
 ---
 
-## Phase 0 — Get the Backend Running Locally
+## Phase 0 — Finish the Backend Foundation
 
-**Goal:** You can start the API, hit it in a browser or with `curl`, and get a real response from PostgreSQL.
+**Goal:** Start the API, connect to Postgres, and get `GET /feed/{user_id}` returning real JSON.
 
-**Why first:** Right now `backend/app/db/base.py` uses `psycopg2` (synchronous), but your repositories use `async`/`await`. Routes call services without passing `userId`. `user_pref_repo.py` is imported in `feed_service.py` but **does not exist**. Until the foundation works, nothing else will.
+Much of Phase 0 from the original roadmap is done. What remains is wiring, fixes, and alignment.
 
-### `DONE` Step 0.1 — Fix `requirements.txt` `DONE`
+### ✅ Step 0.1 — Fix `requirements.txt` (done)
 
-**File:** `backend/requirements.txt`
+**File:** `backend/requirements.txt` — already has FastAPI, asyncpg, sentence-transformers, etc.
 
-Replace the current system-wide package dump with a small, project-specific list:
+### Step 0.2 — Move database config out of `main.py`
 
-```txt
-fastapi>=0.110.0
-uvicorn[standard]>=0.27.0
-asyncpg>=0.29.0
-pydantic>=2.0.0
-python-jose[cryptography]>=3.3.0
-passlib[bcrypt]>=1.7.4
-sentence-transformers>=2.2.0
-pgvector>=0.2.0
-python-dotenv>=1.0.0
-```
-
-Install:
-
-```bash
-cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-### Step 0.2 — Add environment-based database config
+**Why:** `backend/app/main.py` still has placeholder credentials (`REPLACE`, `THISTOO`). `backend/app/db/base.py` is empty. You want one place for the connection string.
 
 **Create:** `backend/app/core/config.py`
 
@@ -89,225 +81,89 @@ DATABASE_URL=postgresql://bubbler:bubbler@localhost:5432/bubbler
 JWT_SECRET=change-me-in-production
 ```
 
-**Update:** `backend/app/db/base.py`
+**Update:** `backend/app/main.py` — use `DATABASE_URL` instead of hard-coded placeholders:
 
 ```python
-import asyncpg
-from ..core.config import DATABASE_URL
+from .core.config import DATABASE_URL
 
-pool = None
-
-async def init_db():
-    global pool
-    pool = await asyncpg.create_pool(DATABASE_URL)
-
-async def close_db():
-    global pool
-    if pool:
-        await pool.close()
+app.state.pool = await asyncpg.create_pool(
+    dsn=DATABASE_URL,
+    min_size=1,
+    max_size=10,
+)
 ```
 
-**Update:** `backend/app/main.py` — connect on startup:
+### 🟡 Step 0.3 — Align schema, models, and seed script (started, needs fixes)
 
-```python
-from contextlib import asynccontextmanager
-from fastapi import FastAPI
-from .db.base import init_db, close_db
-from .api.routes import auth, feed, posts, users
+**File:** `backend/app/db/schema.sql` — you updated this to valid PostgreSQL with `vector(384)`, `topic_id`, and `post_topics`. Good.
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    await init_db()
-    yield
-    await close_db()
+**Problem:** Other files still assume the old shape:
 
-app = FastAPI(lifespan=lifespan)
-app.include_router(auth.router, prefix="/auth", tags=["auth"])
-app.include_router(feed.router, prefix="/feed", tags=["feed"])
-app.include_router(posts.router, prefix="/posts", tags=["posts"])
-app.include_router(users.router, prefix="/users", tags=["users"])
-```
+| File | Mismatch |
+|------|----------|
+| `scripts/seed_db.py` | Inserts into `topic` column — schema uses `topic_id` |
+| `backend/app/models/user_profile.py` | Expects `preferred_topics`, `blacklisted_topics`, `strategy_weights` |
+| `schema.sql` `user_profiles` | Only has `embedding`, `diversity_tolerance`, `randomness` — missing topic lists and strategy weights |
+| `user_pref_repo.py` line 32 | Typo: `preferrred_topics` (three r's) |
 
-### `DONE` Step 0.3 — Fix the SQL schema `DONE`
-
-**File:** `backend/app/db/schema.sql`
-
-The current file mixes SQLite-style syntax (`DATETIME`, `SERIAL` in wrong places) with PostgreSQL. Rewrite it as valid PostgreSQL. Key fixes:
-
-- `users.id` should be a single primary key type (use `SERIAL PRIMARY KEY` or `UUID`).
-- `posts.embedding` needs a dimension, e.g. `vector(384)` for MiniLM.
-- Foreign keys must reference the same type (`INTEGER` vs `UUID` must match everywhere).
-
-Minimal working version to start:
+**Fix the schema** — extend `user_profiles` in `backend/app/db/schema.sql`:
 
 ```sql
-CREATE EXTENSION IF NOT EXISTS vector;
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
-
-CREATE TABLE users (
-    id SERIAL PRIMARY KEY,
-    username TEXT NOT NULL UNIQUE,
-    email TEXT NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE topics (
-    id SERIAL PRIMARY KEY,
-    name TEXT NOT NULL UNIQUE,
-    parent_topic_id INTEGER REFERENCES topics(id)
-);
-
-CREATE TABLE posts (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id INTEGER NOT NULL REFERENCES users(id),
-    content TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    embedding vector(384),
-    topic TEXT
-);
-
-CREATE INDEX posts_embedding_idx ON posts
-USING hnsw (embedding vector_cosine_ops);
-
-CREATE TABLE edges (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    from_post_id UUID NOT NULL REFERENCES posts(id),
-    to_post_id UUID NOT NULL REFERENCES posts(id),
-    edge_type TEXT NOT NULL,  -- 'similar', 'opposite', 'topic'
-    weight FLOAT NOT NULL DEFAULT 1.0
-);
-
-CREATE TABLE interactions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id INTEGER NOT NULL REFERENCES users(id),
-    post_id UUID NOT NULL REFERENCES posts(id),
-    type TEXT NOT NULL,  -- 'like', 'skip', 'explore'
-    view_time FLOAT DEFAULT 0,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
 CREATE TABLE user_profiles (
     user_id INTEGER PRIMARY KEY REFERENCES users(id),
-    diversity_tolerance INTEGER NOT NULL DEFAULT 40,
-    randomness FLOAT NOT NULL DEFAULT 0.3,
+    embedding vector(384),
+    diversity_tolerance FLOAT CHECK (diversity_tolerance BETWEEN 0 AND 1) DEFAULT 0.4,
+    randomness FLOAT DEFAULT 0.3,
     preferred_topics TEXT[] NOT NULL DEFAULT '{}',
     blacklisted_topics TEXT[] NOT NULL DEFAULT '{}',
     use_view_time BOOLEAN NOT NULL DEFAULT FALSE,
-    view_time_weight FLOAT NOT NULL DEFAULT 0.1,
-    strategy_weights JSONB NOT NULL DEFAULT '{"similar":0.5,"graph":0.2,"opposite":0.2,"random":0.1}'
+    view_time_weight FLOAT DEFAULT 0.1,
+    strategy_weights JSONB NOT NULL DEFAULT '{"similar":0.7,"graph":0.2,"opposite":0.0,"random":0.1}'
 );
 ```
 
-Run it against your local Postgres database before continuing.
-
-### `DONE` Step 0.4 — Create the missing `user_pref_repo.py` `DONE`
-
-**Create:** `backend/app/repositories/user_pref_repo.py`
+**Fix** `backend/app/repositories/user_pref_repo.py` line 32:
 
 ```python
-from ..models.user_profile import UserProfile
-from ..db.base import pool
+preferred_topics=list(rows["preferred_topics"]),  # fix typo
+```
 
-DEFAULT_PREFS = UserProfile(
-    user_id=0,
-    diversity_tolerance=40,
-    randomness=0.3,
-    preferred_topics=[],
-    blacklisted_topics=[],
-    strategy_weights={
-        "similar": 0.5,
-        "graph": 0.2,
-        "opposite": 0.2,
-        "random": 0.1,
-    },
+**Fix** `scripts/seed_db.py` — either insert topics first and use `topic_id`, or add a `topic TEXT` column back to `posts` for simplicity during MVP:
+
+```python
+# Simple MVP: add topics, then posts
+topic_id = await conn.fetchval(
+    "INSERT INTO topics (name) VALUES ($1) ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING id",
+    topic,
 )
-
-class UserPrefRepository:
-    async def getPrefs(self, user_id: int) -> UserProfile:
-        async with pool.acquire() as conn:
-            row = await conn.fetchrow(
-                "SELECT * FROM user_profiles WHERE user_id = $1",
-                user_id,
-            )
-        if not row:
-            return DEFAULT_PREFS.model_copy(update={"user_id": user_id})
-        return UserProfile(
-            user_id=row["user_id"],
-            diversity_tolerance=row["diversity_tolerance"],
-            randomness=row["randomness"],
-            preferred_topics=list(row["preferred_topics"]),
-            blacklisted_topics=list(row["blacklisted_topics"]),
-            use_view_time=row["use_view_time"],
-            view_time_weight=row["view_time_weight"],
-            strategy_weights=dict(row["strategy_weights"]),
-        )
+await conn.execute(
+    "INSERT INTO posts (user_id, content, topic_id, embedding) VALUES ($1, $2, $3, $4)",
+    user_id, content, topic_id, vector,
+)
 ```
 
-### `DONE` Step 0.5 — Add dependency injection (wire services to routes) `DONE`
+Also add `UNIQUE` on `users.email` if you use `ON CONFLICT (email)` in the seed script.
 
-**Create:** `backend/app/api/deps.py`
+### ✅ Step 0.4 — `user_pref_repo.py` (done, fix typo above)
 
-This is the glue that tells FastAPI *how* to build a `FeedService` when a route asks for one:
+**File:** `backend/app/repositories/user_pref_repo.py` — class is named `UserPreferencesRepository` (used in `deps.py`).
 
-```python
-from ..db.base import pool
-from ..repositories.feed_repo import FeedRepository
-from ..repositories.graph_repo import GraphRepository
-from ..repositories.user_pref_repo import UserPrefRepository
-from ..repositories.interaction_repo import InteractionRepository
-from ..services.feed_service import FeedService
-from ..services.graph_service import GraphService
-from ..services.ranking_service import RankingService
-from ..services.strategy_service import StrategyService
-from ..services.preference_service import PreferenceService
-from ..services.embedding_service import EmbeddingService
+### ✅ Step 0.5 — Dependency injection (done)
 
-def get_feed_service() -> FeedService:
-    feed_repo = FeedRepository(pool)
-    graph_repo = GraphRepository(pool)
-    return FeedService(
-        repo=feed_repo,
-        GraphService=GraphService(graph_repo),
-        RankingService=RankingService(),
-        EmbeddingService=EmbeddingService(),
-        StrategyService=StrategyService(feed_repo, GraphService(graph_repo)),
-        PreferenceService=PreferenceService(),
-        PrefRepo=UserPrefRepository(),
-        InteractionRepo=InteractionRepository(pool),
-    )
-```
+**File:** `backend/app/api/deps.py` — full wiring for repos and services including `getFeedService`. No changes needed unless you add new services.
 
-**Update:** `backend/app/api/routes/feed.py`
-
-```python
-from fastapi import APIRouter, Depends, Query
-from ...services.feed_service import FeedService
-from ...api.deps import get_feed_service
-
-router = APIRouter()
-
-@router.get("/{user_id}")
-async def get_feed(
-    user_id: int,
-    q: str = Query(default="", description="Optional text to steer the feed"),
-    service: FeedService = Depends(get_feed_service),
-):
-    return await service.getFeed(user_id, q)
-
-@router.get("/{user_id}/session")
-async def get_session_posts(
-    user_id: int,
-    service: FeedService = Depends(get_feed_service),
-):
-    return await service.getNewSessionPosts(user_id)
-```
-
-### `DONE` Step 0.6 — Fill in missing repository methods `DONE`
+### 🟡 Step 0.6 — Repository methods (partially done, fix bugs)
 
 **File:** `backend/app/repositories/feed_repo.py`
 
-Add these methods (your `feed_service.py` and `strategy_service.py` already expect them):
+| Method | Status |
+|--------|--------|
+| `getSimilarPosts` | ✅ Works |
+| `getOppositePosts` | ✅ Added |
+| `getRandomPosts` | ✅ Added |
+| `getPostsByIds` | ❌ **Bug** — SQL uses `ORDER BY RANDOM()` instead of filtering by IDs |
+
+Fix `getPostsByIds`:
 
 ```python
 async def getPostsByIds(self, ids: list):
@@ -316,375 +172,373 @@ async def getPostsByIds(self, ids: list):
     async with self.pool.acquire() as conn:
         rows = await conn.fetch(
             """
-            SELECT id, content, topic, created_at, user_id
+            SELECT id, content, topic_id, created_at, user_id
             FROM posts
             WHERE id = ANY($1::uuid[])
             """,
             ids,
         )
     return [dict(r) for r in rows]
-
-async def getRandomPosts(self, limit: int = 10):
-    async with self.pool.acquire() as conn:
-        rows = await conn.fetch(
-            """
-            SELECT id, content, topic, created_at, user_id
-            FROM posts
-            ORDER BY RANDOM()
-            LIMIT $1
-            """,
-            limit,
-        )
-    return [dict(r) for r in rows]
 ```
 
-Also fix `getNewSessionPosts` — the current SQL has a syntax error (`SELECT *` followed by `1 - ...` on the next line without a comma).
-
-### `DONE` Step 0.7 — Seed fake data so you have something to show `DONE`
-
-**File:** `scripts/seed_db.py`
+Fix `getNewSessionPosts` — SQL still has a syntax error (missing comma after `SELECT *`):
 
 ```python
-import asyncio
-import asyncpg
-from ml.embeddings.generate import embed
-
-SAMPLE_POSTS = [
-    ("I love building side projects.", "tech"),
-    ("Morning runs clear my head.", "health"),
-    ("This startup idea needs validation.", "startups"),
-    ("Hot take: tabs over spaces.", "tech"),
-]
-
-async def main():
-    conn = await asyncpg.connect("postgresql://bubbler:bubbler@localhost:5432/bubbler")
-
-    user_id = await conn.fetchval(
-        """
-        INSERT INTO users (username, email, password_hash)
-        VALUES ('demo', 'demo@bubbler.test', 'not-a-real-hash')
-        ON CONFLICT (email) DO UPDATE SET username = EXCLUDED.username
-        RETURNING id
-        """
-    )
-
-    for content, topic in SAMPLE_POSTS:
-        vector = embed(content)
-        post_id = await conn.fetchval(
-            """
-            INSERT INTO posts (user_id, content, topic, embedding)
-            VALUES ($1, $2, $3, $4)
-            RETURNING id
-            """,
-            user_id, content, topic, vector,
-        )
-        print("Inserted post", post_id)
-
-    await conn.close()
-
-if __name__ == "__main__":
-    asyncio.run(main())
+post = await conn.fetchrow(
+    """
+    SELECT *, 1 - (embedding <=> $1::vector) AS similarity
+    FROM posts
+    WHERE topic_id = $2
+    ORDER BY ABS((1 - (embedding <=> $1::vector)) - $3)
+    LIMIT 1
+    """,
+    yesterdayPost, likedTopic, target,
+)
 ```
 
-**Checkpoint:** Run `uvicorn app.main:app --reload` from `backend/`, then open `http://127.0.0.1:8000/docs`. You should see your routes and get JSON back from `/feed/1`.
+### 🟡 Step 0.7 — Seed script (started, fix schema alignment)
+
+**File:** `scripts/seed_db.py` — has sample posts and embedding logic. Update to match schema (see Step 0.3), then run:
+
+```bash
+python scripts/seed_db.py
+```
+
+### Step 0.8 — Fix feed routes and service bugs
+
+**File:** `backend/app/api/routes/feed.py` — routes exist but do not pass `user_id` or `await` async methods:
+
+```python
+from fastapi import APIRouter, Depends, Query
+from ...services.feed_service import FeedService
+from ..deps import getFeedService
+
+router = APIRouter()
+
+@router.get("/{user_id}")
+async def get_feed(
+    user_id: int,
+    q: str = Query(default=""),
+    service: FeedService = Depends(getFeedService),
+):
+    return await service.getFeed(user_id, q)
+
+@router.get("/{user_id}/session")
+async def get_session_posts(
+    user_id: int,
+    service: FeedService = Depends(getFeedService),
+):
+    return await service.getNewSessionPosts(user_id)
+```
+
+**File:** `backend/app/services/feed_service.py` — fix these bugs:
+
+```python
+# line 29: use instance, not class
+embedding = self.EmbeddingService.embedText(userInput)
+
+# line 48: missing await
+expandedPosts = await self.repo.getPostsByIds(list(allIds))
+
+# line 80: wrong attribute name (model uses diversity_tolerance)
+return await self.repo.getNewSessionPosts(prefs.diversity_tolerance, [], None)
+```
+
+**File:** `backend/app/services/strategy_service.py` — `getOppositePosts` exists in the repo but strategy still has `pass`:
+
+```python
+if prefs.strategy_weights.get("opposite", 0) > 0:
+    opposite = await self.repo.getOppositePosts(embedding, limit=10)
+    strategies.append(("opposite", opposite))
+```
+
+Remove stale TODO comments for `getPostsByIds` and `getRandomPosts` — those methods exist now.
+
+**File:** `backend/app/services/post_service.py` — use instance method:
+
+```python
+embedded = self.EmbeddingService.embedText(post)
+```
+
+**Checkpoint:** Run `uvicorn app.main:app --reload` from `backend/`, open `http://127.0.0.1:8000/docs`, call `GET /feed/1`. You should get a JSON list of posts.
 
 ---
 
-## Phase 1 — One Working End-to-End Path (Backend + iOS)
+## Phase 1 — Connect the iOS App to the Backend
 
-**Goal:** A user opens the iOS app, sees a list of posts from your real API, and can refresh the feed.
+**Goal:** `BubblerApp/` loads real posts from your API instead of hard-coded placeholder cards.
 
-**Why now:** This proves the whole pipeline before you build the fancy graph UI.
+**Why now:** You already have a polished `FeedView` and working Firebase login. The missing piece is network code.
 
-### Step 1.1 — Pick one iOS app folder
+### Step 1.1 — Add `APIClient` to `BubblerApp/`
 
-You currently have two iOS locations:
+**Create:** `BubblerApp/BubblerApp/APIClient.swift`
 
-- `ios-app/BubblerApp/` — has Feed, models, services (more complete)
-- `BubblerApp/` — Xcode project with a “Hello, world” `ContentView.swift`
-
-**Recommendation:** Treat `ios-app/` as the source of truth. Either move its files into the Xcode project under `BubblerApp/`, or point Xcode at `ios-app/`. Do not maintain both long-term.
-
-### Step 1.2 — Point the API client at localhost
-
-**File:** `ios-app/BubblerApp/App/Services/APIClient.swift`
-
-For the simulator, `localhost` on the Mac is reachable as `127.0.0.1`:
+Copy the pattern from `ios-app/BubblerApp/App/Services/APIClient.swift`, but point at localhost:
 
 ```swift
 import Foundation
 
-class APIClient {
+final class APIClient {
     static let shared = APIClient()
 
-    // Change this when you deploy
+    // Simulator reaches your Mac at 127.0.0.1
     private let baseURL = "http://127.0.0.1:8000"
 
-    func get<T: Decodable>(_ path: String, completion: @escaping (Result<T, Error>) -> Void) {
-        guard let url = URL(string: baseURL + path) else { return }
-
-        URLSession.shared.dataTask(with: url) { data, _, error in
-            if let error = error {
-                completion(.failure(error))
-                return
-            }
-            guard let data = data else { return }
-
-            do {
-                let decoded = try JSONDecoder().decode(T.self, from: data)
-                completion(.success(decoded))
-            } catch {
-                completion(.failure(error))
-            }
-        }.resume()
+    func get<T: Decodable>(_ path: String) async throws -> T {
+        guard let url = URL(string: baseURL + path) else {
+            throw URLError(.badURL)
+        }
+        let (data, _) = try await URLSession.shared.data(from: url)
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return try decoder.decode(T.self, from: data)
     }
 }
 ```
 
-Add a `JSONDecoder` date strategy in `FeedViewModel` if your API returns ISO dates.
+Add the file to your Xcode target (`BubblerApp.xcodeproj`).
 
-### Step 1.3 — Fix the feed API path
+### Step 1.2 — Add a `Post` model to `BubblerApp/`
 
-**File:** `ios-app/BubblerApp/App/Features/Feed/FeedViewModel.swift`
+**Create:** `BubblerApp/BubblerApp/Post.swift`
 
 ```swift
-class FeedViewModel: ObservableObject {
-    @Published var posts: [Post] = []
+import Foundation
 
-    // Hard-code user 1 until auth works
+struct Post: Codable, Identifiable {
+    let id: UUID
+    let content: String
+    let topicId: UUID?
+    let userId: Int?
+    let score: Double?
+}
+```
+
+Match field names to whatever JSON your feed endpoint actually returns — check `/docs` first.
+
+### Step 1.3 — Add a `FeedViewModel` and wire `FeedView`
+
+**Create:** `BubblerApp/BubblerApp/FeedViewModel.swift`
+
+```swift
+import Foundation
+
+@MainActor
+final class FeedViewModel: ObservableObject {
+    @Published var posts: [Post] = []
+    @Published var errorMessage: String?
+
+    // Until Firebase UID is mapped to a backend user id, hard-code 1
     private let userId = 1
 
-    func loadFeed() {
-        APIClient.shared.get("/feed/\(userId)") { (result: Result<[Post], Error>) in
-            DispatchQueue.main.async {
-                if case .success(let posts) = result {
-                    self.posts = posts
-                }
-            }
+    func loadFeed() async {
+        do {
+            posts = try await APIClient.shared.get("/feed/\(userId)")
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 }
 ```
 
-Your `Post` model may need a simpler decode shape at first — match whatever JSON the backend actually returns (start without `author` until you join user data).
-
-### Step 1.4 — Create a minimal `LoginView` (stub is fine)
-
-**Create:** `ios-app/BubblerApp/App/Features/Auth/LoginView.swift`
+**Update:** `BubblerApp/BubblerApp/FeedView.swift` — replace hard-coded `feedCard(...)` calls with real data:
 
 ```swift
-import SwiftUI
-
-struct LoginView: View {
-    @EnvironmentObject var auth: AuthService
+struct FeedView: View {
+    @StateObject private var viewModel = FeedViewModel()
 
     var body: some View {
-        VStack(spacing: 16) {
-            Text("Bubbler")
-                .font(.largeTitle)
-            Button("Continue as demo user") {
-                auth.isLoggedIn = true
+        // ... keep your existing gradient + header ...
+        VStack(spacing: 18) {
+            if let error = viewModel.errorMessage {
+                Text(error).foregroundColor(.white)
+            }
+            ForEach(viewModel.posts) { post in
+                feedCard(
+                    bubble: "Post",
+                    title: post.content,
+                    subtitle: "Score: \(post.score ?? 0)",
+                    color: .blue
+                )
             }
         }
+        .task { await viewModel.loadFeed() }
     }
 }
 ```
 
-**File:** `ios-app/BubblerApp/App/Services/AuthService.swift` — ensure it has `@Published var isLoggedIn = false`.
+### Step 1.4 — Bridge Firebase users to backend users
 
-### Step 1.5 — Hook `RootView` into the app entry point
+**Current state:** iOS uses **Firebase Auth** (`AuthSession.swift`). The backend uses its own `users` table and `auth` routes. These are separate systems today.
 
-Wire `RootView` as the root of your SwiftUI app (in whichever `*App.swift` file your Xcode target uses):
+**Short-term MVP (pick one):**
+
+**Option A — Firebase only on client, backend trusts a header (fastest for solo dev):**
+- After Firebase login, call `POST /auth/register` once to create a matching backend user (use Firebase UID as username or store mapping).
+- Send `X-User-Id: 1` header from `APIClient` until you build proper token exchange.
+
+**Option B — Sync on first login:**
+
+**Update:** `BubblerApp/BubblerApp/AuthSession.swift` — after successful sign-in:
 
 ```swift
-@main
-struct BubblerAppApp: App {
-    @StateObject private var auth = AuthService()
-
-    var body: some Scene {
-        WindowGroup {
-            RootView()
-                .environmentObject(auth)
-        }
-    }
+// After Firebase sign-in succeeds:
+if let email = Auth.auth().currentUser?.email {
+    try await APIClient.shared.registerIfNeeded(email: email)
 }
 ```
 
-**Checkpoint:** Simulator shows posts from your seeded database. If the list is empty, debug the network call in Xcode’s console first, then the backend logs.
+**Create:** a small `BackendAuthService.swift` that calls your FastAPI `/auth/register` endpoint.
+
+**File to extend:** `backend/app/api/routes/auth.py` — still uses `login/{id}` and `register/{id}` with a user id in the URL. Simplify when you tackle Phase 4.
+
+### Step 1.5 — Deprecate `ios-app/` duplicate
+
+Once `APIClient` lives in `BubblerApp/`, treat `ios-app/` as archived. Add a one-line note to `README.md` when you're ready (optional).
+
+**Checkpoint:** Log in on the simulator → `FeedView` shows posts from Postgres, not placeholder NASA/AI headlines.
 
 ---
 
 ## Phase 2 — Build the Graph Experience (Core Product)
 
-**Goal:** Instead of a scrolling list, the user sees **one post** and **a few “bubble” choices** for what to read next. That is the DAG path idea.
+**Goal:** User sees **one post** and **a few choices** for what to read next — the DAG path, not a scrolling list.
 
 **Plain-language explanation:**
 
 - Each post is a **node**.
-- Each link to another post is an **edge** (stored in the `edges` table).
-- The user’s **path** is the sequence of posts they chose.
-- The feed algorithm picks which edges to show as bubbles.
+- Each link between posts is an **edge** (in the `edges` table).
+- The user's **path** is the sequence of posts they chose.
+- The algorithm picks which edges to show as bubbles.
 
-### Step 2.1 — Build edges when posts are created
+### 🟡 Step 2.1 — Build edges when posts are created (repo exists, not wired)
 
-Right now `edges` is empty unless you fill it. When someone creates a post, find similar posts and insert edges.
+**File:** `backend/app/repositories/edge_builder_repo.py` — `buildEdgesForPost` already exists.
 
-**Create:** `backend/app/services/edge_builder_service.py`
+**Still to do:**
+
+1. Add `getEdgeBuilderRepo` to `backend/app/api/deps.py`
+2. Call it from `backend/app/services/post_service.py` after inserting a post:
 
 ```python
-class EdgeBuilderService:
-    def __init__(self, pool, embedding_service):
-        self.pool = pool
-        self.embedding_service = embedding_service
-
-    async def build_edges_for_post(self, post_id, embedding):
-        async with self.pool.acquire() as conn:
-            # Similar neighbors
-            similar = await conn.fetch(
-                """
-                SELECT id, 1 - (embedding <=> $1) AS similarity
-                FROM posts
-                WHERE id != $2
-                ORDER BY embedding <=> $1
-                LIMIT 5
-                """,
-                embedding, post_id,
-            )
-            for row in similar:
-                await conn.execute(
-                    """
-                    INSERT INTO edges (from_post_id, to_post_id, edge_type, weight)
-                    VALUES ($1, $2, 'similar', $3)
-                    ON CONFLICT DO NOTHING
-                    """,
-                    post_id, row["id"], float(row["similarity"]),
-                )
+async def postUserPosts(self, user_id, content):
+    embedded = self.EmbeddingService.embedText(content)
+    post = await self.repo.postUserPosts(user_id, content, embedded)
+    await self.edgeBuilder.buildEdgesForPost(post["id"], embedded)
+    return post
 ```
 
-Call this from `post_service.py` after inserting a new post.
+3. Run edge building for existing posts in `scripts/seed_db.py` after insert loop
+
+**Note:** `ON CONFLICT DO NOTHING` in the edge insert requires a unique constraint on `(from_post_id, to_post_id)` — add that to `schema.sql` if inserts fail silently.
 
 ### Step 2.2 — Add a “next posts” API endpoint
-
-This is what the graph UI will call when the user taps a bubble.
 
 **Create:** `backend/app/api/routes/graph.py`
 
 ```python
 from fastapi import APIRouter, Depends
-from ...api.deps import get_graph_service  # you will add this in deps.py
+from ...services.graph_service import GraphService
+from ..deps import getGraphService, getFeedRepo
+from ...repositories.feed_repo import FeedRepository
 
 router = APIRouter()
 
 @router.get("/posts/{post_id}/next")
-async def get_next_posts(post_id: str, service=Depends(get_graph_service)):
-  """
-  Returns up to 4 neighbor posts the user can choose from.
-  """
-  return await service.getNextChoices(post_id)
+async def get_next_posts(
+    post_id: str,
+    graph: GraphService = Depends(getGraphService),
+    feed_repo: FeedRepository = Depends(getFeedRepo),
+):
+    neighbors = await graph.repo.getNeighbors(post_id, limit=4)
+    if not neighbors:
+        return []
+    ids = [n["to_post_id"] for n in neighbors]
+    return await feed_repo.getPostsByIds(ids)
 ```
 
-**Update:** `backend/app/services/graph_service.py`
+**Update:** `backend/app/services/graph_service.py` — add a helper if you prefer logic in the service layer:
 
 ```python
 async def getNextChoices(self, post_id: str, limit: int = 4):
     neighbors = await self.repo.getNeighbors(post_id, limit=limit)
-    if not neighbors:
-        return []
-    ids = [n["to_post_id"] for n in neighbors]
-    # reuse FeedRepository.getPostsByIds or add a method on graph_repo
-    return ids
+    return [n["to_post_id"] for n in neighbors]
 ```
 
-**Update:** `backend/app/main.py` — register the router:
+**Update:** `backend/app/main.py`:
 
 ```python
 from .api.routes import graph
 app.include_router(graph.router, prefix="/graph", tags=["graph"])
 ```
 
-### Step 2.3 — Build `BubbleView` on iOS
+### Step 2.3 — Graph feed screen on iOS
 
-**Create:** `ios-app/BubblerApp/App/Components/BubbleView.swift`
+The current `FeedView` is a **linear list with mock data**. The graph experience is different: one current post + choice bubbles.
 
-```swift
-import SwiftUI
-
-struct BubbleView: View {
-    let post: Post
-    let onTap: () -> Void
-
-    var body: some View {
-        Button(action: onTap) {
-            Text(post.content)
-                .lineLimit(3)
-                .padding()
-                .frame(maxWidth: .infinity)
-                .background(.ultraThinMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: 20))
-        }
-        .buttonStyle(.plain)
-    }
-}
-```
-
-### Step 2.4 — Replace the list feed with a graph feed screen
-
-**Create:** `ios-app/BubblerApp/App/Features/Graph/GraphFeedView.swift`
+**Create:** `BubblerApp/BubblerApp/GraphFeedView.swift`
 
 ```swift
-import SwiftUI
-
 struct GraphFeedView: View {
     @StateObject private var vm = GraphFeedViewModel()
 
     var body: some View {
-        VStack {
+        VStack(spacing: 20) {
             if let current = vm.currentPost {
-                PostView(post: current)
+                // Reuse your feedCard styling or a simpler post card
+                Text(current.content)
+                    .foregroundColor(.white)
+                    .padding()
             }
 
             Text("Where next?")
                 .font(.headline)
-                .padding(.top)
+                .foregroundColor(.white)
 
             ForEach(vm.choices) { choice in
-                BubbleView(post: choice) {
-                    vm.choose(choice)
+                Button(choice.content) {
+                    Task { await vm.choose(choice) }
                 }
+                .buttonStyle(.borderedProminent)
             }
         }
-        .onAppear { vm.startSession() }
+        .task { await vm.startSession() }
     }
 }
 ```
 
-**Create:** `ios-app/BubblerApp/App/Features/Graph/GraphFeedViewModel.swift`
+**Create:** `BubblerApp/BubblerApp/GraphFeedViewModel.swift`
 
 ```swift
-class GraphFeedViewModel: ObservableObject {
+@MainActor
+final class GraphFeedViewModel: ObservableObject {
     @Published var currentPost: Post?
     @Published var choices: [Post] = []
     private var path: [Post] = []
+    private let userId = 1
 
-    func startSession() {
-        // 1) GET /feed/1/session  -> first post
-        // 2) GET /graph/posts/{id}/next -> bubble choices
+    func startSession() async {
+        // GET /feed/{userId}/session -> pick first post
+        // GET /graph/posts/{id}/next -> fill choices
     }
 
-    func choose(_ post: Post) {
+    func choose(_ post: Post) async {
         path.append(post)
         currentPost = post
-        // fetch next choices for this post
-        // POST interaction type "explore" so the backend learns
+        // fetch next choices
+        // POST /interactions to record "explore"
     }
 }
 ```
 
-**Update:** `ios-app/BubblerApp/App/Components/RootView.swift` — show `GraphFeedView()` instead of `FeedView()` once this works.
+**Update:** `BubblerApp/BubblerApp/ContentView.swift` — swap `FeedView()` for `GraphFeedView()` once the loop works.
 
-### Step 2.5 — Record interactions when the user chooses
+**Reuse:** `BubbleDetail.swift` styling can inspire bubble choice buttons.
 
-**Update:** `backend/app/repositories/interaction_repo.py`
+### Step 2.4 — Record interactions
+
+**File:** `backend/app/repositories/interaction_repo.py` — currently only has `__init__`. Add:
 
 ```python
 async def record(self, user_id: int, post_id: str, type: str, view_time: float = 0):
@@ -701,9 +555,10 @@ async def getRecentInteractions(self, user_id: int, limit: int = 50):
     async with self.pool.acquire() as conn:
         rows = await conn.fetch(
             """
-            SELECT i.*, p.topic
+            SELECT i.*, pt.topic_id
             FROM interactions i
             JOIN posts p ON p.id = i.post_id
+            LEFT JOIN post_topics pt ON pt.post_id = p.id
             WHERE i.user_id = $1
             ORDER BY i.created_at DESC
             LIMIT $2
@@ -713,30 +568,45 @@ async def getRecentInteractions(self, user_id: int, limit: int = 50):
     return rows
 ```
 
-**Update:** `backend/app/services/preference_service.py` — fix attribute names to match `UserProfile` (`preferred_topics`, not `preferredTopics`).
+Add `view_time` column to `interactions` in `schema.sql` if missing.
 
-**Checkpoint:** You can tap through 3–4 posts in a row. Each tap fetches new bubbles. That is Bubbler’s core loop.
+**Update:** `backend/app/api/routes/interactions.py` — fix the route (currently calls `InteractionService.getUserInteractions()` without `id` or `await`):
+
+```python
+@router.post("/{user_id}")
+async def record_interaction(
+    user_id: int,
+    body: InteractionCreate,
+    service: InteractionService = Depends(getInteractionService),
+):
+    return await service.record(user_id, body)
+```
+
+**Update:** `backend/app/services/preference_service.py` — fix attribute name:
+
+```python
+prefs.preferred_topics = [t[0] for t in sortedTopics[:5]]  # not preferredTopics
+```
+
+**Checkpoint:** Tap through 3–4 posts. Each tap loads new choices. That is Bubbler's core loop.
 
 ---
 
 ## Phase 3 — User-Controlled Algorithm
 
-**Goal:** The user can set diversity, randomness, topic lists, and whether view time counts — as described in `docs/api_contracts.md`.
+**Goal:** User sets diversity, randomness, topic lists, and view-time weighting — per `docs/api_contracts.md`.
 
-### Step 3.1 — Preferences API
+### Step 3.1 — Preferences API on the backend
 
-**Update:** `backend/app/api/routes/users.py`
+**File:** `backend/app/api/routes/users.py` — currently only has profile stubs. Add:
 
 ```python
-from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from ...models.user_profile import UserProfile
-from ...api.deps import get_user_pref_repo
-
-router = APIRouter()
+from ..deps import getUserPrefRepo
+from ...repositories.user_pref_repo import UserPreferencesRepository
 
 class PrefsUpdate(BaseModel):
-    diversity_tolerance: int | None = None
+    diversity_tolerance: float | None = None
     randomness: float | None = None
     preferred_topics: list[str] | None = None
     blacklisted_topics: list[str] | None = None
@@ -744,24 +614,26 @@ class PrefsUpdate(BaseModel):
     strategy_weights: dict[str, float] | None = None
 
 @router.get("/{user_id}/preferences")
-async def get_preferences(user_id: int, repo=Depends(get_user_pref_repo)):
+async def get_preferences(user_id: int, repo: UserPreferencesRepository = Depends(getUserPrefRepo)):
     return await repo.getPrefs(user_id)
 
 @router.put("/{user_id}/preferences")
-async def update_preferences(user_id: int, body: PrefsUpdate, repo=Depends(get_user_pref_repo)):
+async def update_preferences(user_id: int, body: PrefsUpdate, repo: UserPreferencesRepository = Depends(getUserPrefRepo)):
     return await repo.updatePrefs(user_id, body)
 ```
 
-Add `updatePrefs` to `user_pref_repo.py` with an `UPDATE ...` SQL statement.
+Add `updatePrefs` to `backend/app/repositories/user_pref_repo.py`.
 
-### Step 3.2 — Settings screen on iOS
+### Step 3.2 — Algorithm settings screen on iOS
 
-**Create:** `ios-app/BubblerApp/App/Features/Profile/AlgorithmSettingsView.swift`
+**File:** `BubblerApp/BubblerApp/SettingsView.swift` — has a "Bubble Sensitivity" row placeholder. Replace with a real screen.
+
+**Create:** `BubblerApp/BubblerApp/AlgorithmSettingsView.swift`
 
 ```swift
 struct AlgorithmSettingsView: View {
     @State private var randomness: Double = 0.3
-    @State private var diversity: Double = 40
+    @State private var diversity: Double = 0.4
     @State private var useViewTime = false
 
     var body: some View {
@@ -770,7 +642,7 @@ struct AlgorithmSettingsView: View {
                 Slider(value: $randomness, in: 0...1) {
                     Text("Randomness")
                 }
-                Slider(value: $diversity, in: 0...65, step: 1) {
+                Slider(value: $diversity, in: 0...1, step: 0.05) {
                     Text("Diversity")
                 }
             }
@@ -778,79 +650,65 @@ struct AlgorithmSettingsView: View {
                 Toggle("Count time spent reading", isOn: $useViewTime)
             }
             Button("Save") {
-                // PUT /users/{id}/preferences
+                Task { await savePreferences() }
             }
         }
         .navigationTitle("Your Algorithm")
     }
+
+    func savePreferences() async {
+        // PUT /users/{id}/preferences via APIClient
+    }
 }
 ```
 
-### `DONE` Step 3.3 — Finish the strategy service TODOs `DONE`
+Wire the NavigationLink from `SettingsView` "Bubble Sensitivity" row to this view.
 
-**File:** `backend/app/services/strategy_service.py`
+### Step 3.3 — Wire opposite posts in strategy service
 
-| TODO | What to do | File to change |
-|------|------------|----------------|
-| Opposite posts | Add `getOppositePosts` in `feed_repo.py` — order by **lowest** similarity instead of highest | `feed_repo.py` |
-| `getPostsByIds` | Already added in Phase 0 | `feed_repo.py` |
-| `getRandomPosts` | Already added in Phase 0 | `feed_repo.py` |
-
-Example opposite-post query:
-
-```python
-async def getOppositePosts(self, embedding, limit: int = 10):
-    async with self.pool.acquire() as conn:
-        rows = await conn.fetch(
-            """
-            SELECT id, content, topic,
-                   1 - (embedding <=> $1) AS similarity
-            FROM posts
-            ORDER BY embedding <=> $1 DESC
-            LIMIT $2
-            """,
-            embedding, limit,
-        )
-    return [dict(r) for r in rows]
-```
+**File:** `backend/app/services/strategy_service.py` — see Phase 0, Step 0.8. `getOppositePosts` already lives in `feed_repo.py`.
 
 ### Step 3.4 — Track view time on iOS
 
-In `GraphFeedView`, start a timer when `currentPost` appears. When the user taps a bubble, send `view_time` seconds with the interaction.
+In `GraphFeedView`, record how long the user reads before tapping a choice:
 
 ```swift
+@State private var viewStartedAt = Date()
+
 .onAppear { viewStartedAt = Date() }
-// on choose:
+
+// when user taps a bubble:
 let seconds = Date().timeIntervalSince(viewStartedAt)
+// send with interaction POST
 ```
 
-**Checkpoint:** Changing randomness visibly shuffles bubble order. Blacklisting a topic removes those posts from results.
+**Checkpoint:** Cranking randomness shuffles results. Blacklisting a topic removes those posts.
 
 ---
 
-## Phase 4 — Auth, Polish, and Deploy Basics
+## Phase 4 — Auth Unification, Tests, and Deploy
 
-**Goal:** Real accounts, safer config, and a path to TestFlight.
+**Goal:** Production-ready basics — one auth story, tests, easy local setup.
 
-### Step 4.1 — Fix auth routes
+### Step 4.1 — Decide: Firebase + backend, or backend-only?
 
-**File:** `backend/app/api/routes/auth.py`
+**Current state:**
 
-Current paths like `login/{id}` are unusual — login should not need a user id in the URL.
+| Layer | Auth |
+|-------|------|
+| iOS (`AuthSession.swift`) | Firebase Auth ✅ |
+| Backend (`auth.py`, `auth_service.py`) | Custom email/password with `PasswordService` (bcrypt) |
 
-```python
-@router.post("/register")
-async def register(body: RegisterRequest, service: AuthService = Depends(get_auth_service)):
-    return await service.register(body.username, body.email, body.password)
+You do **not** need two login systems long-term. Common solo-dev paths:
 
-@router.post("/login")
-async def login(body: LoginRequest, service: AuthService = Depends(get_auth_service)):
-    return await service.login(body.email, body.password)
-```
+1. **Keep Firebase for iOS**, verify Firebase ID tokens on the backend (add middleware in FastAPI).
+2. **Drop Firebase**, use backend JWT only, simplify iOS to call `/auth/login`.
 
-Return a JWT token. **File:** `backend/app/core/security.py` — add `create_access_token` / `decode_token`.
+**File:** `backend/app/api/routes/auth.py` — fix route paths (missing `/` prefix: `"login/{id}"` → `"/login"`).
 
-On iOS, store the token in Keychain and send `Authorization: Bearer ...` from `APIClient`.
+**File:** `backend/app/core/security.py` — empty. Add JWT helpers when you pick backend tokens.
+
+**File:** `backend/app/services/password_service.py` — methods should be `@staticmethod` or use `self` consistently (currently defined without `self` on instance methods).
 
 ### Step 4.2 — Add basic tests
 
@@ -862,16 +720,16 @@ from httpx import AsyncClient, ASGITransport
 from app.main import app
 
 @pytest.mark.asyncio
-async def test_health():
+async def test_app_starts():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.get("/")
+        response = await client.get("/docs")
     assert response.status_code == 200
 ```
 
-You do not need 100% coverage. Start with: health check, feed returns a list, preferences save and load.
+Add `httpx` and `pytest` to `requirements.txt`.
 
-### Step 4.3 — Docker Compose for Postgres (optional but helpful)
+### Step 4.3 — Docker Compose for Postgres
 
 **Create:** `docker-compose.yml` at repo root:
 
@@ -892,98 +750,119 @@ volumes:
   bubbler_pg:
 ```
 
-Run `docker compose up -d`, apply `schema.sql`, run `seed_db.py`.
+Then: `docker compose up -d` → apply `schema.sql` → run `seed_db.py`.
 
-### Step 4.4 — Clean up inconsistencies (do as you touch files)
+### Step 4.4 — Remaining cleanup checklist
 
-| Issue | Location | Fix |
-|-------|----------|-----|
-| `Post.id` is `int` in Python but `UUID` in SQL | `backend/app/models/post.py` | Use `UUID` type everywhere |
-| `feed_service.py` calls `self.repo.getPostsByIds` without `await` | `feed_service.py` line ~60 | Add `await` |
-| `EmbeddingService.embedText` called as static in `post_service.py` | `post_service.py` | Use `self.EmbeddingService.embedText` |
-| `interactions` router not registered | `main.py` | Add `interactions.router` |
-| iOS `PostView` expects `post.author` | `PostView.swift` | Add author to API or remove from UI for now |
+| Issue | File | Fix |
+|-------|------|-----|
+| `Post.id` type mismatch (`int` vs `UUID`) | `backend/app/models/post.py` | Use `UUID` |
+| `feed_service.py` missing `await` on `getPostsByIds` | `feed_service.py` ~line 48 | Add `await` |
+| `EmbeddingService` called as class not instance | `feed_service.py`, `post_service.py` | Use `self.` |
+| `interactions` route broken | `interactions.py` | Pass `id`, `await`, use instance |
+| `ranking_service.py` uses `post["topic"]` | `ranking_service.py` | Join topic name or use `topic_id` |
+| `SearchView` placeholder | `BubblerApp/.../SearchView.swift` | Defer until graph loop works |
+| Profile shows placeholder stats | `ProfileView.swift` | Wire to `/users/{id}/profile` later |
 
 ---
 
 ## Suggested Timeline (Solo Dev)
 
-| Phase | Focus | Rough time |
-|-------|-------|------------|
-| 0 | Backend runs locally | 1–2 weekends |
-| 1 | iOS shows real posts | 1 weekend |
-| 2 | Graph bubbles + path | 2–3 weekends |
-| 3 | Algorithm settings | 1–2 weekends |
-| 4 | Auth, tests, deploy | 2+ weekends |
+| Phase | Focus | Rough time | Status |
+|-------|-------|------------|--------|
+| 0 | Backend foundation + bug fixes | 1 weekend | 🟡 ~70% done |
+| 1 | iOS ↔ API connection | 1 weekend | ❌ Not started |
+| 2 | Graph bubbles + path | 2–3 weekends | ❌ Not started |
+| 3 | Algorithm settings | 1–2 weekends | ❌ UI placeholders only |
+| 4 | Auth unification, tests, deploy | 2+ weekends | ❌ Not started |
 
-Do **not** jump to Phase 4 before Phase 2 works. The graph loop is what makes Bubbler different from a normal feed app.
+Do **not** polish `SearchView` or profile stats until Phase 2's graph loop works.
 
 ---
 
 ## What to Avoid (Common Solo-Dev Traps)
 
-1. **Building both iOS folders** — pick one Xcode project and delete or ignore the other.
-2. **Perfecting the ML model early** — MiniLM + pgvector is enough for months.
-3. **Terraform / microservices** — one FastAPI app + one Postgres DB is correct for now.
-4. **Graph visualization** — you do not need a visual node graph on screen. Bubbles + a path history is enough.
-5. **Rewriting the algorithm before seed data exists** — seed 50–100 posts first, then tune weights.
+1. **Maintaining two iOS folders** — `BubblerApp/` is canonical; copy from `ios-app/` then ignore it.
+2. **Perfecting the ML model** — MiniLM + pgvector is enough for months.
+3. **Building a visual node-graph diagram** — bubbles + a path trail (`ProfileView` "Bubble Trail") is enough.
+4. **Firebase AND custom auth forever** — pick a unified approach in Phase 4.
+5. **Tuning the algorithm before seed data** — seed 50–100 posts with edges first.
 
 ---
 
-## File Checklist (Quick Reference)
+## File Checklist (Updated)
 
-Files you will likely **create**:
+**Already created (verify/fix, don't recreate):**
+
+```
+backend/app/api/deps.py
+backend/app/repositories/user_pref_repo.py
+backend/app/repositories/edge_builder_repo.py
+backend/app/services/password_service.py
+backend/requirements.txt
+BubblerApp/BubblerApp/AuthSession.swift
+BubblerApp/BubblerApp/LoginView.swift
+BubblerApp/BubblerApp/CreateAccountView.swift
+BubblerApp/BubblerApp/FeedView.swift
+BubblerApp/BubblerApp/ProfileView.swift
+BubblerApp/BubblerApp/SettingsView.swift
+BubblerApp/BubblerApp/BubbleDetail.swift
+scripts/seed_db.py
+```
+
+**Still to create:**
 
 ```
 backend/app/core/config.py
-backend/app/api/deps.py
-backend/app/repositories/user_pref_repo.py
+backend/.env.example
 backend/app/api/routes/graph.py
-backend/app/services/edge_builder_service.py
 backend/tests/test_feed.py
-ios-app/.../Features/Auth/LoginView.swift
-ios-app/.../Features/Graph/GraphFeedView.swift
-ios-app/.../Features/Graph/GraphFeedViewModel.swift
-ios-app/.../Components/BubbleView.swift
-ios-app/.../Features/Profile/AlgorithmSettingsView.swift
+docker-compose.yml
+BubblerApp/BubblerApp/APIClient.swift
+BubblerApp/BubblerApp/Post.swift
+BubblerApp/BubblerApp/FeedViewModel.swift
+BubblerApp/BubblerApp/GraphFeedView.swift
+BubblerApp/BubblerApp/GraphFeedViewModel.swift
+BubblerApp/BubblerApp/AlgorithmSettingsView.swift
 ```
 
-Files you will likely **edit soon**:
+**Edit next (highest priority):**
 
 ```
 backend/app/main.py
-backend/app/db/base.py
 backend/app/db/schema.sql
-backend/app/repositories/feed_repo.py
-backend/app/repositories/interaction_repo.py
 backend/app/api/routes/feed.py
 backend/app/services/feed_service.py
-backend/app/services/preference_service.py
-backend/app/services/post_service.py
-ios-app/.../Services/APIClient.swift
-ios-app/.../Features/Feed/FeedViewModel.swift
-ios-app/.../Components/RootView.swift
+backend/app/services/strategy_service.py
+backend/app/repositories/feed_repo.py
+backend/app/repositories/user_pref_repo.py
+backend/app/repositories/interaction_repo.py
 scripts/seed_db.py
+BubblerApp/BubblerApp/FeedView.swift
+BubblerApp/BubblerApp/ContentView.swift
 ```
 
 ---
 
 ## When You're Stuck
 
-Work in this debug order:
+Debug in this order:
 
-1. **Database** — can you `SELECT * FROM posts` and see rows?
-2. **API** — does `/docs` show the route and return JSON?
-3. **iOS network** — is the simulator hitting `127.0.0.1:8000` (not `api.bubbler.com`)?
-4. **JSON shape** — does Swift `Post` match the keys the API sends (`user_id` vs `userId`)?
-5. **Algorithm** — only after 1–4 work; log `post["score"]` in `ranking_service.py` to see ranking.
+1. **Database** — `SELECT * FROM posts` returns rows with embeddings?
+2. **API** — `/docs` works and `GET /feed/1` returns JSON?
+3. **iOS network** — Simulator uses `127.0.0.1:8000`, not `api.bubbler.com`?
+4. **JSON shape** — Swift `Post` fields match API keys (`user_id` vs `userId`)?
+5. **Firebase vs backend user** — Is the `user_id` you pass to `/feed/{id}` a real row in `users`?
+6. **Algorithm** — Log `post["score"]` in `ranking_service.py` only after 1–5 work.
 
 ---
 
-## Next Action (Start Here Tomorrow)
+## Next Action (Start Here)
 
 If you only do **one thing** next:
 
-> Complete **Phase 0, Steps 0.1–0.7** so `GET /feed/1` returns seeded posts in Swagger UI.
+> Finish **Phase 0, Steps 0.2 and 0.8** — add `config.py`, fix `feed.py` routes and `feed_service.py` bugs, then confirm `GET /feed/1` returns posts in Swagger.
 
-That unlocks everything else.
+Then move to **Phase 1** — add `APIClient.swift` to `BubblerApp/` and replace the mock cards in `FeedView.swift` with real data.
+
+That connects the two halves of the project and unlocks the graph work in Phase 2.

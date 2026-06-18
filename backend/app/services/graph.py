@@ -1,18 +1,15 @@
-from typing import List
-
 class GraphService:
-
-    def __init__(self, repo: GraphRepository):
+    def __init__(self, repo):
         self.repo = repo
 
-    async def expandPosts(self, seedPosts: List[str], depth: int=1):
+    async def expandPosts(self, seedPosts: list[str], depth: int = 1):
         visited = set()
         results = []
 
         async def dfs(postId: int, currentDepth: int):
             if currentDepth > depth or postId in visited:
                 return
-            
+
             visited.add(postId)
 
             neighbors = await self.repo.getNeighbors(postId)
@@ -25,7 +22,4 @@ class GraphService:
             await dfs(post["id"], 0)
 
         return results
-
-    
-
     

@@ -1,12 +1,29 @@
 from typing import List
 
+
 class FeedRepository:
-    def __init__(self, pool):
-        self.pool = pool
 
-    async def getSimilarPosts(self, embeddedPost: List[float], limit: int = 4):
+    # --- Graph ---
+    @classmethod
+    async def get_neighbors(cls, pool, id: int, limit: int = 4):
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT to_post_id, weight
+                FROM edges
+                WHERE from_post_id = $1
+                ORDER BY weight DESC
+                LIMIT $2
+                """,
+                id,
+                limit,
+            )
+        return [dict(r) for r in rows]
 
-        async with self.pool.acquire() as conn:
+    # --- Feed ---
+    @classmethod
+    async def get_similar_posts(cls, pool, embedded_post: List[float], limit: int = 4):
+        async with pool.acquire() as conn:
             rows = await conn.fetch(
                 """
                 SELECT
@@ -17,10 +34,9 @@ class FeedRepository:
                 ORDER BY embedding <=> $1
                 LIMIT $2
                 """,
-                embeddedPost,
-                limit
+                embedded_post,
+                limit,
             )
-
         return [
             {
                 "id": r["id"],
@@ -29,77 +45,63 @@ class FeedRepository:
             }
             for r in rows
         ]
-    
-    async def getOppositePosts(self, embedding, limit: int = 10):
-        async with self.pool.acquire() as conn:
-            rows = await conn.fetch(
-                """
-                SELECT id, content, topic,
-                    1 - (embedding <=> $1) AS similarity
-                FROM posts
-                ORDER BY embedding <=> $1 DESC
-                LIMIT $2
-                """,
-                embedding, limit,
-            )
-        return [dict(r) for r in rows]
-    
-    async def getNewSessionPosts(self, diversityTolerance: float, yesterdayPost: List[float], likedTopic: str):
+
+    @classmethod
+    async def get_new_session_posts(cls, pool, diversity_tolerance: float, yesterday_post: List[float], liked_topic: str):
         val = 1
-        similarityTargets = []
-        for i in range(4): # Retrieve 4 posts
-            similarityTargets.append(val)
-            val = max(0, val - diversityTolerance)
+        similarity_targets = []
+        for i in range(4):
+            similarity_targets.append(val)
+            val = max(0, val - diversity_tolerance)
 
         results = []
 
-        async with self.pool.acquire() as conn:
-            for target in similarityTargets:
-                post = await conn.fetchrow("""
-                                            SELECT *, 1 - (embedding <=> $1::vector) AS similarity
-                                            FROM posts
-                                            WHERE topic = $2
-                                            ORDER BY ABS((1 - (embedding <=> $1::vector)) - $3)
-                                            LIMIT 1
-                                        """,
-                                        yesterdayPost,
-                                        likedTopic,
-                                        target)
-                
+        async with pool.acquire() as conn:
+            for target in similarity_targets:
+                post = await conn.fetchrow(
+                    """
+                    SELECT *,
+                        1 - (embedding <=> $1::vector) AS similarity
+                    FROM posts
+                    WHERE topic = $2
+                    ORDER BY ABS((1 - (embedding <=> $1::vector)) - $3)
+                    LIMIT 1
+                    """,
+                    yesterday_post,
+                    liked_topic,
+                    target,
+                )
                 if post:
                     results.append(dict(post))
-                
-            return results
-        
-    async def getPostsByIds(self, ids: list):
+
+        return results
+
+    @classmethod
+    async def get_posts_by_ids(cls, pool, ids: list):
         if not ids:
             return []
-        
-        async with self.pool.acquire() as conn:
-            rows = await conn.fetch(
-                """SELECT id, content, topic_id, created_at, user_id
-                    FROM posts
-                    WHERE id = ANY($1::uuid[])""",
-                   ids,
-            )
-        
-        return [dict(r) for r in rows]
-    
-    async def getRandomPosts(self, limit: int=10):
-        async with self.pool.acquire() as conn:
-            rows = await conn.fetch(
-                """SELECT id, content, topic, created_at, user_id
-                   FROM posts
-                   ORDER BY RANDOM()
-                   LIMIT $1""",
-                   limit,
-            )
 
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT id, content, topic, created_at, user_id
+                FROM posts
+                WHERE id = ANY($1)
+                """,
+                ids,
+            )
         return [dict(r) for r in rows]
 
-'''
-Notes:
-- The post embedding should be passed in, not the post itself (embedding again would be redundant)
-- The "limit" parameter defines the max posts that will appear in the graph
-- In pgvector, the <=> operator defines cosine similarity, NOT null-safe equality
-'''
+    @classmethod
+    async def get_random_posts(cls, pool, limit: int = 10):
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT id, content, topic, created_at, user_id
+                FROM posts
+                ORDER BY RANDOM()
+                LIMIT $1
+                """,
+                limit,
+            )
+        return [dict(r) for r in rows]

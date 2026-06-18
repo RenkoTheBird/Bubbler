@@ -3,3 +3,11 @@
 
 *.xcuserstate
 xcuserdata/
+
+Pipfile
+Pipfile.lock
+
+venv/
+.env
+Pipfile.lock
+__pycache__/

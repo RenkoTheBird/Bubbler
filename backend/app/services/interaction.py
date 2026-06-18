@@ -1,5 +1,5 @@
 class InteractionService:
-    def __init__(self, repo: InteractionRepository):
+    def __init__(self, repo):
         self.repo = repo
 
     def getUserInteractions(self, id: int):

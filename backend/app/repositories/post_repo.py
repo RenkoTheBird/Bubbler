@@ -1,31 +1,33 @@
 from typing import List
-from app.models.post import Post
+from backend.app.schemas.post import Post
 
 class PostRepository:
-    def __init__(self, pool):
-        self.pool = pool
+
 
     # Posts for the graph are retrieved in feed_service.py
     # id here is user id
-    async def getUserPosts(self, id: int):
+    @classmethod
+    async def getUserPosts(cls, pool, id: int):
 
-        async with self.pool.acquire() as conn:
+        async with pool.acquire() as conn:
             posts = await conn.fetch(
                 "SELECT * FROM posts WHERE user_id = $1", id
             )
         
-        return [self._map_row(posts) for post in posts]
+        return [cls._map_row(post) for post in posts]
 
-    async def postUserPosts(self, id: int, post: str, embeddedPost: List[float]):
+    @classmethod
+    async def postUserPosts(cls, pool, id: int, post: str, embeddedPost: List[float]):
         
-        async with self.pool.acquire() as conn:
+        async with cls.pool.acquire() as conn:
             result = await conn.fetch(
                 "INSERT INTO posts (user_id, content, embedding) VALUES ($1, $2, $3)", id, post, embeddedPost
             )
 
-        return self._map_row(result)
+        return cls._map_row(result)
     
-    def _map_row(self, row) -> Post:
+    @classmethod
+    def _map_row(cls, row) -> Post:
         return Post(
             id=row["id"],
             user_id=row["user_id"],

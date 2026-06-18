@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.services.feed_service import FeedService
+from app.services.feed import FeedService
 
 
 def create_feed_router(feed_service: FeedService):
@@ -7,10 +7,10 @@ def create_feed_router(feed_service: FeedService):
 
     @router.get("/{id}/similar")
     async def get_feed(id: int):
-        return await feed_service.get_feed(id)
+        return await feed_service.getFeed(id)
 
     @router.get("/{id}/session")
     async def get_new_session_posts(id: int):
-        return await feed_service.get_new_session_posts(id)
+        return await feed_service.getNewSessionPosts(id)
 
     return router

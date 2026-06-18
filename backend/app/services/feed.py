@@ -59,7 +59,8 @@ class StrategyService:
             strategies.append(("similar", similar))
 
         if prefs.strategy_weights.get("opposite", 0) > 0:
-            pass
+            opposite = await self.repo.get_opposite_posts(embedding, limit=10)
+            strategies.append(("opposite", opposite))
 
         if prefs.strategy_weights.get("graph", 0) > 0:
             base = await self.repo.getSimilarPosts(embedding, limit=5)

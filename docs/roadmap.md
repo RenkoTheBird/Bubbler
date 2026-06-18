@@ -94,32 +94,7 @@ There is no `api/deps.py` anymore — **`startup.py` owns wiring**.
 
 **Goal:** App starts, all routers register, imports resolve, one feed request returns JSON.
 
-### Step 0.1 — Fix broken imports in routes
-
-Routes still reference old module names. Update imports:
-
-**File:** `backend/app/routes/feed.py`
-
-```python
-from app.services.feed import FeedService  # was feed_service
-```
-
-**File:** `backend/app/routes/user.py`
-
-```python
-from app.services.user import UserService
-from app.services.interaction import InteractionService
-from app.services.post import PostService
-```
-
-**File:** `backend/app/routes/auth.py`
-
-```python
-from app.schemas.user import CreateUser, UserLogin  # fix UserLoggin typo
-# Route handler should call auth_service.post_login_info(...) matching service method names
-```
-
-### Step 0.2 — Align service method names with routes
+### Step 0.1 — Align service method names with routes
 
 Several services use mixed `camelCase` / `snake_case`. Pick **snake_case** for Python and make routes + services match.
 
@@ -145,7 +120,7 @@ async def get_user_by_email(self, email: str):
         )
 ```
 
-### Step 0.3 — Wire all routers in `startup.py`
+### Step 0.2 — Wire all routers in `startup.py`
 
 **File:** `backend/app/startup.py` — today only auth registers. Extend:
 
@@ -188,7 +163,7 @@ class FeedRepository:
 
 Update `FeedService` / `StrategyService` / `GraphService` to call the snake_case methods.
 
-### Step 0.5 — Fix `FeedService` runtime bugs
+### Step 0.3 — Fix `FeedService` runtime bugs
 
 **File:** `backend/app/services/feed.py`
 
@@ -375,40 +350,13 @@ class InteractionRepository:
 
 Wire into `InteractionService` and `startup.py`. Add `POST /interactions` route (new file or extend `user.py`).
 
-### Step 2.3 — Restore opposite-post query
-
-**File:** `backend/app/repositories/feed_repo.py` — add back:
-
-```python
-async def get_opposite_posts(self, embedding, limit: int = 10):
-    async with self.pool.acquire() as conn:
-        rows = await conn.fetch(
-            """
-            SELECT id, content, topic, 1 - (embedding <=> $1) AS similarity
-            FROM posts
-            ORDER BY embedding <=> $1 DESC
-            LIMIT $2
-            """,
-            embedding, limit,
-        )
-    return [dict(r) for r in rows]
-```
-
-**File:** `backend/app/services/feed.py` — in `StrategyService.getCandidates`:
-
-```python
-if prefs.strategy_weights.get("opposite", 0) > 0:
-    opposite = await self.repo.get_opposite_posts(embedding, limit=10)
-    strategies.append(("opposite", opposite))
-```
-
-### Step 2.4 — Wire edge builder on post create
+### Step 2.3 — Wire edge builder on post create
 
 **File:** `backend/app/services/post.py` — after insert, call `EdgeBuilderRepo.build_edges_for_post`.
 
 Fix `post_repo.py` bugs (`cls.pool` → `self.pool`, import path `backend.app.schemas` → `app.schemas`).
 
-### Step 2.5 — Fix seed script + prefs typo
+### Step 2.4 — Fix seed script + prefs typo
 
 **File:** `scripts/seed_db.py` — use `config.py` env vars for connection string; match schema columns.
 

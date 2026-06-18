@@ -16,7 +16,7 @@ class PreferenceService:
 
         sortedTopics = sorted(topicScores.items(), key=lambda x: x[1], reverse=True)
 
-        prefs.preferredTopics = [t[0] for t in sortedTopics[:5]]
+        prefs.preferred_topics = [t[0] for t in sortedTopics[:5]]
 
         return prefs
 
@@ -100,7 +100,7 @@ class FeedService:
         interactions = await self.InteractionRepo.getRecentInteractions(userId)
         prefs = self.PreferenceService.updateFromInteractions(prefs, interactions)
 
-        embedding = EmbeddingService.embedText(userInput)
+        embedding = self.EmbeddingService.embedText(userInput)
 
         strategyResults = await self.StrategyService.getCandidates(embedding, prefs)
 
@@ -114,7 +114,7 @@ class FeedService:
         expandedIds = await self.GraphService.expandPosts(seedPosts)
         allIds = set(p["id"] for p in seedPosts) | set(expandedIds)
 
-        expandedPosts = self.repo.getPostsByIds(list(allIds))
+        expandedPosts = await self.repo.getPostsByIds(list(allIds))
 
         seedMap = {p["id"]: p for p in seeds}
 
@@ -139,4 +139,4 @@ class FeedService:
 
     async def getNewSessionPosts(self, userId: int):
         prefs = await self.PrefRepo.getPrefs(userId)
-        return await self.repo.getNewSessionPosts(prefs.diversityTolerance, [], None)
+        return await self.repo.getNewSessionPosts(prefs.diversity_tolerance, [], None)

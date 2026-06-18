@@ -141,7 +141,7 @@ fastapi.include_router(create_user_router(...), prefix="/users", tags=["users"])
 
 Store `pool` on `app.state.pool` so services/repos can access it if needed.
 
-### Step 0.4 — Pick one repository pattern
+### Step 0.3 — Pick one repository pattern
 
 **Problem:** `FeedRepository` uses `@classmethod` + `pool` argument; `FeedService` expects instance repos with methods like `getSimilarPosts`. `GraphService` calls `self.repo.getNeighbors` but repo has `get_neighbors(cls, pool, ...)`.
 
@@ -162,24 +162,6 @@ class FeedRepository:
 ```
 
 Update `FeedService` / `StrategyService` / `GraphService` to call the snake_case methods.
-
-### Step 0.3 — Fix `FeedService` runtime bugs
-
-**File:** `backend/app/services/feed.py`
-
-| Bug | Fix |
-|-----|-----|
-| `EmbeddingService.embedText` called on class | `self.EmbeddingService.embedText(userInput)` |
-| `getPostsByIds` without `await` | `await self.repo.get_posts_by_ids(...)` |
-| `prefs.diversityTolerance` | `prefs.diversity_tolerance` |
-| `PreferenceService` sets `preferredTopics` | `preferred_topics` |
-| Opposite strategy is `pass` | Restore query (Phase 2) |
-
-**File:** `backend/app/routes/feed.py` — methods should match service:
-
-```python
-return await feed_service.get_feed(user_id, q="")
-```
 
 **Checkpoint:** `uvicorn main:app --reload` from `backend/`, Swagger at `/docs` shows `/auth`, `/feed`, `/users`. No import errors on startup.
 
@@ -324,15 +306,7 @@ final class APIClient {
 
 These existed before the refactor but are **missing now**.
 
-### Step 2.1 — Recreate SQL schema
-
-**Create:** `backend/db/schema.sql` (new location — old `app/db/` is gone)
-
-Include: `users`, `topics`, `posts` (with `vector(384)`), `post_topics`, `edges`, `interactions` (with `view_time`), `user_profiles` (with `preferred_topics`, `blacklisted_topics`, `strategy_weights` JSONB).
-
-Align column names with repos — e.g. `password_hash` not `password`.
-
-### Step 2.2 — Recreate `interaction_repo`
+### Step 2.1 — Recreate `interaction_repo`
 
 **Create:** `backend/app/repositories/interaction_repo.py`
 
@@ -350,13 +324,13 @@ class InteractionRepository:
 
 Wire into `InteractionService` and `startup.py`. Add `POST /interactions` route (new file or extend `user.py`).
 
-### Step 2.3 — Wire edge builder on post create
+### Step 2.2 — Wire edge builder on post create
 
 **File:** `backend/app/services/post.py` — after insert, call `EdgeBuilderRepo.build_edges_for_post`.
 
 Fix `post_repo.py` bugs (`cls.pool` → `self.pool`, import path `backend.app.schemas` → `app.schemas`).
 
-### Step 2.4 — Fix seed script + prefs typo
+### Step 2.3 — Fix seed script + prefs typo
 
 **File:** `scripts/seed_db.py` — use `config.py` env vars for connection string; match schema columns.
 

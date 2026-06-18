@@ -1,7 +1,7 @@
 import datetime
 import bcrypt
 from app.repositories.auth_repo import AuthRepository
-from app.schemas.user import CreateUser, UserLoggin
+from app.schemas.user import CreateUser, UserLogin
 
 
 def hash_password(password: str):
@@ -15,7 +15,7 @@ class AuthService:
     def __init__(self, db_pool):
         self.auth_repo = AuthRepository(db_pool)
 
-    async def postLoginInfo(self, userloggin: UserLoggin):
+    async def postLoginInfo(self, userloggin: UserLogin):
         password_hash = hash_password(userloggin.password)
         em, pw = await self.auth_repo.postLoginInfo(id, userloggin.email, password_hash)
         return check_password(pw, password_hash)

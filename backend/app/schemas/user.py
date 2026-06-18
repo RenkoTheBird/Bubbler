@@ -1,17 +1,15 @@
 from pydantic import BaseModel, EmailStr
-import datetime
-
 
 class CreateUser(BaseModel):
     username: str
     email: EmailStr
     password: str
     
-class UserLoggin(BaseModel):
+class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
-# To load an user profile 
+# To load a user profile 
 class UserProfile(BaseModel):
     user_id: int
     

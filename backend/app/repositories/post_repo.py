@@ -3,7 +3,6 @@ from backend.app.schemas.post import Post
 
 class PostRepository:
 
-
     # Posts for the graph are retrieved in feed_service.py
     # id here is user id
     @classmethod

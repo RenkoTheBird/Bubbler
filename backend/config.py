@@ -1,35 +1,49 @@
-import logging
-from dotenv import load_dotenv
-from os import getenv
-from urllib.parse import quote_plus
+"""
+Developer testing script
+"""
 
-logger = logging.getLogger(__name__)
+import asyncio
+import asyncpg
+from ml.embeddings.generate import embed
+from config import my_env_vars  
 
-load_dotenv()
-
-env_vars = [
-    "DATABASE",
-    "DB_USER",
-    "DATABASE_PASSWORD",
-    "HOST",
-    "PORT",
+SAMPLE_POSTS = [
+    ("I love building side projects.", "tech"),
+    ("Morning runs clear my head.", "health"),
+    ("This startup idea needs validation.", "startups"),
+    ("Hot take: tabs over spaces.", "tech"),
 ]
 
-missing = [var for var in env_vars if getenv(var) is None]
+async def main():
+    # Use env-based DB URL
+    conn = await asyncpg.connect(my_env_vars.db_url)
 
-if missing:
-    raise SystemExit(f"Error: Missing enviroment variable/s: {missing}")
+    user_id = await conn.fetchval(
+        """
+        INSERT INTO users (username, email, password_hash)
+        VALUES ('demo', 'demo@bubbler.test', 'not-a-real-hash')
+        ON CONFLICT (email) DO UPDATE SET username = EXCLUDED.username
+        RETURNING id
+        """
+    )
 
-class EnvVars:
+    for content, topic in SAMPLE_POSTS:
+        vector = embed(content)
+        post_id = await conn.fetchval(
+            """
+            INSERT INTO posts (user_id, content, topic, embedding)
+            VALUES ($1, $2, $3, $4)
+            RETURNING id
+            """,
+            user_id,
+            content,
+            topic,
+            vector,
+        )
+        print("Inserted post", post_id)
 
-    def __init__(self):
-        self.database = getenv("DATABASE")
-        self.db_user = getenv("DB_USER")
-        self.db_pass = getenv("DATABASE_PASSWORD")
-        self.host = getenv("HOST")
-        self.port = getenv("PORT")
-        # helps format parse it properly 
-        self.db_url = f"postgresql://{self.db_user}:{quote_plus(self.db_pass)}@{self.host}:{self.port}/{self.database}"
-        logger.info("Environment variables loaded successfully")
-        
-my_env_vars = EnvVars()
+    await conn.close()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

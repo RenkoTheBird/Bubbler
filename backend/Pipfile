@@ -10,6 +10,7 @@ fastapi = "*"
 dotenv = "*"
 asyncpg = "*"
 pydantic = {extras = ["email"], version = "*"}
+sentence-transformers = "*"
 
 [dev-packages]
 

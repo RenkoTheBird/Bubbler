@@ -330,14 +330,6 @@ Wire into `InteractionService` and `startup.py`. Add `POST /interactions` route 
 
 Fix `post_repo.py` bugs (`cls.pool` → `self.pool`, import path `backend.app.schemas` → `app.schemas`).
 
-### Step 2.3 — Fix seed script + prefs typo
-
-**File:** `scripts/seed_db.py` — use `config.py` env vars for connection string; match schema columns.
-
-**File:** `backend/app/repositories/user_repo.py` line 53 — fix `preferrred_topics` → `preferred_topics`.
-
-**File:** `backend/Pipfile` — add `sentence-transformers` if embeddings run in-process.
-
 **Checkpoint:** Seed script inserts users + posts + edges. `GET /feed/1` returns ranked posts.
 
 ---

@@ -50,7 +50,7 @@ class UserRepository:
             user_id=rows["user_id"],
             diversity_tolerance=rows["diversity_tolerance"],
             randomness=rows["randomness"],
-            preferred_topics=list(rows["preferrred_topics"]),
+            preferred_topics=list(rows["preferred_topics"]),
             blacklisted_topics=list(rows["blacklisted_topics"]),
             use_view_time=rows["use_view_time"],
             view_time_weight=rows["view_time_weight"],

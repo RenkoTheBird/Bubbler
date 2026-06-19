@@ -324,14 +324,6 @@ class InteractionRepository:
 
 Wire into `InteractionService` and `startup.py`. Add `POST /interactions` route (new file or extend `user.py`).
 
-### Step 2.2 — Wire edge builder on post create
-
-**File:** `backend/app/services/post.py` — after insert, call `EdgeBuilderRepo.build_edges_for_post`.
-
-Fix `post_repo.py` bugs (`cls.pool` → `self.pool`, import path `backend.app.schemas` → `app.schemas`).
-
-**Checkpoint:** Seed script inserts users + posts + edges. `GET /feed/1` returns ranked posts.
-
 ---
 
 ## Phase 3 — Connect iOS to Real Data

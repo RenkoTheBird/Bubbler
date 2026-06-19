@@ -1,5 +1,4 @@
 from app.repositories.user_repo import UserProfile
-import datetime
 
 class AuthRepository:
 

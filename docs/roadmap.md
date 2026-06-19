@@ -133,7 +133,7 @@ from app.services.interaction import InteractionService
 from app.routes.feed import create_feed_router
 from app.routes.user import create_user_router
 
-# Build services (pass pool into repos — see Step 0.4)
+# Build services (pass pool into repos — see Step 0.3)
 feed_service = FeedService(...)
 fastapi.include_router(create_feed_router(feed_service), prefix="/feed", tags=["feed"])
 fastapi.include_router(create_user_router(...), prefix="/users", tags=["users"])

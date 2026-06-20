@@ -1,13 +1,11 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr , Field
 
+# Doesnt need ID or Register Time autofilled by DB 
 class CreateUser(BaseModel):
-    username: str
-    email: EmailStr
-    password: str
-    
-class UserLogin(BaseModel):
-    email: EmailStr
-    password: str
+    username: str = Field(min_length=1, max_length=20)
+    email: EmailStr = Field(max_length=80)
+    password: str = Field(min_length=5, max_length=40) ## logical limit at api side truly capped at 60 for hash at db 
+
 
 # To load a user profile 
 class UserProfile(BaseModel):

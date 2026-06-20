@@ -13,8 +13,12 @@ env_vars = [
     "DATABASE_PASSWORD",
     "HOST",
     "PORT",
+    "ALGORITHM",
+    "TIMEOFFSET",
+    "SECRETKEY"
 ]
 
+# verify the presence of all required env vars 
 missing = [var for var in env_vars if getenv(var) is None]
 
 if missing:
@@ -28,6 +32,10 @@ class EnvVars:
         self.db_pass = getenv("DATABASE_PASSWORD")
         self.host = getenv("HOST")
         self.port = getenv("PORT")
+        self.algorithm = getenv("ALGORITHM")
+        self.timeoffset = int(getenv("TIMEOFFSET"))
+        self.secret_key = getenv("SECRETKEY")
+        
         # helps format parse it properly 
         self.db_url = f"postgresql://{self.db_user}:{quote_plus(self.db_pass)}@{self.host}:{self.port}/{self.database}"
         logger.info("Environment variables loaded successfully")

@@ -5,25 +5,18 @@ class AuthRepository:
     def __init__(self, pool):
         self.pool = pool
 
-    async def postLoginInfo(self, id: int, email: str, password_hash: str):
+    async def postLoginInfo(self, email: str):
         async with self.pool.acquire() as conn:
-            result = await conn.fetch("""SELECT email, password_hash FROM users WHERE id=$1""", id)
-        
-        return [self._map_user(res) for res in result]
-
-    async def postRegistrationInfo(self, id: int, username: str, email: str, password_hash: str):
-        
+            row = await conn.fetchrow("""SELECT password, id FROM users WHERE email=$1 OR """, email)
+        return row
+            
+    async def postRegistrationInfo(self, username: str, email: str, password_hash: str):
         async with self.pool.acquire() as conn:
-            result = await conn.execute(
+            result = await conn.fetchval(
                 """INSERT INTO users (username, email, password) 
-                   VALUES ($1, $2, $3 )""",
-                   username, email, password_hash
+                VALUES ($1, $2, $3)
+                RETURNING id""",
+                username, email, password_hash
             )
-        
         return result
     
-    def _map_user(self, row) -> UserProfile:
-        return UserProfile (
-            email=row["email"],
-            password_hash=row["password_hash"]
-        )

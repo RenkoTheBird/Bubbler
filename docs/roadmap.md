@@ -1,128 +1,154 @@
 # Bubbler Roadmap — What to Do Next
 
-Step-by-step plan for a **solo developer**. Plain language, exact file paths, updated for the **refactored backend** (post–folder restructure).
+Step-by-step plan for a **solo developer**. Plain language, exact file paths. Updated after auth pipeline changes and re-added refactor items.
 
 ---
 
 ## Where You Are Today
 
-### Already in place (do not re-build these)
+### Already in place (do not re-build)
 
 | Area | Location | Notes |
 |------|----------|-------|
-| Env-based DB config | `backend/config.py` | Loads `DATABASE`, `DB_USER`, `DATABASE_PASSWORD`, `HOST`, `PORT`; builds `db_url` |
-| App lifespan + DB pool | `backend/app/startup.py` | asyncpg pool on startup |
-| Dependency manifest | `backend/Pipfile` | FastAPI, asyncpg, passlib/bcrypt, pydantic |
+| Env-based DB + JWT config | `backend/config.py` | `DATABASE`, `DB_USER`, `DATABASE_PASSWORD`, `HOST`, `PORT`, `SECRETKEY`, `ALGORITHM`, `TIMEOFFSET` |
+| App lifespan + DB pool | `backend/app/startup.py` | asyncpg pool; auth service wired |
+| Dependencies | `backend/Pipfile` | FastAPI, asyncpg, bcrypt/passlib, pyjwt, python-multipart, sentence-transformers |
 | Route factory pattern | `backend/app/routes/*.py` | `create_auth_router`, `create_feed_router`, `create_user_router` |
-| Pydantic schemas | `backend/app/schemas/` | `CreateUser`, `UserLogin`, `UserProfile`, `Post`, `Interaction`, `Edge` |
-| bcrypt helpers | `backend/app/services/auth.py` | `hash_password`, `check_password` |
-| Auth endpoints (shape) | `backend/app/routes/auth.py` | `POST /login`, `POST /register` with request bodies |
-| Feed algorithm code | `backend/app/services/feed.py` | `FeedService`, `StrategyService`, `RankingService`, `PreferenceService` |
+| Route imports (fixed) | `feed.py`, `user.py` | Import from `app.services.feed`, `user`, `post`, `interaction` |
+| Pydantic schemas | `backend/app/schemas/` | `CreateUser`, `UserProfile`, `Post`, `Interaction`, `Edge` |
+| bcrypt + JWT in auth service | `backend/app/services/auth.py` | `hash_password`, `check_password`, `create_access_token`; login/register return JWT |
+| OAuth2 login route | `backend/app/routes/auth.py` | `POST /login` uses `OAuth2PasswordRequestForm`; `POST /register` uses `CreateUser` |
+| SQL schema reference | `backend/app/db/schema.sql` | users, topics, posts, edges, interactions, user_profiles |
+| Feed algorithm | `backend/app/services/feed.py` | Feed, Strategy, Ranking, Preference services; opposite strategy wired |
 | Graph expansion | `backend/app/services/graph.py` | DFS over edges |
-| Feed DB queries | `backend/app/repositories/feed_repo.py` | Similar/random/posts-by-id/neighbors/session (classmethod + pool) |
-| User prefs query | `backend/app/repositories/user_repo.py` | `getPrefs` (merged from old `user_pref_repo`) |
+| Feed DB queries | `backend/app/repositories/feed_repo.py` | similar, opposite, random, posts-by-id, neighbors, session |
+| User prefs query | `backend/app/repositories/user_repo.py` | `getPrefs`; `preferred_topics` typo fixed |
+| Interaction repo file | `backend/app/repositories/interaction_repo.py` | Class exists |
 | Edge builder | `backend/app/repositories/edge_builder_repo.py` | `build_edges_for_post` |
 | iOS UI shell | `BubblerApp/BubblerApp/` | Login, create account, feed, profile, settings, bubble detail |
 | Seed script skeleton | `scripts/seed_db.py` | Sample posts + embeddings |
 
-### Not done yet (your actual backlog)
+### Not done yet (your backlog)
 
 | Area | Status |
 |------|--------|
-| All routers registered in `startup.py` | ❌ Only auth is registered today |
-| Import paths aligned with new file names | ❌ Routes import `feed_service`, `user_service`, etc. — files are `feed.py`, `user.py` |
-| JWT auth | ❌ Not implemented |
-| Firebase → backend auth on iOS | ❌ Still on Firebase (`AuthSession.swift`) |
-| SQL schema file | ❌ Removed in refactor — no `backend/app/db/schema.sql` |
-| `interaction_repo` | ❌ Removed — `InteractionService` has nothing to call |
+| Feed + user routers registered in `startup.py` | ❌ Only auth router today |
+| Auth repo SQL + column alignment | ❌ Broken login query; `password` vs `password_hash` mismatch |
+| Standard OAuth2 token response | ❌ Login returns raw JWT string, not `{access_token, token_type}` |
+| JWT verification on protected routes | ❌ No `get_current_user_id` dependency |
+| Repo pattern unified (instance vs classmethod) | ❌ Services call camelCase methods; repos use snake_case classmethods |
+| `interaction_repo` implemented | ❌ Methods are `pass` stubs |
+| `user_profiles` schema vs model | ❌ Schema missing topic lists, strategy_weights, view_time |
+| Seed script aligned with schema | ❌ Still uses `topic`, `password_hash` vs live DB columns |
+| Edge builder wired on post create | 🟡 Attempted in `post.py` but not correctly connected |
+| iOS backend auth (drop Firebase) | ❌ `AuthSession.swift` still uses Firebase |
+| iOS ↔ API | ❌ No `APIClient` in `BubblerApp/` |
 | Graph HTTP route | ❌ No `routes/graph.py` |
-| `getOppositePosts` | ❌ Removed from `feed_repo` |
-| iOS ↔ API connection | ❌ No `APIClient` in `BubblerApp/` |
 | Graph path UI | ❌ Feed is mock data |
 | Algorithm settings (wired) | ❌ Settings UI is placeholders |
 | Automated tests / CI | ❌ None |
 
-**Big picture:** The refactor cleaned up folder layout (`routes/`, `services/`, `schemas/`, `startup.py`) but only auth is wired end-to-end. Several pieces from the pre-refactor backend were dropped or left half-migrated. Next priorities: finish wiring, restore missing repos/schema, add JWT, connect iOS, then build the graph loop.
+**Big picture:** Auth pipeline exists on the backend (bcrypt + JWT issuance), and missing refactor files are back. What remains is fixing auth/repo bugs, registering the rest of the routers, protecting routes with JWT, finishing interaction + schema alignment, then connecting iOS and building the graph loop.
 
 ---
 
-## New Backend Layout (read this once)
+## Backend Layout
 
 ```
 backend/
-├── main.py                 # FastAPI app + lifespan import
-├── config.py               # Env vars → db_url
-├── Pipfile                 # Dependencies
+├── main.py
+├── config.py               # DB + JWT env vars
+├── Pipfile
 ├── app/
-│   ├── startup.py          # Pool, service init, router registration
+│   ├── startup.py          # Pool + router registration (auth only today)
+│   ├── db/schema.sql
 │   ├── routes/
-│   │   ├── auth.py         # create_auth_router(auth_service)
-│   │   ├── feed.py         # create_feed_router(feed_service)
-│   │   └── user.py         # create_user_router(...)
-│   ├── services/
 │   │   ├── auth.py
-│   │   ├── feed.py         # Feed + Strategy + Ranking + Preference
+│   │   ├── feed.py
+│   │   └── user.py
+│   ├── services/
+│   │   ├── auth.py         # bcrypt + JWT
+│   │   ├── feed.py
 │   │   ├── graph.py
 │   │   ├── post.py
 │   │   ├── user.py
 │   │   └── interaction.py
 │   ├── repositories/
 │   │   ├── auth_repo.py
-│   │   ├── feed_repo.py    # Also handles graph neighbor queries
+│   │   ├── feed_repo.py
 │   │   ├── post_repo.py
-│   │   ├── user_repo.py    # Profile + preferences
+│   │   ├── user_repo.py
+│   │   ├── interaction_repo.py
 │   │   └── edge_builder_repo.py
 │   └── schemas/
-│       ├── user.py
-│       ├── post.py
-│       └── edge.py
 ```
 
-There is no `api/deps.py` anymore — **`startup.py` owns wiring**.
+`startup.py` owns all wiring — there is no separate `deps.py` yet.
 
 ---
 
 ## How to Read This Roadmap
 
 - Phases are ordered. Complete each checkpoint before moving on.
-- Steps listed here are **not yet done**. Completed work appears only in the summary table above.
-- Code blocks are examples — match naming to your files as you implement.
+- Everything below is **still to do**. Completed work appears only in the table above.
+- Code blocks are examples — match your files as you implement.
 
 ---
 
-## Phase 0 — Finish Refactor Wiring
+## Phase 0 — Fix Auth + Register Remaining Routers
 
-**Goal:** App starts, all routers register, imports resolve, one feed request returns JSON.
+**Goal:** Login and register work against Supabase/Postgres; feed and user routes appear in Swagger.
 
-### Step 0.1 — Align service method names with routes
+### Step 0.1 — Fix `auth_repo.py`
 
-Several services use mixed `camelCase` / `snake_case`. Pick **snake_case** for Python and make routes + services match.
+**File:** `backend/app/repositories/auth_repo.py`
 
-**File:** `backend/app/services/auth.py` — fix login (undefined `id`, wrong hash flow):
-
-```python
-async def post_login_info(self, email: str, password: str):
-    row = await self.auth_repo.get_user_by_email(email)
-    if not row:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    if not check_password(password.encode(), row["password_hash"].encode()):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    return row  # later: wrap in JWT (Phase 1)
-```
-
-**File:** `backend/app/repositories/auth_repo.py` — fix column name (`password` → `password_hash`), add lookup by email:
+Current login query is broken (`OR ""`). Align columns with `schema.sql` (`password_hash`):
 
 ```python
-async def get_user_by_email(self, email: str):
+async def postLoginInfo(self, email: str):
     async with self.pool.acquire() as conn:
         return await conn.fetchrow(
-            "SELECT id, email, password_hash FROM users WHERE email = $1", email
+            "SELECT id, password_hash FROM users WHERE email = $1 OR username = $1",
+            email,
+        )
+
+async def postRegistrationInfo(self, username: str, email: str, password_hash: str):
+    async with self.pool.acquire() as conn:
+        return await conn.fetchval(
+            """
+            INSERT INTO users (username, email, password_hash)
+            VALUES ($1, $2, $3)
+            RETURNING id
+            """,
+            username, email, password_hash,
         )
 ```
 
-### Step 0.2 — Wire all routers in `startup.py`
+**File:** `backend/app/services/auth.py` — read `password_hash` from row:
 
-**File:** `backend/app/startup.py` — today only auth registers. Extend:
+```python
+if not check_password(password.encode(), row["password_hash"].encode()):
+    ...
+```
+
+### Step 0.2 — Return standard token shape from login
+
+OAuth2 clients (and iOS) expect a JSON object, not a bare string.
+
+**File:** `backend/app/services/auth.py`
+
+```python
+def _token_response(self, user_id: int) -> dict:
+    token = self.create_access_token({"sub": str(user_id)})
+    return {"access_token": token, "token_type": "bearer", "user_id": user_id}
+```
+
+Use in both `postLoginInfo` and `postRegistrationInfo`.
+
+### Step 0.3 — Register feed + user routers in `startup.py`
+
+**File:** `backend/app/startup.py` — only auth is registered today. Add:
 
 ```python
 from app.services.feed import FeedService, StrategyService, RankingService, PreferenceService
@@ -130,73 +156,106 @@ from app.services.graph import GraphService
 from app.services.post import PostService, EmbeddingService
 from app.services.user import UserService
 from app.services.interaction import InteractionService
+from app.repositories.feed_repo import FeedRepository
+from app.repositories.user_repo import UserRepository
+from app.repositories.interaction_repo import InteractionRepository
+from app.repositories.post_repo import PostRepository
 from app.routes.feed import create_feed_router
 from app.routes.user import create_user_router
 
-# Build services (pass pool into repos — see Step 0.3)
-feed_service = FeedService(...)
+# After pool creation — build services with pool, register routers:
+fastapi.state.pool = pool
+feed_service = FeedService(...)   # wire repos + services
 fastapi.include_router(create_feed_router(feed_service), prefix="/feed", tags=["feed"])
-fastapi.include_router(create_user_router(...), prefix="/users", tags=["users"])
+fastapi.include_router(create_user_router(user_service, interaction_service, post_service), prefix="/users", tags=["users"])
 ```
 
-Store `pool` on `app.state.pool` so services/repos can access it if needed.
+### Step 0.4 — Unify repository pattern
 
-### Step 0.3 — Pick one repository pattern
+**Problem:** `FeedService` calls `self.repo.getSimilarPosts(...)` but `FeedRepository` exposes `get_similar_posts(cls, pool, ...)`. Same for `GraphService.getNeighbors` vs `get_neighbors`.
 
-**Problem:** `FeedRepository` uses `@classmethod` + `pool` argument; `FeedService` expects instance repos with methods like `getSimilarPosts`. `GraphService` calls `self.repo.getNeighbors` but repo has `get_neighbors(cls, pool, ...)`.
-
-Choose **instance repos** (cleaner with your service classes):
-
-**File:** `backend/app/repositories/feed_repo.py`
+Pick **instance repos** that hold `pool`:
 
 ```python
+# feed_repo.py
 class FeedRepository:
     def __init__(self, pool):
         self.pool = pool
 
     async def get_similar_posts(self, embedding, limit=4):
-        ...
+        async with self.pool.acquire() as conn:
+            ...
+```
 
-    async def get_neighbors(self, post_id, limit=4):
+Update `StrategyService`, `GraphService`, and `FeedService` to call snake_case instance methods.
+
+Fix `get_opposite_posts` — it is a `@classmethod` but uses `self.pool` (will crash):
+
+```python
+async def get_opposite_posts(self, embedding, limit: int = 10):
+    async with self.pool.acquire() as conn:
         ...
 ```
 
-Update `FeedService` / `StrategyService` / `GraphService` to call the snake_case methods.
-
-**Checkpoint:** `uvicorn main:app --reload` from `backend/`, Swagger at `/docs` shows `/auth`, `/feed`, `/users`. No import errors on startup.
+**Checkpoint:** `uvicorn main:app --reload` from `backend/` → `/docs` shows `/login`, `/register`, `/feed`, `/users`. Register + login return `access_token`.
 
 ---
 
-## Phase 1 — Auth: bcrypt + JWT (Replace Firebase)
+## Phase 1 — JWT Protection on Routes
 
-**Goal:** Backend issues JWT on login/register. iOS can authenticate without Firebase.
+**Goal:** Feed and user endpoints require a valid Bearer token.
 
-### Step 1.1 — Add JWT dependencies and config
+### Step 1.1 — Add JWT verification dependency
 
-**File:** `backend/Pipfile` — add:
-
-```toml
-python-jose = {extras = ["cryptography"], version = "*"}
-```
-
-**File:** `backend/config.py` — add `JWT_SECRET` and `JWT_EXPIRE_MINUTES` to required env vars (or optional with dev default).
-
-**Create:** `backend/app/security/jwt.py`
+**Create:** `backend/app/security/deps.py`
 
 ```python
-from datetime import datetime, timedelta, timezone
-from jose import jwt
+import jwt
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from config import my_env_vars
 
-def create_access_token(user_id: int) -> str:
-    payload = {
-        "sub": str(user_id),
-        "exp": datetime.now(timezone.utc) + timedelta(minutes=my_env_vars.jwt_expire_minutes),
-    }
-    return jwt.encode(payload, my_env_vars.jwt_secret, algorithm="HS256")
+security = HTTPBearer()
+
+async def get_current_user_id(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+) -> int:
+    try:
+        payload = jwt.decode(
+            credentials.credentials,
+            my_env_vars.secret_key,
+            algorithms=[my_env_vars.algorithm],
+        )
+        return int(payload["sub"])
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
 ```
 
-**Create:** `backend/.env.example`:
+Pass `secret_key` and `algorithm` from `startup.py` if you prefer not to import config in deps.
+
+### Step 1.2 — Protect feed and user routes
+
+**File:** `backend/app/routes/feed.py`
+
+```python
+from app.security.deps import get_current_user_id
+
+@router.get("/me")
+async def get_my_feed(user_id: int = Depends(get_current_user_id)):
+    return await feed_service.getFeed(user_id, q="")
+
+@router.get("/me/session")
+async def get_session_posts(user_id: int = Depends(get_current_user_id)):
+    return await feed_service.getNewSessionPosts(user_id)
+```
+
+Keep `/{id}` variants temporarily for local debugging if useful, but `/me` is the target shape.
+
+Apply the same pattern to user routes (`/users/me/profile`, etc.).
+
+### Step 1.3 — Create `.env.example`
+
+**Create:** `backend/.env.example`
 
 ```env
 DATABASE=bubbler
@@ -204,210 +263,280 @@ DB_USER=bubbler
 DATABASE_PASSWORD=changeme
 HOST=localhost
 PORT=5432
-JWT_SECRET=change-me-in-production
-JWT_EXPIRE_MINUTES=10080
+SECRETKEY=change-me-in-production
+ALGORITHM=HS256
+TIMEOFFSET=168
 ```
 
-### Step 1.2 — Return JWT from auth endpoints
+**Checkpoint:** `GET /feed/me` without token → 401. With `Authorization: Bearer <token>` → 200.
 
-**File:** `backend/app/services/auth.py`
+---
+
+## Phase 2 — Finish Backend Data Layer
+
+**Goal:** Schema, seed script, interactions, and edge building all work together.
+
+### Step 2.1 — Extend `user_profiles` in schema
+
+**File:** `backend/app/db/schema.sql`
+
+`UserRepository.getPrefs` expects columns not in the current schema. Add:
+
+```sql
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS preferred_topics TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS blacklisted_topics TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS use_view_time BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS view_time_weight FLOAT DEFAULT 0.1;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS strategy_weights JSONB NOT NULL DEFAULT '{"similar":0.7,"graph":0.2,"opposite":0.0,"random":0.1}';
+```
+
+Also add `view_time FLOAT` to `interactions` if you plan to use it.
+
+Apply on Supabase or local Postgres.
+
+### Step 2.2 — Implement `interaction_repo.py`
+
+**File:** `backend/app/repositories/interaction_repo.py` — replace `pass` stubs:
 
 ```python
-async def post_login_info(self, email: str, password: str):
-    user = await self.auth_repo.get_user_by_email(email)
-    # ... verify password ...
-    token = create_access_token(user["id"])
-    return {"access_token": token, "token_type": "bearer", "user_id": user["id"]}
+async def record(self, user_id: int, post_id: str, type: str, view_time: float = 0):
+    async with self.pool.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO interactions (user_id, post_id, type, view_time)
+            VALUES ($1, $2, $3, $4)
+            """,
+            user_id, post_id, type, view_time,
+        )
+
+async def get_recent_interactions(self, user_id: int, limit: int = 50):
+    async with self.pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT i.*, t.name AS topic
+            FROM interactions i
+            JOIN posts p ON p.id = i.post_id
+            LEFT JOIN post_topics pt ON pt.post_id = p.id
+            LEFT JOIN topics t ON t.id = pt.topic_id
+            WHERE i.user_id = $1
+            ORDER BY i.created_at DESC
+            LIMIT $2
+            """,
+            user_id, limit,
+        )
+    return rows
 ```
 
-Same pattern for register — create user, return token.
+Wire into `InteractionService` (add `async`, fix method names) and register in `startup.py`.
 
-### Step 1.3 — Protect routes with JWT dependency
-
-**Create:** `backend/app/security/deps.py`
+Add route:
 
 ```python
-from fastapi import Depends, HTTPException
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from jose import jwt, JWTError
-
-security = HTTPBearer()
-
-async def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)) -> int:
-    try:
-        payload = jwt.decode(credentials.credentials, my_env_vars.jwt_secret, algorithms=["HS256"])
-        return int(payload["sub"])
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
+# user.py or new routes/interactions.py
+@router.post("/me/interactions")
+async def record_interaction(body: InteractionCreate, user_id: int = Depends(get_current_user_id)):
+    return await interaction_service.record(user_id, body)
 ```
 
-Use on feed/user routes instead of raw `{id}` in URL where appropriate:
+### Step 2.3 — Fix seed script
+
+**File:** `scripts/seed_db.py`
+
+- Read connection string from env (same vars as `config.py`) instead of hard-coded URL
+- Use `password_hash` column (not `password`)
+- Insert topics first, then posts with `topic_id` (schema uses `topic_id`, not `topic`)
+- Call `EdgeBuilderRepo.build_edges_for_post` after each post insert
+
+### Step 2.4 — Wire edge builder + fix `post_repo.py`
+
+**File:** `backend/app/repositories/post_repo.py`
+
+- Fix import: `from app.schemas.post import Post`
+- Fix `cls.pool` → use `pool` parameter passed to classmethod, or switch to instance repo
+- `postUserPosts` should `RETURNING *` and return a dict with `id`
+
+**File:** `backend/app/services/post.py`
 
 ```python
-@router.get("/me")
-async def get_my_feed(user_id: int = Depends(get_current_user_id), ...):
-    return await feed_service.get_feed(user_id, "")
+async def postUserPosts(self, user_id, content):
+    embedded = self.EmbeddingService.embedText(content)
+    row = await self.repo.postUserPosts(user_id, content, embedded)
+    await self.edge_builder.build_edges_for_post(row["id"], embedded)
+    return row
 ```
 
-### Step 1.4 — Conditions for dropping Firebase (iOS)
+Inject `EdgeBuilderRepo` in constructor via `startup.py`.
 
-Do **not** remove Firebase until **all** of these are true:
+**Checkpoint:** Seed script runs cleanly. New post creates edges. `GET /feed/me` returns ranked posts for a seeded user.
+
+---
+
+## Phase 3 — iOS: Drop Firebase, Use Backend Auth
+
+**Goal:** Login and register hit your FastAPI backend; JWT stored in Keychain.
+
+### Conditions for dropping Firebase
+
+Do **not** remove Firebase until **all** of these pass:
 
 | # | Condition | How to verify |
 |---|-----------|---------------|
-| 1 | `POST /login` returns `access_token` | curl or Swagger |
-| 2 | `POST /register` creates user + returns token | New email registers successfully |
-| 3 | Protected endpoint rejects missing token (401) | curl without `Authorization` header |
-| 4 | Protected endpoint accepts valid token (200) | curl with `Bearer <token>` |
-| 5 | iOS `AuthSession` calls backend login/register | Breakpoint / log network call |
-| 6 | Token stored in Keychain (survives app restart) | Kill app, reopen, still signed in |
-| 7 | `APIClient` sends `Authorization: Bearer ...` on every request | Log headers in debug |
-| 8 | Login + create-account flows work on device/simulator | Manual test both paths |
+| 1 | `POST /register` returns `{access_token, token_type}` | curl / Swagger |
+| 2 | `POST /login` (form: username=email, password=…) returns token | curl / Swagger |
+| 3 | Protected route rejects missing token (401) | curl without header |
+| 4 | Protected route accepts valid token (200) | curl with `Bearer` |
+| 5 | iOS `AuthSession` calls backend login/register | Network log |
+| 6 | Token stored in Keychain (survives restart) | Kill app, reopen |
+| 7 | `APIClient` sends `Authorization: Bearer …` | Debug log |
+| 8 | Login + create-account flows work on simulator | Manual test |
 
 **Only after 1–8:** remove Firebase.
 
-### Step 1.5 — Replace Firebase on iOS
+### Step 3.1 — Add `APIClient` + Keychain helper
 
 **Create:** `BubblerApp/BubblerApp/APIClient.swift`
 
-```swift
-final class APIClient {
-    static let shared = APIClient()
-    private let baseURL = URL(string: "http://127.0.0.1:8000")!
+Login uses form-encoded body (OAuth2), not JSON:
 
-    func post<T: Decodable>(_ path: String, body: Encodable, token: String? = nil) async throws -> T {
-        var request = URLRequest(url: baseURL.appendingPathComponent(path))
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
-        request.httpBody = try JSONEncoder().encode(body)
-        let (data, _) = try await URLSession.shared.data(for: request)
-        return try JSONDecoder().decode(T.self, from: data)
+```swift
+func login(email: String, password: String) async throws -> AuthResponse {
+    var request = URLRequest(url: baseURL.appendingPathComponent("/login"))
+    request.httpMethod = "POST"
+    request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+    let body = "username=\(email.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? email)&password=\(password.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? password)"
+    request.httpBody = body.data(using: .utf8)
+    ...
+}
+```
+
+Register uses JSON matching `CreateUser`:
+
+```swift
+struct RegisterBody: Encodable {
+    let username: String
+    let email: String
+    let password: String
+}
+```
+
+**Create:** `BubblerApp/BubblerApp/KeychainStore.swift` — save/load/delete `access_token`.
+
+Reference pattern: `ios-app/BubblerApp/App/Services/APIClient.swift` (copy ideas, don't maintain two apps).
+
+### Step 3.2 — Rewrite `AuthSession.swift`
+
+**File:** `BubblerApp/BubblerApp/AuthSession.swift`
+
+- Remove `import FirebaseAuth`
+- `signIn` → `APIClient.login` → store token in Keychain → set `isSignedIn = true`
+- `createAccount` → `APIClient.register` → same
+- `signOut` → delete Keychain token
+- On init, restore session if Keychain has valid token
+
+**Update:** `BubblerApp/BubblerApp/ContentView.swift` — remove `FirebaseCore`, `AppDelegate`, `FirebaseApp.configure()`.
+
+**Update:** `CreateAccountView.swift` — collect username (backend requires it).
+
+**Delete (after checklist):**
+
+- `BubblerApp/BubblerApp/GoogleService-Info.plist`
+- Firebase SPM dependency in Xcode
+
+**Checkpoint:** Register → login → token in Keychain → no Firebase imports.
+
+---
+
+## Phase 4 — Connect iOS to Real Feed Data
+
+**Goal:** `FeedView` shows API posts, not hard-coded cards.
+
+### Step 4.1 — Add models + view model
+
+**Create:** `BubblerApp/BubblerApp/Post.swift`, `FeedViewModel.swift`
+
+```swift
+@MainActor
+final class FeedViewModel: ObservableObject {
+    @Published var posts: [Post] = []
+
+    func loadFeed(token: String) async {
+        posts = try await APIClient.shared.get("/feed/me", token: token)
     }
 }
 ```
 
-**Rewrite:** `BubblerApp/BubblerApp/AuthSession.swift` — remove `import FirebaseAuth`; call `/login` and `/register`; store token via Keychain helper.
+### Step 4.2 — Wire `FeedView.swift`
 
-**Update:** `BubblerApp/BubblerApp/ContentView.swift` — remove `FirebaseCore`, `AppDelegate`, `FirebaseApp.configure()`.
+Replace hard-coded `feedCard(...)` placeholders with `ForEach(viewModel.posts)`. Pass token from `AuthSession`.
 
-**Delete (after conditions met):**
-
-- `BubblerApp/BubblerApp/GoogleService-Info.plist`
-- Firebase package from Xcode (`project.pbxproj` / Swift Package dependencies)
-
-**Checkpoint:** Register → login → token in Keychain → authenticated API call succeeds. No Firebase imports remain.
+**Checkpoint:** Signed-in user sees real post content from the database.
 
 ---
 
-## Phase 2 — Restore Missing Backend Pieces
-
-**Goal:** Database schema exists, seed data loads, interactions and opposite-post strategy work.
-
-These existed before the refactor but are **missing now**.
-
-### Step 2.1 — Recreate `interaction_repo`
-
-**Create:** `backend/app/repositories/interaction_repo.py`
-
-```python
-class InteractionRepository:
-    def __init__(self, pool):
-        self.pool = pool
-
-    async def record(self, user_id: int, post_id: str, type: str, view_time: float = 0):
-        ...
-
-    async def get_recent_interactions(self, user_id: int, limit: int = 50):
-        ...
-```
-
-Wire into `InteractionService` and `startup.py`. Add `POST /interactions` route (new file or extend `user.py`).
-
----
-
-## Phase 3 — Connect iOS to Real Data
-
-**Goal:** `FeedView` shows API posts, not hard-coded cards.
-
-### Step 3.1 — Add models + view model
-
-**Create:** `BubblerApp/BubblerApp/Post.swift`, `FeedViewModel.swift`
-
-Load from `/feed/me` (JWT) or `/feed/{id}` during development.
-
-### Step 3.2 — Replace mock cards in `FeedView.swift`
-
-Swap `feedCard(...)` placeholders for `ForEach(viewModel.posts)`.
-
-Keep bubble chips static for now — topic filtering comes in Phase 5.
-
-**Checkpoint:** Signed-in user sees real post content from Postgres.
-
----
-
-## Phase 4 — Graph Path (Core Product)
+## Phase 5 — Graph Path (Core Product)
 
 **Goal:** One current post + tap-to-choose next posts (DAG path).
 
-### Step 4.1 — Graph route
+### Step 5.1 — Graph route
 
 **Create:** `backend/app/routes/graph.py`
 
 ```python
-def create_graph_router(pool):
+def create_graph_router(feed_repo, get_current_user_id):
     router = APIRouter()
 
     @router.get("/posts/{post_id}/next")
     async def get_next_posts(post_id: str, user_id: int = Depends(get_current_user_id)):
-        neighbors = await FeedRepository(pool).get_neighbors(post_id, limit=4)
+        neighbors = await feed_repo.get_neighbors(post_id, limit=4)
         ids = [n["to_post_id"] for n in neighbors]
-        return await FeedRepository(pool).get_posts_by_ids(ids)
+        return await feed_repo.get_posts_by_ids(ids)
 
     return router
 ```
 
 Register in `startup.py` with prefix `/graph`.
 
-### Step 4.2 — Graph feed on iOS
+### Step 5.2 — Graph feed on iOS
 
 **Create:** `BubblerApp/BubblerApp/GraphFeedView.swift`, `GraphFeedViewModel.swift`
 
-Flow: `GET /feed/{id}/session` → first post → `GET /graph/posts/{id}/next` → show choices → on tap, record interaction + load next.
+Flow: `GET /feed/me/session` → first post → `GET /graph/posts/{id}/next` → show choices → on tap, `POST /users/me/interactions` + load next.
 
 Reuse styling from `BubbleDetail.swift`.
 
-**Update:** `ContentView.swift` — use `GraphFeedView` instead of mock `FeedView` when loop works.
+**Update:** `ContentView.swift` — swap to `GraphFeedView` when the loop works.
 
-### Step 4.3 — Record interactions + view time
+### Step 5.3 — View time on interactions
 
-Post to interactions endpoint with `type: "explore"` and `view_time` seconds.
+Track seconds on each post; send `view_time` with interaction POST.
 
-**Checkpoint:** Tap through 3–4 posts in a row; each step loads new choices.
+**Checkpoint:** Tap through 3–4 posts; each step loads new choices.
 
 ---
 
-## Phase 5 — User-Controlled Algorithm
+## Phase 6 — User-Controlled Algorithm
 
-**Goal:** Diversity, randomness, topic lists, view-time weighting — per `docs/api_contracts.md`.
+**Goal:** Diversity, randomness, topic lists, view-time — per `docs/api_contracts.md`.
 
-### Step 5.1 — Preferences API
+### Step 6.1 — Preferences API
 
 **File:** `backend/app/routes/user.py` — add:
 
 ```python
 @router.get("/me/preferences")
 async def get_preferences(user_id: int = Depends(get_current_user_id)):
-    return await user_repo.get_prefs(user_id)
+    return await user_repo.getPrefs(user_id)
 
 @router.put("/me/preferences")
 async def update_preferences(body: PrefsUpdate, user_id: int = Depends(get_current_user_id)):
-    return await user_repo.update_prefs(user_id, body)
+    return await user_repo.updatePrefs(user_id, body)
 ```
 
-Add `update_prefs` to `user_repo.py`.
+Add `updatePrefs` to `user_repo.py`.
 
-### Step 5.2 — Algorithm settings screen
+Fix `UserService` — methods reference `self.repo` but constructor sets `self.user_repo`; routes pass `id` but service ignores it.
+
+### Step 6.2 — Algorithm settings screen
 
 **Create:** `BubblerApp/BubblerApp/AlgorithmSettingsView.swift`
 
@@ -417,13 +546,15 @@ Wire from `SettingsView.swift` “Bubble Sensitivity” row. Load/save via `APIC
 
 ---
 
-## Phase 6 — Testing & CI
+## Phase 7 — Testing & CI
 
-**Goal:** Catch regressions automatically — especially important after the refactor broke import paths once already.
+**Goal:** Catch regressions automatically — especially auth and import wiring.
 
-### Step 6.1 — Backend unit + integration tests
+Run this **in parallel** with Phases 0–2; add a test each time you fix an endpoint.
 
-**Create:** `backend/tests/` package.
+### Step 7.1 — Backend tests
+
+**Create:** `backend/tests/` with `conftest.py`, `test_auth.py`, `test_feed.py`.
 
 **File:** `backend/Pipfile` — dev-packages:
 
@@ -434,175 +565,91 @@ pytest-asyncio = "*"
 httpx = "*"
 ```
 
-**Create:** `backend/tests/conftest.py` — test client with lifespan override or test DB URL.
-
-**Create:** `backend/tests/test_auth.py`
+**File:** `backend/tests/test_auth.py`
 
 ```python
 @pytest.mark.asyncio
-async def test_register_returns_token(client):
+async def test_register_returns_access_token(client):
     response = await client.post("/register", json={
         "username": "testuser",
         "email": "test@bubbler.test",
         "password": "secret123",
     })
     assert response.status_code == 200
+    body = response.json()
+    assert "access_token" in body
+    assert body["token_type"] == "bearer"
+
+@pytest.mark.asyncio
+async def test_login_form_returns_token(client, registered_user):
+    response = await client.post("/login", data={
+        "username": "test@bubbler.test",
+        "password": "secret123",
+    })
+    assert response.status_code == 200
     assert "access_token" in response.json()
 
 @pytest.mark.asyncio
-async def test_protected_route_requires_token(client):
-    response = await client.get("/feed/me")
-    assert response.status_code == 401
+async def test_feed_me_requires_token(client):
+    assert (await client.get("/feed/me")).status_code == 401
 ```
 
-**Create:** `backend/tests/test_feed.py` — feed returns list for authenticated user.
+Note: login tests must use **form data** (`data=`), not JSON — your route uses `OAuth2PasswordRequestForm`.
 
-**Create:** `backend/tests/test_repositories/test_feed_repo.py` — mock pool or use test DB for `get_similar_posts`, `get_posts_by_ids`.
+Run: `cd backend && pipenv run pytest`
 
-Run locally:
-
-```bash
-cd backend && pipenv run pytest
-```
-
-### Step 6.2 — Backend CI pipeline
+### Step 7.2 — Backend CI
 
 **Create:** `.github/workflows/backend.yml`
 
-```yaml
-name: Backend CI
+- Trigger on `backend/**`, `ml/**`, `scripts/**`
+- Postgres service with pgvector
+- Apply `backend/app/db/schema.sql` before tests
+- Env vars: `SECRETKEY`, `ALGORITHM`, `TIMEOFFSET`, DB vars
 
-on:
-  push:
-    paths: ['backend/**', 'ml/**', 'scripts/**']
-  pull_request:
-    paths: ['backend/**', 'ml/**', 'scripts/**']
+### Step 7.3 — iOS tests
 
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: pgvector/pgvector:pg16
-        env:
-          POSTGRES_USER: bubbler
-          POSTGRES_PASSWORD: bubbler
-          POSTGRES_DB: bubbler
-        ports: ['5432:5432']
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - run: pip install pipenv
-      - working-directory: backend
-        run: |
-          pipenv install --dev
-          pipenv run pytest
-        env:
-          DATABASE: bubbler
-          DB_USER: bubbler
-          DATABASE_PASSWORD: bubbler
-          HOST: localhost
-          PORT: 5432
-          JWT_SECRET: ci-test-secret
-```
+**Create:** `BubblerApp/BubblerAppTests/`
 
-Add a step to apply `backend/db/schema.sql` before tests once schema exists.
+| File | Tests |
+|------|-------|
+| `AuthSessionTests.swift` | Empty email rejected; token stored after login |
+| `APIClientTests.swift` | Mock `URLProtocol`; verify `Authorization` header |
+| `FeedViewModelTests.swift` | Decode sample feed JSON into `[Post]` |
 
-### Step 6.3 — iOS unit tests (component registration)
+Register the test target in Xcode (`BubblerApp.xcodeproj`) if not present.
 
-**Create:** `BubblerApp/BubblerAppTests/` target in Xcode if not present.
-
-**Create:** `BubblerApp/BubblerAppTests/AuthSessionTests.swift`
-
-```swift
-import XCTest
-@testable import BubblerApp
-
-final class AuthSessionTests: XCTestCase {
-    func testLoginRejectsEmptyEmail() async {
-        let session = AuthSession()
-        await session.signIn(email: "", password: "secret")
-        XCTAssertNotNil(session.authError)
-    }
-}
-```
-
-**Create:** `BubblerApp/BubblerAppTests/APIClientTests.swift` — mock `URLProtocol` to verify `Authorization` header is sent when token is set.
-
-**Create:** `BubblerApp/BubblerAppTests/FeedViewModelTests.swift` — decode sample JSON into `[Post]`.
-
-### Step 6.4 — iOS UI tests (optional but valuable)
-
-**Create:** `BubblerApp/BubblerAppUITests/LoginFlowTests.swift`
-
-```swift
-func testLoginScreenShowsEmailField() {
-    let app = XCUIApplication()
-    app.launch()
-    XCTAssertTrue(app.textFields["Enter your email"].exists)
-}
-```
-
-### Step 6.5 — CI for iOS (macOS runner)
+### Step 7.4 — iOS CI
 
 **Create:** `.github/workflows/ios.yml`
 
-```yaml
-name: iOS CI
+- macOS runner
+- `xcodebuild test -project BubblerApp/BubblerApp.xcodeproj -scheme BubblerApp`
 
-on:
-  push:
-    paths: ['BubblerApp/**']
-  pull_request:
-    paths: ['BubblerApp/**']
-
-jobs:
-  build-and-test:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Run unit tests
-        run: |
-          xcodebuild test \
-            -project BubblerApp/BubblerApp.xcodeproj \
-            -scheme BubblerApp \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
-            -only-testing:BubblerAppTests
-```
-
-Adjust scheme/simulator name to match your project.
-
-### Step 6.6 — Testing gates (use at every phase)
-
-Before merging any phase:
+### Step 7.5 — Gates before each merge
 
 | Gate | Command |
 |------|---------|
-| Backend tests green | `pipenv run pytest` |
+| Backend tests | `pipenv run pytest` |
 | App starts | `uvicorn main:app` — no import errors |
-| iOS unit tests green | `xcodebuild test ...` |
-| Manual smoke | Register → login → feed loads |
-
-**Checkpoint:** PRs run GitHub Actions; failing tests block merge.
+| iOS unit tests | `xcodebuild test ...` |
+| Smoke test | Register → login → `/feed/me` |
 
 ---
 
-## Phase 7 — Deploy Basics
+## Phase 8 — Deploy Basics
 
-**Goal:** Repeatable local dev + path to TestFlight.
+### Step 8.1 — Docker Compose for local Postgres
 
-### Step 7.1 — Docker Compose for Postgres
+**Create:** `docker-compose.yml` with `pgvector/pgvector:pg16`. Document: compose up → apply schema → seed.
 
-**Create:** `docker-compose.yml` at repo root with `pgvector/pgvector:pg16`. Document in README: `docker compose up -d` → apply schema → seed.
+### Step 8.2 — Production checklist
 
-### Step 7.2 — Production env checklist
-
-- Rotate `JWT_SECRET`
+- Rotate `SECRETKEY`
 - HTTPS only
-- CORS restricted to your app origin
+- CORS restricted to app origin
 - Rate-limit `/login` and `/register`
+- Supabase RLS policies if using Supabase auth-adjacent tables
 
 ---
 
@@ -610,26 +657,25 @@ Before merging any phase:
 
 | Phase | Focus | Rough time |
 |-------|-------|------------|
-| 0 | Refactor wiring + imports | 1 weekend |
-| 1 | JWT + Firebase drop | 1–2 weekends |
-| 2 | Schema + missing repos | 1 weekend |
-| 3 | iOS ↔ API | 1 weekend |
-| 4 | Graph path | 2–3 weekends |
-| 5 | Algorithm settings | 1–2 weekends |
-| 6 | Tests + CI | 1–2 weekends |
-| 7 | Deploy basics | 1 weekend |
-
-Run Phase 6 **in parallel** once Phase 0 completes — add tests for each new endpoint as you build it.
+| 0 | Fix auth bugs + register routers | 2–3 days |
+| 1 | JWT protection | 1–2 days |
+| 2 | Data layer (interactions, seed, edges) | 1 weekend |
+| 3 | iOS backend auth, drop Firebase | 1 weekend |
+| 4 | iOS real feed | 2–3 days |
+| 5 | Graph path | 2–3 weekends |
+| 6 | Algorithm settings | 1–2 weekends |
+| 7 | Tests + CI | 1–2 weekends (start early) |
+| 8 | Deploy basics | 1 weekend |
 
 ---
 
 ## What to Avoid
 
-1. **Re-creating `deps.py`** unless startup becomes unwieldy — the factory + startup pattern is fine for a solo dev.
-2. **Removing Firebase before JWT works** — use the 8-condition checklist in Phase 1.4.
-3. **Maintaining `ios-app/`** — copy `APIClient` patterns into `BubblerApp/`, then ignore the old folder.
-4. **Skipping tests after a refactor** — import renames will break again; CI pays for itself quickly.
-5. **Graph visualization** — bubbles + path trail in `ProfileView` is enough.
+1. **Removing Firebase before the 8-condition checklist passes.**
+2. **Maintaining `ios-app/`** — copy patterns into `BubblerApp/`, then ignore the old folder.
+3. **Sending JSON to `/login`** — it expects form-urlencoded (`username`, `password`).
+4. **Skipping tests after auth changes** — login/register are easy to break silently.
+5. **Graph visualization UI** — bubbles + path trail in `ProfileView` is enough.
 
 ---
 
@@ -639,10 +685,7 @@ Run Phase 6 **in parallel** once Phase 0 completes — add tests for each new en
 
 ```
 backend/.env.example
-backend/db/schema.sql
-backend/app/security/jwt.py
 backend/app/security/deps.py
-backend/app/repositories/interaction_repo.py
 backend/app/routes/graph.py
 backend/tests/conftest.py
 backend/tests/test_auth.py
@@ -650,6 +693,7 @@ backend/tests/test_feed.py
 .github/workflows/backend.yml
 .github/workflows/ios.yml
 BubblerApp/BubblerApp/APIClient.swift
+BubblerApp/BubblerApp/KeychainStore.swift
 BubblerApp/BubblerApp/Post.swift
 BubblerApp/BubblerApp/FeedViewModel.swift
 BubblerApp/BubblerApp/GraphFeedView.swift
@@ -663,23 +707,24 @@ docker-compose.yml
 **Edit next (highest priority):**
 
 ```
-backend/app/startup.py
-backend/app/routes/auth.py
-backend/app/routes/feed.py
-backend/app/routes/user.py
-backend/app/services/auth.py
-backend/app/services/feed.py
 backend/app/repositories/auth_repo.py
+backend/app/services/auth.py
+backend/app/startup.py
 backend/app/repositories/feed_repo.py
+backend/app/repositories/interaction_repo.py
 backend/app/repositories/post_repo.py
-backend/app/repositories/user_repo.py
+backend/app/services/post.py
+backend/app/services/user.py
+backend/app/services/interaction.py
+backend/app/db/schema.sql
+backend/app/routes/feed.py
+scripts/seed_db.py
 BubblerApp/BubblerApp/AuthSession.swift
 BubblerApp/BubblerApp/ContentView.swift
 BubblerApp/BubblerApp/FeedView.swift
-scripts/seed_db.py
 ```
 
-**Delete (only after Phase 1.4 conditions met):**
+**Delete (only after Phase 3 checklist):**
 
 ```
 BubblerApp/BubblerApp/GoogleService-Info.plist
@@ -690,11 +735,11 @@ BubblerApp/BubblerApp/GoogleService-Info.plist
 
 ## When You're Stuck
 
-1. **Import error on startup** — route imports wrong module name? Check `app/services/` filenames.
-2. **Pool not found** — is service built with `pool` in `startup.py`?
-3. **401 on iOS** — token expired or `Authorization` header missing?
-4. **Empty feed** — seed data? Embeddings present? Check `get_similar_posts` returns rows.
-5. **Tests fail on CI** — schema applied before pytest? Env vars set in workflow?
+1. **Login 401** — `auth_repo` query returning nothing? Column `password` vs `password_hash`?
+2. **Login 422** — sending JSON instead of form body to `/login`?
+3. **Import error** — service filename vs import (`app.services.feed`, not `feed_service`)?
+4. **Feed empty** — seed data? Embeddings? User has rows in `user_profiles`?
+5. **Opposite strategy crash** — `get_opposite_posts` using `self.pool` on a classmethod?
 
 ---
 
@@ -702,8 +747,6 @@ BubblerApp/BubblerApp/GoogleService-Info.plist
 
 If you only do **one thing** next:
 
-> **Phase 0, Steps 0.1–0.3** — fix route imports, align auth login flow, register feed + user routers in `startup.py`.
+> **Phase 0, Steps 0.1–0.3** — fix `auth_repo.py`, return `{access_token, token_type}` from auth, register feed + user routers in `startup.py`.
 
-Then add **`test_auth.py`** (Phase 6.1) so the refactor stays wired.
-
-That unlocks JWT (Phase 1), Firebase removal, and everything downstream.
+Then add **`test_auth.py`** (Phase 7.1) so auth stays working as you connect iOS.

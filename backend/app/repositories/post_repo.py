@@ -1,5 +1,5 @@
 from typing import List
-from backend.app.schemas.post import Post
+from schemas.post import Post
 
 class PostRepository:
 

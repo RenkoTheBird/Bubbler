@@ -16,4 +16,6 @@ class PostService:
 
     async def postUserPosts(self, id, post):
         embedded = EmbeddingService.embedText(post)
-        return await self.repo.postUserPosts(id, post, embedded)
+        row = await self.repo.postUserPosts(id, post, embedded)
+        self.EdgeBuilderRepo.build_edges_for_post(row["id"], embedded)
+        return row

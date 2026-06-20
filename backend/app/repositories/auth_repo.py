@@ -1,9 +1,8 @@
 from app.repositories.user_repo import UserProfile
-from asyncpg import Pool
 
 class AuthRepository:
 
-    def __init__(self, pool: Pool):
+    def __init__(self, pool):
         self.pool = pool
 
     async def postLoginInfo(self, email: str):

@@ -133,7 +133,7 @@ from app.services.interaction import InteractionService
 from app.routes.feed import create_feed_router
 from app.routes.user import create_user_router
 
-# Build services (pass pool into repos — see Step 0.4)
+# Build services (pass pool into repos — see Step 0.3)
 feed_service = FeedService(...)
 fastapi.include_router(create_feed_router(feed_service), prefix="/feed", tags=["feed"])
 fastapi.include_router(create_user_router(...), prefix="/users", tags=["users"])
@@ -323,22 +323,6 @@ class InteractionRepository:
 ```
 
 Wire into `InteractionService` and `startup.py`. Add `POST /interactions` route (new file or extend `user.py`).
-
-### Step 2.2 — Wire edge builder on post create
-
-**File:** `backend/app/services/post.py` — after insert, call `EdgeBuilderRepo.build_edges_for_post`.
-
-Fix `post_repo.py` bugs (`cls.pool` → `self.pool`, import path `backend.app.schemas` → `app.schemas`).
-
-### Step 2.3 — Fix seed script + prefs typo
-
-**File:** `scripts/seed_db.py` — use `config.py` env vars for connection string; match schema columns.
-
-**File:** `backend/app/repositories/user_repo.py` line 53 — fix `preferrred_topics` → `preferred_topics`.
-
-**File:** `backend/Pipfile` — add `sentence-transformers` if embeddings run in-process.
-
-**Checkpoint:** Seed script inserts users + posts + edges. `GET /feed/1` returns ranked posts.
 
 ---
 

@@ -10,6 +10,8 @@ fastapi = "*"
 dotenv = "*"
 asyncpg = "*"
 pydantic = {extras = ["email"], version = "*"}
+pyjwt = "*"
+python-multipart = "*"
 
 [dev-packages]
 

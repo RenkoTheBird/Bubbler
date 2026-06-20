@@ -30,7 +30,7 @@ async def lifespan(fastapi: FastAPI):
         raise
     
     # Start services 
-    auth_service = AuthService(pool)
+    auth_service = AuthService(pool, my_env_vars.secret_key, my_env_vars.algorithm, my_env_vars.timeoffset)
     
     #start routers 
     auth_router = create_auth_router(auth_service)

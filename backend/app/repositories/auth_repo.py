@@ -7,13 +7,13 @@ class AuthRepository:
 
     async def postLoginInfo(self, email: str):
         async with self.pool.acquire() as conn:
-            row = await conn.fetchrow("""SELECT password, id FROM users WHERE email=$1 OR """, email)
+            row = await conn.fetchrow("""SELECT password_hash, id FROM users WHERE email=$1 OR username=$1""", email)
         return row
             
     async def postRegistrationInfo(self, username: str, email: str, password_hash: str):
         async with self.pool.acquire() as conn:
             result = await conn.fetchval(
-                """INSERT INTO users (username, email, password) 
+                """INSERT INTO users (username, email, password_hash) 
                 VALUES ($1, $2, $3)
                 RETURNING id""",
                 username, email, password_hash

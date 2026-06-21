@@ -29,12 +29,12 @@ class AuthService:
         encoded_jwt = jwt.encode(to_encode, self.secret_key, algorithm = self.algorithm)
         return encoded_jwt
 
-    # quick tip here username could be email or username in future OATH2 ask for username to be the field though 
+    # quick tip here username could be email or username in future OAUTH2 ask for username to be the field though 
     async def postLoginInfo(self, username, password):
         row = await self.auth_repo.postLoginInfo(username)
         if not row:
             raise HTTPException(status_code=401, detail="Incorrect email or password")
-        if not check_password(password.encode(), row["password"].encode()):
+        if not check_password(password.encode(), row["password_hash"].encode()):
             raise HTTPException(status_code=401, detail="Incorrect email or password")
         return self.create_access_token({"sub": str(row["id"])})  ## comes as int from db 
     

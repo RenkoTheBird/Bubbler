@@ -99,40 +99,7 @@ backend/
 
 **Goal:** Login and register work against Supabase/Postgres; feed and user routes appear in Swagger.
 
-### Step 0.1 — Fix `auth_repo.py`
-
-**File:** `backend/app/repositories/auth_repo.py`
-
-Current login query is broken (`OR ""`). Align columns with `schema.sql` (`password_hash`):
-
-```python
-async def postLoginInfo(self, email: str):
-    async with self.pool.acquire() as conn:
-        return await conn.fetchrow(
-            "SELECT id, password_hash FROM users WHERE email = $1 OR username = $1",
-            email,
-        )
-
-async def postRegistrationInfo(self, username: str, email: str, password_hash: str):
-    async with self.pool.acquire() as conn:
-        return await conn.fetchval(
-            """
-            INSERT INTO users (username, email, password_hash)
-            VALUES ($1, $2, $3)
-            RETURNING id
-            """,
-            username, email, password_hash,
-        )
-```
-
-**File:** `backend/app/services/auth.py` — read `password_hash` from row:
-
-```python
-if not check_password(password.encode(), row["password_hash"].encode()):
-    ...
-```
-
-### Step 0.2 — Return standard token shape from login
+### Step 0.1 — Return standard token shape from login
 
 OAuth2 clients (and iOS) expect a JSON object, not a bare string.
 
@@ -146,7 +113,7 @@ def _token_response(self, user_id: int) -> dict:
 
 Use in both `postLoginInfo` and `postRegistrationInfo`.
 
-### Step 0.3 — Register feed + user routers in `startup.py`
+### Step 0.2 — Register feed + user routers in `startup.py`
 
 **File:** `backend/app/startup.py` — only auth is registered today. Add:
 
@@ -170,7 +137,7 @@ fastapi.include_router(create_feed_router(feed_service), prefix="/feed", tags=["
 fastapi.include_router(create_user_router(user_service, interaction_service, post_service), prefix="/users", tags=["users"])
 ```
 
-### Step 0.4 — Unify repository pattern
+### Step 0.3 — Unify repository pattern
 
 **Problem:** `FeedService` calls `self.repo.getSimilarPosts(...)` but `FeedRepository` exposes `get_similar_posts(cls, pool, ...)`. Same for `GraphService.getNeighbors` vs `get_neighbors`.
 

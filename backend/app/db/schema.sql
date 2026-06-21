@@ -52,7 +52,8 @@ CREATE TABLE interactions (
     user_id INTEGER REFERENCES users(id),
     post_id UUID REFERENCES posts(id),
     type TEXT CHECK (type IN ('like', 'skip', 'explore')),
-    created_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT NOW(),
+    view_time FLOAT
 );
 
 -- EDGES (post graph)
@@ -71,3 +72,12 @@ CREATE TABLE user_profiles (
     diversity_tolerance FLOAT CHECK (diversity_tolerance BETWEEN 0 AND 1),
     randomness FLOAT
 );
+
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS preferred_topics TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS blacklisted_topics TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS use_view_time BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS view_time_weight FLOAT DEFAULT 0.1;
+-- 
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS strategy_weights JSONB NOT NULL DEFAULT 
+'{"similar":0.7,"graph":0.2,"opposite":0.0,"random":0.1}';
+--

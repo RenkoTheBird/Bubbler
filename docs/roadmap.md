@@ -261,25 +261,7 @@ Apply the same pattern to user routes (`/users/me/profile`, etc.).
 
 **Goal:** Schema, seed script, interactions, and edge building all work together.
 
-### Step 2.1 — Extend `user_profiles` in schema
-
-**File:** `backend/app/db/schema.sql`
-
-`UserRepository.getPrefs` expects columns not in the current schema. Add:
-
-```sql
-ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS preferred_topics TEXT[] NOT NULL DEFAULT '{}';
-ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS blacklisted_topics TEXT[] NOT NULL DEFAULT '{}';
-ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS use_view_time BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS view_time_weight FLOAT DEFAULT 0.1;
-ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS strategy_weights JSONB NOT NULL DEFAULT '{"similar":0.7,"graph":0.2,"opposite":0.0,"random":0.1}';
-```
-
-Also add `view_time FLOAT` to `interactions` if you plan to use it.
-
-Apply on Supabase or local Postgres.
-
-### Step 2.2 — Implement `interaction_repo.py`
+### Step 2.1 — Implement `interaction_repo.py`
 
 **File:** `backend/app/repositories/interaction_repo.py` — replace `pass` stubs:
 
@@ -323,7 +305,7 @@ async def record_interaction(body: InteractionCreate, user_id: int = Depends(get
     return await interaction_service.record(user_id, body)
 ```
 
-### Step 2.3 — Fix seed script
+### Step 2.2 — Fix seed script
 
 **File:** `scripts/seed_db.py`
 
@@ -332,7 +314,7 @@ async def record_interaction(body: InteractionCreate, user_id: int = Depends(get
 - Insert topics first, then posts with `topic_id` (schema uses `topic_id`, not `topic`)
 - Call `EdgeBuilderRepo.build_edges_for_post` after each post insert
 
-### Step 2.4 — Wire edge builder + fix `post_repo.py`
+### Step 2.3 — Wire edge builder + fix `post_repo.py`
 
 **File:** `backend/app/repositories/post_repo.py`
 

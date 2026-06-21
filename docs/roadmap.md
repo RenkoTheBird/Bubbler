@@ -253,21 +253,6 @@ Keep `/{id}` variants temporarily for local debugging if useful, but `/me` is th
 
 Apply the same pattern to user routes (`/users/me/profile`, etc.).
 
-### Step 1.3 — Create `.env.example`
-
-**Create:** `backend/.env.example`
-
-```env
-DATABASE=bubbler
-DB_USER=bubbler
-DATABASE_PASSWORD=changeme
-HOST=localhost
-PORT=5432
-SECRETKEY=change-me-in-production
-ALGORITHM=HS256
-TIMEOFFSET=168
-```
-
 **Checkpoint:** `GET /feed/me` without token → 401. With `Authorization: Bearer <token>` → 200.
 
 ---

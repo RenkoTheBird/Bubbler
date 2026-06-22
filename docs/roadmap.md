@@ -156,12 +156,6 @@ class FeedRepository:
 
 Update `StrategyService`, `GraphService`, and `FeedService` to call snake_case instance methods.
 
-Fix `get_opposite_posts` — it is a `@classmethod` but uses `self.pool` (will crash):
-
-```python
-async def get_opposite_posts(self, embedding, limit: int = 10):
-    async with self.pool.acquire() as conn:
-        ...
 ```
 
 **Checkpoint:** `uvicorn main:app --reload` from `backend/` → `/docs` shows `/login`, `/register`, `/feed`, `/users`. Register + login return `access_token`.

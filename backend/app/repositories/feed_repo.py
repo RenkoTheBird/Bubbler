@@ -47,8 +47,8 @@ class FeedRepository:
         ]
     
     @classmethod
-    async def get_opposite_posts(self, embedding, limit: int = 10):
-        async with self.pool.acquire() as conn:
+    async def get_opposite_posts(cls, pool, embedding, limit: int = 10):
+        async with pool.acquire() as conn:
             rows = await conn.fetch(
                 """
                 SELECT id, content, topic, 1 - (embedding <=> $1) AS similarity

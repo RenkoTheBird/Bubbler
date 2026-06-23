@@ -140,3 +140,8 @@ class FeedService:
     async def getNewSessionPosts(self, userId: int):
         prefs = await self.PrefRepo.getPrefs(userId)
         return await self.repo.getNewSessionPosts(prefs.diversity_tolerance, [], None)
+    
+    async def getNextPosts(self, post_id):
+        neighbors = await self.repo.get_neighbors(post_id, limit=4)
+        ids = [n["to_post_id"] for n in neighbors]
+        return await self.repo.get_posts_by_ids(ids)

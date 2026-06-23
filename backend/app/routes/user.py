@@ -4,7 +4,7 @@ from app.services.interaction import InteractionService
 from app.services.post import PostService
 
 
-def create_user_router(user_service: UserService, interaction_service: InteractionService, post_service: PostService):
+def create_user_router(user_service: UserService, interaction_service: InteractionService, post_service: PostService, getCurrentUserId):
     router = APIRouter()
 
     @router.get("/me/profile")

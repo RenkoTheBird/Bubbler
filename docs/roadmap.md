@@ -170,30 +170,6 @@ Update `StrategyService`, `GraphService`, and `FeedService` to call snake_case i
 
 **Create:** `backend/app/security/deps.py`
 
-```python
-import jwt
-from fastapi import Depends, HTTPException
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from config import my_env_varsalphabet
-
-security = HTTPBearer()
-
-async def get_current_user_id(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-) -> int:
-    try:
-        payload = jwt.decode(
-            credentials.credentials,
-            my_env_vars.secret_key,
-            algorithms=[my_env_vars.algorithm],
-        )
-        return int(payload["sub"])
-    except jwt.PyJWTError:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-```
-
-Pass `secret_key` and `algorithm` from `startup.py` if you prefer not to import config in deps.
-
 **Checkpoint:** `GET /feed/me` without token → 401. With `Authorization: Bearer <token>` → 200.
 
 ---
@@ -386,21 +362,6 @@ Replace hard-coded `feedCard(...)` placeholders with `ForEach(viewModel.posts)`.
 **Goal:** One current post + tap-to-choose next posts (DAG path).
 
 ### Step 5.1 — Graph route
-
-**Create:** `backend/app/routes/graph.py`
-
-```python
-def create_graph_router(feed_repo, get_current_user_id):
-    router = APIRouter()
-
-    @router.get("/posts/{post_id}/next")
-    async def get_next_posts(post_id: str, user_id: int = Depends(get_current_user_id)):
-        neighbors = await feed_repo.get_neighbors(post_id, limit=4)
-        ids = [n["to_post_id"] for n in neighbors]
-        return await feed_repo.get_posts_by_ids(ids)
-
-    return router
-```
 
 Register in `startup.py` with prefix `/graph`.
 

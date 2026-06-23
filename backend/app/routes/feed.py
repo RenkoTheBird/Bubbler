@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from app.services.feed import FeedService
 
 
-def create_feed_router(feed_service: FeedService):
+def create_feed_router(feed_service: FeedService, getCurrentUserId):
     router = APIRouter()
 
     @router.get("/me")

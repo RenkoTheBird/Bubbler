@@ -174,7 +174,7 @@ Update `StrategyService`, `GraphService`, and `FeedService` to call snake_case i
 import jwt
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from config import my_env_vars
+from config import my_env_varsalphabet
 
 security = HTTPBearer()
 

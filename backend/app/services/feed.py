@@ -48,8 +48,8 @@ class RankingService:
 
 class StrategyService:
     def __init__(self, repo, service):
-        self.repo = repo
-        self.service = service
+        self.repo = repo # feed repo
+        self.service = service # graph service
 
     async def getCandidates(self, embedding, prefs):
         strategies = []

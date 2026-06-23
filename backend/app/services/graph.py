@@ -1,6 +1,6 @@
 class GraphService:
     def __init__(self, repo):
-        self.repo = repo
+        self.repo = repo # feed repo
 
     async def expandPosts(self, seedPosts: list[str], depth: int = 1):
         visited = set()

@@ -8,7 +8,7 @@ class EmbeddingService:
 
 class PostService:
     def __init__(self, repo, EmbeddingService: EmbeddingService):
-        self.repo = repo
+        self.repo = repo # post repo
         self.EmbeddingService = EmbeddingService
 
     async def getUserPosts(self):

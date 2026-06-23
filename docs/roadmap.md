@@ -194,26 +194,6 @@ async def get_current_user_id(
 
 Pass `secret_key` and `algorithm` from `startup.py` if you prefer not to import config in deps.
 
-### Step 1.2 — Protect feed and user routes
-
-**File:** `backend/app/routes/feed.py`
-
-```python
-from app.security.deps import get_current_user_id
-
-@router.get("/me")
-async def get_my_feed(user_id: int = Depends(get_current_user_id)):
-    return await feed_service.getFeed(user_id, q="")
-
-@router.get("/me/session")
-async def get_session_posts(user_id: int = Depends(get_current_user_id)):
-    return await feed_service.getNewSessionPosts(user_id)
-```
-
-Keep `/{id}` variants temporarily for local debugging if useful, but `/me` is the target shape.
-
-Apply the same pattern to user routes (`/users/me/profile`, etc.).
-
 **Checkpoint:** `GET /feed/me` without token → 401. With `Authorization: Bearer <token>` → 200.
 
 ---

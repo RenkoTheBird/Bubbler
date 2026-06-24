@@ -162,26 +162,7 @@ async def record_interaction(body: InteractionCreate, user_id: int = Depends(get
 - Use `password_hash` column (not `password`)
 - Insert topics first, then posts with `topic_id` (schema uses `topic_id`, not `topic`)
 - Call `EdgeBuilderRepo.build_edges_for_post` after each post insert
-
-### Step 2.3 — Wire edge builder + fix `post_repo.py`
-
-**File:** `backend/app/repositories/post_repo.py`
-
-- Fix import: `from app.schemas.post import Post`
-- Fix `cls.pool` → use `pool` parameter passed to classmethod, or switch to instance repo
-- `postUserPosts` should `RETURNING *` and return a dict with `id`
-
-**File:** `backend/app/services/post.py`
-
-```python
-async def postUserPosts(self, user_id, content):
-    embedded = self.EmbeddingService.embedText(content)
-    row = await self.repo.postUserPosts(user_id, content, embedded)
-    await self.edge_builder.build_edges_for_post(row["id"], embedded)
-    return row
 ```
-
-Inject `EdgeBuilderRepo` in constructor via `startup.py`.
 
 **Checkpoint:** Seed script runs cleanly. New post creates edges. `GET /feed/me` returns ranked posts for a seeded user.
 
@@ -293,11 +274,7 @@ Replace hard-coded `feedCard(...)` placeholders with `ForEach(viewModel.posts)`.
 
 **Goal:** One current post + tap-to-choose next posts (DAG path).
 
-### Step 5.1 — Graph route
-
-Register in `startup.py` with prefix `/graph`.
-
-### Step 5.2 — Graph feed on iOS
+### Step 5.1 — Graph feed on iOS
 
 **Create:** `BubblerApp/BubblerApp/GraphFeedView.swift`, `GraphFeedViewModel.swift`
 
@@ -307,7 +284,7 @@ Reuse styling from `BubbleDetail.swift`.
 
 **Update:** `ContentView.swift` — swap to `GraphFeedView` when the loop works.
 
-### Step 5.3 — View time on interactions
+### Step 5.2 — View time on interactions
 
 Track seconds on each post; send `view_time` with interaction POST.
 

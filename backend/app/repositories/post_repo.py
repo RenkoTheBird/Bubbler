@@ -18,12 +18,12 @@ class PostRepository:
     @classmethod
     async def postUserPosts(cls, pool, id: int, post: str, embeddedPost: List[float]):
         
-        async with cls.pool.acquire() as conn:
+        async with pool.acquire() as conn:
             result = await conn.fetch(
-                "INSERT INTO posts (user_id, content, embedding) VALUES ($1, $2, $3)", id, post, embeddedPost
+                "INSERT INTO posts (user_id, content, embedding) VALUES ($1, $2, $3) RETURNING *", id, post, embeddedPost
             )
 
-        return cls._map_row(result)
+        return dict(cls._map_row(result))
     
     @classmethod
     def _map_row(cls, row) -> Post:

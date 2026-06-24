@@ -28,6 +28,14 @@ class AuthService:
         
         encoded_jwt = jwt.encode(to_encode, self.secret_key, algorithm = self.algorithm)
         return encoded_jwt
+    
+    def _token_response(self, user_id: int) -> dict:
+        token = self.create_access_token({"sub": str(user_id)})
+        return {
+             "access_token": token,
+             "token_type": "bearer",
+             "user_id": user_id
+        }
 
     # quick tip here username could be email or username in future OAUTH2 ask for username to be the field though 
     async def postLoginInfo(self, username, password):
@@ -36,13 +44,13 @@ class AuthService:
             raise HTTPException(status_code=401, detail="Incorrect email or password")
         if not check_password(password.encode(), row["password_hash"].encode()):
             raise HTTPException(status_code=401, detail="Incorrect email or password")
-        return self.create_access_token({"sub": str(row["id"])})  ## comes as int from db 
+        return self._token_response(row["id"])  ## comes as int from db 
     
 
-    async def postRegistrationInfo(self, username, email, passowrd):
-        password_hash = hash_password(passowrd).decode()
+    async def postRegistrationInfo(self, username, email, password):
+        password_hash = hash_password(password).decode()
         try:    
-            result = await self.auth_repo.postRegistrationInfo(username, email, password_hash)
-            return self.create_access_token({"sub": str(result)})
+            user_id = await self.auth_repo.postRegistrationInfo(username, email, password_hash)
+            return self._token_response(user_id)
         except UniqueViolationError as exc:
             raise HTTPException(status_code=409, detail="username or email already taken")

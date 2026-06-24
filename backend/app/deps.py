@@ -5,7 +5,7 @@ from config import my_env_vars
 
 security = HTTPBearer()
 
-async def getCurrentUserId(
+async def get_current_user_id(
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ) -> int:
     try:

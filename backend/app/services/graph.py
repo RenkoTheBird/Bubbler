@@ -2,7 +2,7 @@ class GraphService:
     def __init__(self, repo):
         self.repo = repo # feed repo
 
-    async def expandPosts(self, seedPosts: list[str], depth: int = 1):
+    async def expand_posts(self, seedPosts: list[str], depth: int = 1):
         visited = set()
         results = []
 
@@ -12,7 +12,7 @@ class GraphService:
 
             visited.add(postId)
 
-            neighbors = await self.repo.getNeighbors(postId)
+            neighbors = await self.repo.get_neighbors(postId)
 
             for neighbor in neighbors:
                 results.append(neighbor["to_post_id"])

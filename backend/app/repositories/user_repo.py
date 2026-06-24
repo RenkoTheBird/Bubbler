@@ -18,7 +18,7 @@ DEFAULT_PREFS = UserProfile(
 class UserRepository:
 
     @classmethod
-    async def getProfileInfo(cls, pool, id: int):
+    async def get_profile_info(cls, pool, id: int):
 
         async with pool.acquire() as conn:
             data = await conn.fetch(
@@ -29,7 +29,7 @@ class UserRepository:
 
     # GOAL: allow user to change their email
     @classmethod
-    async def putEmail(cls, pool, email: str, id: int):
+    async def put_email(cls, pool, email: str, id: int):
 
         async with pool.acquire() as conn:
             data = await conn.fetch(
@@ -39,7 +39,7 @@ class UserRepository:
         return data
     
     @classmethod
-    async def getPrefs(cls, pool, user_id: int) -> UserProfile:
+    async def get_prefs(cls, pool, user_id: int) -> UserProfile:
         async with pool.acquire() as conn:
             rows = await conn.fetchrow("""SELECT * FROM user_profiles WHERE user_id = $1""", user_id)
 

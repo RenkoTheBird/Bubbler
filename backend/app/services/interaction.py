@@ -11,6 +11,6 @@ class InteractionService:
         view_time = body.view_time
         return await self.repo.record(user_id, post_id, type, view_time)
 
-    async def getUserInteractions(self, user_id: int):
+    async def get_user_interactions(self, user_id: int):
         return await self.repo.get_recent_interactions(user_id)
     

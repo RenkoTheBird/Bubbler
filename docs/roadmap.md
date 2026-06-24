@@ -145,7 +145,6 @@ Update `StrategyService`, `GraphService`, and `FeedService` to call snake_case i
 **File:** `scripts/seed_db.py`
 
 - Read connection string from env (same vars as `config.py`) instead of hard-coded URL
-- Use `password_hash` column (not `password`)
 - Insert topics first, then posts with `topic_id` (schema uses `topic_id`, not `topic`)
 - Call `EdgeBuilderRepo.build_edges_for_post` after each post insert
 ```

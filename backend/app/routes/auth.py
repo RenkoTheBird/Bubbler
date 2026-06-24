@@ -9,12 +9,12 @@ def create_auth_router(auth_service: AuthService):
 
     @router.post("/login")
     async def post_login_info(body: Annotated[OAuth2PasswordRequestForm, Depends()]):
-        result = await auth_service.postLoginInfo(body.username, body.password)
+        result = await auth_service.post_login_info(body.username, body.password)
         return result 
        
     @router.post("/register")
     async def post_registration_info(body: CreateUser):
-        result = await auth_service.postRegistrationInfo(body.username, body.email, body.password)
+        result = await auth_service.post_registration_info(body.username, body.email, body.password)
         return result
 
     return router

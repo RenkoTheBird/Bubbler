@@ -4,7 +4,7 @@ from typing import List
 
 
 class PreferenceService:
-    def updateFromInteractions(self, prefs, interactions):
+    def update_from_interactions(self, prefs, interactions):
         topicScores = {}
 
         for i in interactions:
@@ -26,7 +26,7 @@ class RankingService:
         recencyBoost = 1 / (1 + (datetime.datetime.now() - post["created_at"]))
         return similarity * 0.7 + recencyBoost * 0.3
 
-    def applyPreferences(self, prefs, posts: List[str]):
+    def apply_preferences(self, prefs, posts: List[str]):
         filtered = []
 
         for post in posts:
@@ -51,7 +51,7 @@ class StrategyService:
         self.repo = repo # feed repo
         self.service = service # graph service
 
-    async def getCandidates(self, embedding, prefs):
+    async def get_candidates(self, embedding, prefs):
         strategies = []
 
         if prefs.strategy_weights.get("similar", 0) > 0:
@@ -95,14 +95,14 @@ class FeedService:
         self.PrefRepo = PrefRepo
         self.InteractionRepo = InteractionRepo
 
-    async def getFeed(self, userId: int, userInput: str):
-        prefs = await self.PrefRepo.getPrefs(userId)
-        interactions = await self.InteractionRepo.getRecentInteractions(userId)
-        prefs = self.PreferenceService.updateFromInteractions(prefs, interactions)
+    async def get_feed(self, userId: int, userInput: str):
+        prefs = await self.PrefRepo.get_prefs(userId)
+        interactions = await self.InteractionRepo.get_recent_interactions(userId)
+        prefs = self.PreferenceService.update_from_interactions(prefs, interactions)
 
-        embedding = self.EmbeddingService.embedText(userInput)
+        embedding = self.EmbeddingService.embed_text(userInput)
 
-        strategyResults = await self.StrategyService.getCandidates(embedding, prefs)
+        strategyResults = await self.StrategyService.get_candidates(embedding, prefs)
 
         seeds = []
         for strategyName, posts in strategyResults:
@@ -111,10 +111,10 @@ class FeedService:
                 seeds.append(p)
 
         seedPosts = seeds[:10]
-        expandedIds = await self.GraphService.expandPosts(seedPosts)
+        expandedIds = await self.GraphService.expand_posts(seedPosts)
         allIds = set(p["id"] for p in seedPosts) | set(expandedIds)
 
-        expandedPosts = await self.repo.getPostsByIds(list(allIds))
+        expandedPosts = await self.repo.get_posts_by_ids(list(allIds))
 
         seedMap = {p["id"]: p for p in seeds}
 
@@ -133,15 +133,15 @@ class FeedService:
             post["score"] = post["similarity"] * weight
             weighted.append(post)
 
-        ranked = self.RankingService.applyPreferences(prefs, weighted)
+        ranked = self.RankingService.apply_preferences(prefs, weighted)
 
         return ranked[:20]
 
-    async def getNewSessionPosts(self, userId: int):
-        prefs = await self.PrefRepo.getPrefs(userId)
-        return await self.repo.getNewSessionPosts(prefs.diversity_tolerance, [], None)
+    async def get_new_session_posts(self, userId: int):
+        prefs = await self.PrefRepo.get_prefs(userId)
+        return await self.repo.get_new_session_posts(prefs.diversity_tolerance, [], None)
     
-    async def getNextPosts(self, post_id):
+    async def get_next_posts(self, post_id):
         neighbors = await self.repo.get_neighbors(post_id, limit=4)
         ids = [n["to_post_id"] for n in neighbors]
         return await self.repo.get_posts_by_ids(ids)

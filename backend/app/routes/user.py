@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from app.services.user import UserService
 from app.services.interaction import InteractionService
 from app.services.post import PostService
+from app.schemas.post import InteractionCreate
 
 
 def create_user_router(user_service: UserService, interaction_service: InteractionService, post_service: PostService, getCurrentUserId):

@@ -139,22 +139,8 @@ Update `StrategyService`, `GraphService`, and `FeedService` to call snake_case i
 ## Phase 2 — Finish Backend Data Layer
 
 **Goal:** Schema, seed script, interactions, and edge building all work together.
-2.1
-        
-```
 
-Wire into `InteractionService` (add `async`, fix method names) and register in `startup.py`.
-
-Add route:
-
-```python
-# user.py or new routes/interactions.py
-@router.post("/me/interactions")
-async def record_interaction(body: InteractionCreate, user_id: int = Depends(get_current_user_id)):
-    return await interaction_service.record(user_id, body)
-```
-
-### Step 2.2 — Fix seed script
+### Step 2.1 — Fix seed script
 
 **File:** `scripts/seed_db.py`
 

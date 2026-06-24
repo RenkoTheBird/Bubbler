@@ -113,31 +113,8 @@ def _token_response(self, user_id: int) -> dict:
 
 Use in both `postLoginInfo` and `postRegistrationInfo`.
 
-### Step 0.2 — Register feed + user routers in `startup.py`
 
-**File:** `backend/app/startup.py` — only auth is registered today. Add:
-
-```python
-from app.services.feed import FeedService, StrategyService, RankingService, PreferenceService
-from app.services.graph import GraphService
-from app.services.post import PostService, EmbeddingService
-from app.services.user import UserService
-from app.services.interaction import InteractionService
-from app.repositories.feed_repo import FeedRepository
-from app.repositories.user_repo import UserRepository
-from app.repositories.interaction_repo import InteractionRepository
-from app.repositories.post_repo import PostRepository
-from app.routes.feed import create_feed_router
-from app.routes.user import create_user_router
-
-# After pool creation — build services with pool, register routers:
-fastapi.state.pool = pool
-feed_service = FeedService(...)   # wire repos + services
-fastapi.include_router(create_feed_router(feed_service), prefix="/feed", tags=["feed"])
-fastapi.include_router(create_user_router(user_service, interaction_service, post_service), prefix="/users", tags=["users"])
-```
-
-### Step 0.3 — Unify repository pattern
+### Step 0.2 — Unify repository pattern
 
 **Problem:** `FeedService` calls `self.repo.getSimilarPosts(...)` but `FeedRepository` exposes `get_similar_posts(cls, pool, ...)`. Same for `GraphService.getNeighbors` vs `get_neighbors`.
 

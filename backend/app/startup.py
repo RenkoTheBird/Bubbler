@@ -72,10 +72,10 @@ async def lifespan(fastapi: FastAPI):
     user_router = create_user_router(user_service, interaction_service, post_service)
 
     #register routers 
-    fastapi.include_router(auth_router)
-    fastapi.include_router(feed_router)
-    fastapi.include_router(graph_router)
-    fastapi.include_router(user_router)
+    fastapi.include_router(auth_router, prefix="/auth", tags=["auth"])
+    fastapi.include_router(feed_router, prefix="/feed", tags=["feed"])
+    fastapi.include_router(graph_router, prefix="/graph", tags=["graph"])
+    fastapi.include_router(user_router, prefix="/user", tags=["user"])
     
     yield
     try:

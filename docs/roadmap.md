@@ -99,22 +99,7 @@ backend/
 
 **Goal:** Login and register work against Supabase/Postgres; feed and user routes appear in Swagger.
 
-### Step 0.1 — Return standard token shape from login
-
-OAuth2 clients (and iOS) expect a JSON object, not a bare string.
-
-**File:** `backend/app/services/auth.py`
-
-```python
-def _token_response(self, user_id: int) -> dict:
-    token = self.create_access_token({"sub": str(user_id)})
-    return {"access_token": token, "token_type": "bearer", "user_id": user_id}
-```
-
-Use in both `postLoginInfo` and `postRegistrationInfo`.
-
-
-### Step 0.2 — Unify repository pattern
+### Step 0.1 — Unify repository pattern
 
 **Problem:** `FeedService` calls `self.repo.getSimilarPosts(...)` but `FeedRepository` exposes `get_similar_posts(cls, pool, ...)`. Same for `GraphService.getNeighbors` vs `get_neighbors`.
 
@@ -154,38 +139,8 @@ Update `StrategyService`, `GraphService`, and `FeedService` to call snake_case i
 ## Phase 2 — Finish Backend Data Layer
 
 **Goal:** Schema, seed script, interactions, and edge building all work together.
-
-### Step 2.1 — Implement `interaction_repo.py`
-
-**File:** `backend/app/repositories/interaction_repo.py` — replace `pass` stubs:
-
-```python
-async def record(self, user_id: int, post_id: str, type: str, view_time: float = 0):
-    async with self.pool.acquire() as conn:
-        await conn.execute(
-            """
-            INSERT INTO interactions (user_id, post_id, type, view_time)
-            VALUES ($1, $2, $3, $4)
-            """,
-            user_id, post_id, type, view_time,
-        )
-
-async def get_recent_interactions(self, user_id: int, limit: int = 50):
-    async with self.pool.acquire() as conn:
-        rows = await conn.fetch(
-            """
-            SELECT i.*, t.name AS topic
-            FROM interactions i
-            JOIN posts p ON p.id = i.post_id
-            LEFT JOIN post_topics pt ON pt.post_id = p.id
-            LEFT JOIN topics t ON t.id = pt.topic_id
-            WHERE i.user_id = $1
-            ORDER BY i.created_at DESC
-            LIMIT $2
-            """,
-            user_id, limit,
-        )
-    return rows
+2.1
+        
 ```
 
 Wire into `InteractionService` (add `async`, fix method names) and register in `startup.py`.

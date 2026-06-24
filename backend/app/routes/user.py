@@ -26,5 +26,9 @@ def create_user_router(user_service: UserService, interaction_service: Interacti
     @router.post("/me/posts")
     async def post_user_posts(post: str, user_id: int = Depends(getCurrentUserId)):
         return await post_service.postUserPosts(id)
+    
+    @router.post("/me/interactions")
+    async def record_interaction(body: InteractionCreate, user_id: int = Depends(getCurrentUserId)):
+        return await interaction_service.record(user_id, body)
 
     return router

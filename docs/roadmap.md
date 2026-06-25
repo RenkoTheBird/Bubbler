@@ -109,17 +109,6 @@ backend/
 
 ## Phase 2 — Finish Backend Data Layer
 
-**Goal:** Schema, seed script, interactions, and edge building all work together.
-
-### Step 2.1 — Fix seed script
-
-**File:** `scripts/seed_db.py`
-
-- Read connection string from env (same vars as `config.py`) instead of hard-coded URL
-- Insert topics first, then posts with `topic_id` (schema uses `topic_id`, not `topic`)
-- Call `EdgeBuilderRepo.build_edges_for_post` after each post insert
-```
-
 **Checkpoint:** Seed script runs cleanly. New post creates edges. `GET /feed/me` returns ranked posts for a seeded user.
 
 ---

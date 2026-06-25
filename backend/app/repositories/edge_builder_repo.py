@@ -1,8 +1,9 @@
 class EdgeBuilderRepo:
+    def __init__(self, pool):
+        self.pool = pool
 
-    @classmethod
-    async def build_edges_for_post(cls, pool, embedding_service, post_id, embedding):
-        async with pool.acquire() as conn:
+    async def build_edges_for_post(self, embedding_service, post_id, embedding):
+        async with self.pool.acquire() as conn:
             similar = await conn.fetch(
                 """SELECT id, 1 - (embedding <=> $1) AS similarity
                    FROM posts

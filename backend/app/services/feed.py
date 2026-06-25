@@ -55,7 +55,7 @@ class StrategyService:
         strategies = []
 
         if prefs.strategy_weights.get("similar", 0) > 0:
-            similar = await self.repo.getSimilarPosts(embedding, limit=10)
+            similar = await self.repo.get_similar_posts(embedding, limit=10)
             strategies.append(("similar", similar))
 
         if prefs.strategy_weights.get("opposite", 0) > 0:
@@ -63,13 +63,13 @@ class StrategyService:
             strategies.append(("opposite", opposite))
 
         if prefs.strategy_weights.get("graph", 0) > 0:
-            base = await self.repo.getSimilarPosts(embedding, limit=5)
-            expandedIds = await self.service.expandPosts(base)
-            graphPosts = await self.repo.getPostsByIds(expandedIds)
+            base = await self.repo.get_similar_posts(embedding, limit=5)
+            expandedIds = await self.service.expand_posts(base)
+            graphPosts = await self.repo.get_posts_by_ids(expandedIds)
             strategies.append(("graph", graphPosts))
 
         if prefs.strategy_weights.get("random", 0) > 0:
-            randomPosts = await self.repo.getRandomPosts(limit=10)
+            randomPosts = await self.repo.get_random_posts(limit=10)
             strategies.append(("random", randomPosts))
 
         return strategies

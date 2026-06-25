@@ -54,16 +54,21 @@ async def lifespan(fastapi: FastAPI):
 
     # Repositories
     auth_repo = AuthRepository(pool)
+    feed_repo = FeedRepository(pool)
+    post_repo = PostRepository(pool)
+    user_repo = UserRepository(pool)
+    interaction_repo = InteractionRepository(pool)
+    edge_builder_repo = EdgeBuilderRepo(pool)
     
     # Start services 
     auth_service = AuthService(pool, my_env_vars.secret_key, my_env_vars.algorithm, my_env_vars.timeoffset)
-    graph_service = GraphService(FeedRepository)
-    interaction_service = InteractionService(InteractionRepository)
-    post_service = PostService(PostRepository)
-    user_service = UserService(UserRepository)
-    strategy_service = StrategyService(FeedRepository, GraphService)
-    feed_service = FeedService(FeedRepository, graph_service, RankingService, EmbeddingService, strategy_service,
-                               PreferenceService, UserRepository, InteractionRepository)
+    graph_service = GraphService(feed_repo)
+    interaction_service = InteractionService(interaction_repo)
+    post_service = PostService(post_repo, edge_builder_repo, EmbeddingService())
+    user_service = UserService(user_repo)
+    strategy_service = StrategyService(feed_repo, graph_service)
+    feed_service = FeedService(feed_repo, graph_service, RankingService(), EmbeddingService(), strategy_service,
+                               PreferenceService(), user_repo, interaction_repo)
     
     #start routers 
     auth_router = create_auth_router(auth_service)

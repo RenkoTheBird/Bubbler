@@ -2,11 +2,12 @@ from typing import List
 
 
 class FeedRepository:
+    def __init__(self, pool):
+        self.pool = pool
 
     # --- Graph ---
-    @classmethod
-    async def get_neighbors(cls, pool, id: int, limit: int = 4):
-        async with pool.acquire() as conn:
+    async def get_neighbors(self, id: int, limit: int = 4):
+        async with self.pool.acquire() as conn:
             rows = await conn.fetch(
                 """
                 SELECT to_post_id, weight
@@ -21,9 +22,8 @@ class FeedRepository:
         return [dict(r) for r in rows]
 
     # --- Feed ---
-    @classmethod
-    async def get_similar_posts(cls, pool, embedded_post: List[float], limit: int = 4):
-        async with pool.acquire() as conn:
+    async def get_similar_posts(self, embedded_post: List[float], limit: int = 4):
+        async with self.pool.acquire() as conn:
             rows = await conn.fetch(
                 """
                 SELECT
@@ -46,9 +46,8 @@ class FeedRepository:
             for r in rows
         ]
     
-    @classmethod
-    async def get_opposite_posts(cls, pool, embedding, limit: int = 10):
-        async with pool.acquire() as conn:
+    async def get_opposite_posts(self, embedding, limit: int = 10):
+        async with self.pool.acquire() as conn:
             rows = await conn.fetch(
                 """
                 SELECT id, content, topic, 1 - (embedding <=> $1) AS similarity
@@ -60,8 +59,7 @@ class FeedRepository:
             )
         return [dict(r) for r in rows]
 
-    @classmethod
-    async def get_new_session_posts(cls, pool, diversity_tolerance: float, yesterday_post: List[float], liked_topic: str):
+    async def get_new_session_posts(self, diversity_tolerance: float, yesterday_post: List[float], liked_topic: str):
         val = 1
         similarity_targets = []
         for i in range(4):
@@ -70,7 +68,7 @@ class FeedRepository:
 
         results = []
 
-        async with pool.acquire() as conn:
+        async with self.pool.acquire() as conn:
             for target in similarity_targets:
                 post = await conn.fetchrow(
                     """
@@ -90,12 +88,11 @@ class FeedRepository:
 
         return results
 
-    @classmethod
-    async def get_posts_by_ids(cls, pool, ids: list):
+    async def get_posts_by_ids(self, ids: list):
         if not ids:
             return []
 
-        async with pool.acquire() as conn:
+        async with self.pool.acquire() as conn:
             rows = await conn.fetch(
                 """
                 SELECT id, content, topic, created_at, user_id
@@ -106,9 +103,8 @@ class FeedRepository:
             )
         return [dict(r) for r in rows]
 
-    @classmethod
-    async def get_random_posts(cls, pool, limit: int = 10):
-        async with pool.acquire() as conn:
+    async def get_random_posts(self, limit: int = 10):
+        async with self.pool.acquire() as conn:
             rows = await conn.fetch(
                 """
                 SELECT id, content, topic, created_at, user_id

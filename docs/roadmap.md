@@ -97,40 +97,11 @@ backend/
 
 ## Phase 0 — Fix Auth + Register Remaining Routers
 
-**Goal:** Login and register work against Supabase/Postgres; feed and user routes appear in Swagger.
-
-### Step 0.1 — Unify repository pattern
-
-**Problem:** `FeedService` calls `self.repo.getSimilarPosts(...)` but `FeedRepository` exposes `get_similar_posts(cls, pool, ...)`. Same for `GraphService.getNeighbors` vs `get_neighbors`.
-
-Pick **instance repos** that hold `pool`:
-
-```python
-# feed_repo.py
-class FeedRepository:
-    def __init__(self, pool):
-        self.pool = pool
-
-    async def get_similar_posts(self, embedding, limit=4):
-        async with self.pool.acquire() as conn:
-            ...
-```
-
-Update `StrategyService`, `GraphService`, and `FeedService` to call snake_case instance methods.
-
-```
-
 **Checkpoint:** `uvicorn main:app --reload` from `backend/` → `/docs` shows `/login`, `/register`, `/feed`, `/users`. Register + login return `access_token`.
 
 ---
 
 ## Phase 1 — JWT Protection on Routes
-
-**Goal:** Feed and user endpoints require a valid Bearer token.
-
-### Step 1.1 — Add JWT verification dependency
-
-**Create:** `backend/app/security/deps.py`
 
 **Checkpoint:** `GET /feed/me` without token → 401. With `Authorization: Bearer <token>` → 200.
 

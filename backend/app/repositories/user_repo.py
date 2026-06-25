@@ -16,11 +16,12 @@ DEFAULT_PREFS = UserProfile(
 
 # GOAL: When viewing user profile, retrieve their data
 class UserRepository:
+    def __init__(self, pool):
+        self.pool = pool
 
-    @classmethod
-    async def get_profile_info(cls, pool, id: int):
+    async def get_profile_info(self, id: int):
 
-        async with pool.acquire() as conn:
+        async with self.pool.acquire() as conn:
             data = await conn.fetch(
                 """SELECT * FROM users WHERE id = $1""", id
             )
@@ -28,19 +29,17 @@ class UserRepository:
         return data
 
     # GOAL: allow user to change their email
-    @classmethod
-    async def put_email(cls, pool, email: str, id: int):
+    async def put_email(self, email: str, id: int):
 
-        async with pool.acquire() as conn:
+        async with self.pool.acquire() as conn:
             data = await conn.fetch(
                 """UPDATE users SET email = $1 WHERE id = $2""", email, id
             )
 
         return data
     
-    @classmethod
-    async def get_prefs(cls, pool, user_id: int) -> UserProfile:
-        async with pool.acquire() as conn:
+    async def get_prefs(self, user_id: int) -> UserProfile:
+        async with self.pool.acquire() as conn:
             rows = await conn.fetchrow("""SELECT * FROM user_profiles WHERE user_id = $1""", user_id)
 
         if not rows:

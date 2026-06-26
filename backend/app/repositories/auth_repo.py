@@ -1,4 +1,4 @@
-from app.repositories.user_repo import UserProfile
+from app.schemas.user import UserProfile
 
 class AuthRepository:
 
@@ -7,16 +7,16 @@ class AuthRepository:
 
     async def post_login_info(self, email: str):
         async with self.pool.acquire() as conn:
-            row = await conn.fetchrow("""SELECT password_hash, id FROM users WHERE email=$1 OR username=$1""", email)
+            row = await conn.fetchrow("""SELECT password, id FROM users WHERE email=$1 OR username=$1""", email)
         return row
             
-    async def post_registration_info(self, username: str, email: str, password_hash: str):
+    async def post_registration_info(self, username: str, email: str, password: str):
         async with self.pool.acquire() as conn:
             result = await conn.fetchval(
-                """INSERT INTO users (username, email, password_hash) 
+                """INSERT INTO users (username, email, password) 
                 VALUES ($1, $2, $3)
                 RETURNING id""",
-                username, email, password_hash
+                username, email, password
             )
         return result
     

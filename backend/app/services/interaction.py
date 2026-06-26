@@ -1,4 +1,4 @@
-from app.schemas.user import InteractionCreate
+from app.schemas.post import InteractionCreate
 
 class InteractionService:
     def __init__(self, repo):

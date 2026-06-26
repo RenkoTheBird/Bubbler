@@ -1,4 +1,4 @@
-from ..schemas.user import UserProfile
+from app.schemas.user import UserProfile
 
 DEFAULT_PREFS = UserProfile(
     user_id=0,

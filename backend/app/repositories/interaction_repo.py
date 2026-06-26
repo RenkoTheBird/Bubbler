@@ -1,4 +1,4 @@
-from ..schemas.post import Interaction
+from app.schemas.post import Interaction
 
 class InteractionRepository:
     def __init__(self, pool):

@@ -78,7 +78,7 @@ class StrategyService:
 class FeedService:
     def __init__(self,
                  repo,
-                 GraphService: GraphService,
+                 GraphService,
                  RankingService: RankingService,
                  EmbeddingService,
                  StrategyService: StrategyService,

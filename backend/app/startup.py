@@ -30,6 +30,9 @@ from .repositories.interaction_repo import InteractionRepository
 from .repositories.post_repo import PostRepository
 from .repositories.user_repo import UserRepository
 
+# Dependencies
+from app.deps import get_current_user_id
+
 # grab logger 
 logger = logging.getLogger(__name__)
 
@@ -72,9 +75,9 @@ async def lifespan(fastapi: FastAPI):
     
     #start routers 
     auth_router = create_auth_router(auth_service)
-    feed_router = create_feed_router(feed_service)
-    graph_router = create_graph_router(feed_service) # not a typo
-    user_router = create_user_router(user_service, interaction_service, post_service)
+    feed_router = create_feed_router(feed_service, get_current_user_id)
+    graph_router = create_graph_router(feed_service, get_current_user_id) # graph routes use feed service
+    user_router = create_user_router(user_service, interaction_service, post_service, get_current_user_id)
 
     #register routers 
     fastapi.include_router(auth_router, prefix="/auth", tags=["auth"])

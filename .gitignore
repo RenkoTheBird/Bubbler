@@ -7,3 +7,4 @@ xcuserdata/
 venv/
 .env
 __pycache__/
+.cursor

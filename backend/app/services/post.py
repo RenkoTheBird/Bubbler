@@ -1,10 +1,8 @@
-from ....ml.embeddings.generate import embed
-
+from app.ml.embeddings.generate import embed
 
 class EmbeddingService:
     def embed_text(self, post: str):
         return embed(post)
-
 
 class PostService:
     def __init__(self, repo, edge_builder_repo, EmbeddingService: EmbeddingService):

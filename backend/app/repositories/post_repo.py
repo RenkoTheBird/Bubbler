@@ -1,5 +1,5 @@
 from typing import List
-from schemas.post import Post
+from app.schemas.post import Post
 
 class PostRepository:
     def __init__(self, pool):

@@ -41,7 +41,7 @@ class AuthService:
         row = await self.auth_repo.post_login_info(username)
         if not row:
             raise HTTPException(status_code=401, detail="Incorrect email or password")
-        if not check_password(password.encode(), row["password_hash"].encode()):
+        if not check_password(password.encode(), row["password"].encode()):
             raise HTTPException(status_code=401, detail="Incorrect email or password")
         return self._token_response(row["id"])  ## comes as int from db 
     

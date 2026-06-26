@@ -16,10 +16,10 @@ sys.path.insert(0, str(ROOT))
 
 load_dotenv(BACKEND_ROOT / ".env")
 
-from config import my_env_vars
-from app.repositories.edge_builder_repo import EdgeBuilderRepo
-from app.services.post import EmbeddingService
-from ml.embeddings.generate import embed
+from backend.config import my_env_vars
+from backend.app.repositories.edge_builder_repo import EdgeBuilderRepo
+from backend.app.services.post import EmbeddingService
+from backend.app.ml.embeddings.generate import embed
 
 SAMPLE_TOPICS = ["tech", "health", "startups"]
 

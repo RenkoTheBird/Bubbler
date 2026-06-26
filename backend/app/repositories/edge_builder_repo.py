@@ -1,3 +1,5 @@
+from app.db.vector import to_pgvector
+
 class EdgeBuilderRepo:
     def __init__(self, pool):
         self.pool = pool
@@ -10,7 +12,7 @@ class EdgeBuilderRepo:
                    WHERE id != $2
                    ORDER BY embedding <=> $1
                    LIMIT 5""",
-                embedding, post_id
+                to_pgvector(embedding), post_id
             )
 
             for row in similar:

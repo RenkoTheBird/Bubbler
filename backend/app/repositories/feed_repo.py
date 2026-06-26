@@ -1,5 +1,5 @@
 from typing import List
-
+from app.db.vector import to_pgvector
 
 class FeedRepository:
     def __init__(self, pool):
@@ -34,7 +34,7 @@ class FeedRepository:
                 ORDER BY embedding <=> $1
                 LIMIT $2
                 """,
-                embedded_post,
+                to_pgvector(embedded_post),
                 limit,
             )
         return [
@@ -50,12 +50,12 @@ class FeedRepository:
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(
                 """
-                SELECT id, content, topic, 1 - (embedding <=> $1) AS similarity
+                SELECT id, content, topic_id, 1 - (embedding <=> $1) AS similarity
                 FROM posts
                 ORDER BY embedding <=> $1 DESC
                 LIMIT $2
                 """,
-                embedding, limit,
+                to_pgvector(embedding), limit,
             )
         return [dict(r) for r in rows]
 
@@ -75,11 +75,11 @@ class FeedRepository:
                     SELECT *,
                         1 - (embedding <=> $1::vector) AS similarity
                     FROM posts
-                    WHERE topic = $2
+                    WHERE topic_id = $2
                     ORDER BY ABS((1 - (embedding <=> $1::vector)) - $3)
                     LIMIT 1
                     """,
-                    yesterday_post,
+                    to_pgvector(yesterday_post),
                     liked_topic,
                     target,
                 )
@@ -95,7 +95,7 @@ class FeedRepository:
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(
                 """
-                SELECT id, content, topic, created_at, user_id
+                SELECT id, content, topic_id, created_at, user_id
                 FROM posts
                 WHERE id = ANY($1)
                 """,
@@ -107,7 +107,7 @@ class FeedRepository:
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(
                 """
-                SELECT id, content, topic, created_at, user_id
+                SELECT id, content, topic_id, created_at, user_id
                 FROM posts
                 ORDER BY RANDOM()
                 LIMIT $1

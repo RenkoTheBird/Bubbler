@@ -93,14 +93,6 @@ backend/
 - Everything below is **still to do**. Completed work appears only in the table above.
 - Code blocks are examples — match your files as you implement.
 
----
-
-## Phase 0 — Fix Auth + Register Remaining Routers
-
-**Checkpoint:** `uvicorn main:app --reload` from `backend/` → `/docs` shows `/login`, `/register`, `/feed`, `/users`. Register + login return `access_token`.
-
----
-
 ## Phase 1 — JWT Protection on Routes
 
 **Checkpoint:** `GET /feed/me` without token → 401. With `Authorization: Bearer <token>` → 200.

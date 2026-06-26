@@ -20,6 +20,7 @@ from backend.config import my_env_vars
 from backend.app.repositories.edge_builder_repo import EdgeBuilderRepo
 from backend.app.services.post import EmbeddingService
 from backend.app.ml.embeddings.generate import embed
+from backend.app.db.vector import to_pgvector
 
 SAMPLE_TOPICS = ["tech", "health", "startups"]
 
@@ -68,10 +69,10 @@ async def main():
                 VALUES ($1, $2, $3, $4)
                 RETURNING id
                 """,
-                user_id, content, topic_id, vector,
+                user_id, content, topic_id, to_pgvector(vector),
             )
             await edge_builder_repo.build_edges_for_post(
-                embedding_service, post_id, vector
+                embedding_service, post_id, to_pgvector(vector)
             )
             print("Inserted post", post_id)
 

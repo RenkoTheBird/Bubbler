@@ -93,12 +93,6 @@ backend/
 - Everything below is **still to do**. Completed work appears only in the table above.
 - Code blocks are examples — match your files as you implement.
 
-## Phase 1 — JWT Protection on Routes
-
-**Checkpoint:** `GET /feed/me` without token → 401. With `Authorization: Bearer <token>` → 200.
-
----
-
 ## Phase 2 — Finish Backend Data Layer
 
 **Checkpoint:** Seed script runs cleanly. New post creates edges. `GET /feed/me` returns ranked posts for a seeded user.

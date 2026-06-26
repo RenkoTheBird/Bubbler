@@ -29,9 +29,9 @@ class FeedRepository:
                 SELECT
                     id,
                     content,
-                    1 - (embedding <=> $1) AS similarity
+                    1 - (embedding <=> $1::vector) AS similarity
                 FROM posts
-                ORDER BY embedding <=> $1
+                ORDER BY embedding <=> $1::vector
                 LIMIT $2
                 """,
                 to_pgvector(embedded_post),
@@ -50,9 +50,9 @@ class FeedRepository:
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(
                 """
-                SELECT id, content, topic_id, 1 - (embedding <=> $1) AS similarity
+                SELECT id, content, topic_id, 1 - (embedding <=> $1::vector) AS similarity
                 FROM posts
-                ORDER BY embedding <=> $1 DESC
+                ORDER BY embedding <=> $1::vector DESC
                 LIMIT $2
                 """,
                 to_pgvector(embedding), limit,

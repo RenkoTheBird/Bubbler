@@ -7,10 +7,10 @@ class EdgeBuilderRepo:
     async def build_edges_for_post(self, embedding_service, post_id, embedding):
         async with self.pool.acquire() as conn:
             similar = await conn.fetch(
-                """SELECT id, 1 - (embedding <=> $1) AS similarity
+                """SELECT id, 1 - (embedding <=> $1::vector) AS similarity
                    FROM posts
                    WHERE id != $2
-                   ORDER BY embedding <=> $1
+                   ORDER BY embedding <=> $1::vector
                    LIMIT 5""",
                 to_pgvector(embedding), post_id
             )

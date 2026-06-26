@@ -66,13 +66,13 @@ async def main():
             post_id = await conn.fetchval(
                 """
                 INSERT INTO posts (user_id, content, topic_id, embedding)
-                VALUES ($1, $2, $3, $4)
+                VALUES ($1, $2, $3, $4::vector)
                 RETURNING id
                 """,
                 user_id, content, topic_id, to_pgvector(vector),
             )
             await edge_builder_repo.build_edges_for_post(
-                embedding_service, post_id, to_pgvector(vector)
+                embedding_service, post_id, vector
             )
             print("Inserted post", post_id)
 

@@ -21,7 +21,7 @@ class PostRepository:
         
         async with self.pool.acquire() as conn:
             result = await conn.fetch(
-                "INSERT INTO posts (user_id, content, embedding) VALUES ($1, $2, $3) RETURNING *", id, post, to_pgvector(embeddedPost)
+                "INSERT INTO posts (user_id, content, embedding) VALUES ($1, $2, $3::vector) RETURNING *", id, post, to_pgvector(embeddedPost)
             )
 
         return self._map_row(result)

@@ -20,7 +20,7 @@ class PostRepository:
     async def post_user_posts(self, id: int, post: str, embeddedPost: List[float]):
         
         async with self.pool.acquire() as conn:
-            result = await conn.fetch(
+            result = await conn.fetchrow(
                 "INSERT INTO posts (user_id, content, embedding) VALUES ($1, $2, $3::vector) RETURNING *", id, post, to_pgvector(embeddedPost)
             )
 
@@ -28,8 +28,11 @@ class PostRepository:
     
     def _map_row(self, row) -> Post:
         return Post(
-            id=row["id"],
+            id=str(row["id"]),
             user_id=row["user_id"],
             content=row["content"],
-            embedding=row["embedding"]
+            embedding=None, # stored in memory anyway
+            created_at=row["created_at"],
+            topic=""
         )
+

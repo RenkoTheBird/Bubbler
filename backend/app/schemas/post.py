@@ -10,7 +10,7 @@ class PostTopic(BaseModel):
 
 
 class Post(BaseModel):
-    id: int
+    id: str
     user_id: int
     content: str
     embedding: Optional[list[float]] = None

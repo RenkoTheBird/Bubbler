@@ -93,12 +93,6 @@ backend/
 - Everything below is **still to do**. Completed work appears only in the table above.
 - Code blocks are examples — match your files as you implement.
 
-## Phase 2 — Finish Backend Data Layer
-
-**Checkpoint:** Seed script runs cleanly. New post creates edges. `GET /feed/me` returns ranked posts for a seeded user.
-
----
-
 ## Phase 3 — iOS: Drop Firebase, Use Backend Auth
 
 **Goal:** Login and register hit your FastAPI backend; JWT stored in Keychain.

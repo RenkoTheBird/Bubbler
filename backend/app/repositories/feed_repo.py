@@ -27,11 +27,14 @@ class FeedRepository:
             rows = await conn.fetch(
                 """
                 SELECT
-                    id,
-                    content,
-                    1 - (embedding <=> $1::vector) AS similarity
-                FROM posts
-                ORDER BY embedding <=> $1::vector
+                    p.id,
+                    p.content,
+                    t.name as topic,
+                    1 - (p.embedding <=> $1::vector) AS similarity
+                FROM posts p
+                LEFT JOIN topics t ON t.id = p.topic_id
+                WHERE p.embedding IS NOT NULL
+                ORDER BY p.embedding <=> $1::vector
                 LIMIT $2
                 """,
                 to_pgvector(embedded_post),
@@ -41,6 +44,7 @@ class FeedRepository:
             {
                 "id": r["id"],
                 "content": r["content"],
+                "topic": r["topic"], # may be None if no topic_id
                 "similarity": float(r["similarity"]),
             }
             for r in rows
@@ -50,14 +54,24 @@ class FeedRepository:
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(
                 """
-                SELECT id, content, topic_id, 1 - (embedding <=> $1::vector) AS similarity
-                FROM posts
-                ORDER BY embedding <=> $1::vector DESC
+                SELECT p.id, p.content, t.name as topic, 1 - (p.embedding <=> $1::vector) AS similarity
+                FROM posts p
+                LEFT JOIN topics t ON t.id = p.topic_id
+                WHERE p.embedding IS NOT NULL
+                ORDER BY p.embedding <=> $1::vector DESC
                 LIMIT $2
                 """,
                 to_pgvector(embedding), limit,
             )
-        return [dict(r) for r in rows]
+        return [
+            {
+                "id": r["id"],
+                "content": r["content"],
+                "topic": r["topic"], # may be None if no topic_id
+                "similarity": float(r["similarity"]),
+            }
+            for r in rows
+        ]
 
     async def get_new_session_posts(self, diversity_tolerance: float, yesterday_post: List[float], liked_topic: str):
         val = 1
@@ -95,23 +109,44 @@ class FeedRepository:
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(
                 """
-                SELECT id, content, topic_id, created_at, user_id
-                FROM posts
-                WHERE id = ANY($1)
+                SELECT p.id, p.content, t.name as topic, p.created_at, p.user_id
+                FROM posts p
+                LEFT JOIN topics t ON t.id = p.topic_id
+                WHERE p.id = ANY($1)
                 """,
                 ids,
             )
-        return [dict(r) for r in rows]
+        return [
+            {
+                "id": r["id"],
+                "content": r["content"],
+                "topic": r["topic"], # may be None if no topic_id
+                "created_at": r["created_at"],
+                "user_id": r["user_id"],
+            }
+            for r in rows
+        ]
 
     async def get_random_posts(self, limit: int = 10):
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(
                 """
-                SELECT id, content, topic_id, created_at, user_id
-                FROM posts
+                SELECT p.id, p.content, t.name as topic, p.created_at, p.user_id
+                FROM posts p
+                LEFT JOIN topics t ON t.id = p.topic_id
+                WHERE p.embedding IS NOT NULL
                 ORDER BY RANDOM()
                 LIMIT $1
                 """,
                 limit,
             )
-        return [dict(r) for r in rows]
+        return [
+            {
+                "id": r["id"],
+                "content": r["content"],
+                "topic": r["topic"], # may be None if no topic_id
+                "created_at": r["created_at"],
+                "user_id": r["user_id"],
+            }
+            for r in rows
+        ]

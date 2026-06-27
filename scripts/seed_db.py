@@ -40,7 +40,7 @@ async def main():
     async with pool.acquire() as conn:
         user_id = await conn.fetchval(
             """
-            INSERT INTO users (username, email, password_hash)
+            INSERT INTO users (username, email, password)
             VALUES ('demo', 'demo@bubbler.test', 'not-a-real-hash')
             ON CONFLICT (email) DO UPDATE SET username = EXCLUDED.username
             RETURNING id

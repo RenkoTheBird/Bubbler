@@ -38,7 +38,7 @@ def create_user_router(user_service: UserService, interaction_service: Interacti
         return await user_service.get_prefs(user_id)
 
     @router.put("/me/preferences")
-    async def update_preferences(body: PrefsUpdate, user_id: int = Depends(get_current_user_id)):
-        return await user_service.update_prefs(user_id, body)
+    async def put_preferences(body: PrefsUpdate, user_id: int = Depends(get_current_user_id)):
+        return await user_service.put_prefs(user_id, body)
 
     return router

@@ -221,23 +221,7 @@ Track seconds on each post; send `view_time` with interaction POST.
 
 **Goal:** Diversity, randomness, topic lists, view-time — per `docs/api_contracts.md`.
 
-### Step 6.1 — Preferences API
-
-**File:** `backend/app/routes/user.py` — add:
-
-```python
-@router.get("/me/preferences")
-async def get_preferences(user_id: int = Depends(get_current_user_id)):
-    return await user_repo.getPrefs(user_id)
-
-@router.put("/me/preferences")
-async def update_preferences(body: PrefsUpdate, user_id: int = Depends(get_current_user_id)):
-    return await user_repo.updatePrefs(user_id, body)
-```
-
-Add `updatePrefs` to `user_repo.py`.
-
-### Step 6.2 — Algorithm settings screen
+### Step 6.1 — Algorithm settings screen
 
 **Create:** `BubblerApp/BubblerApp/AlgorithmSettingsView.swift`
 

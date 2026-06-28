@@ -68,7 +68,7 @@ CREATE TABLE edges (
 -- USER PROFILES (vector preferences)
 CREATE TABLE user_profiles (
     user_id INTEGER PRIMARY KEY REFERENCES users(id),
-    embedding vector,
+    -- preferences (also in ALTER TABLE below)
     diversity_tolerance FLOAT CHECK (diversity_tolerance BETWEEN 0 AND 1),
     randomness FLOAT
 );

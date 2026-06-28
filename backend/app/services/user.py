@@ -7,3 +7,9 @@ class UserService:
 
     async def put_email(self, email, user_id):
         return await self.user_repo.put_email(email, user_id)
+    
+    async def get_prefs(self, user_id):
+        return await self.user_repo.get_prefs(user_id)
+    
+    async def put_prefs(self, user_id, body):
+        return await self.user_repo.put_prefs(user_id, body)

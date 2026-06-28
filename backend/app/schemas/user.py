@@ -21,3 +21,16 @@ class UserProfile(BaseModel):
 
     # feed composition, e.g. {"similar": 0.6, "opposite": 0.2, "random": 0.2}
     strategy_weights: dict[str, float]
+
+# Update user preferences
+class PrefsUpdate(BaseModel):
+    # preferences (defaults removed)
+    diversity_tolerance: float
+    randomness: float
+    preferred_topics: list[str]
+    blacklisted_topics: list[str]
+    use_view_time: bool
+    view_time_weight: float
+
+    # feed composition, e.g. {"similar": 0.6, "opposite": 0.2, "random": 0.2}
+    strategy_weights: dict[str, float]

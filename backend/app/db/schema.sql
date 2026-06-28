@@ -26,7 +26,7 @@ CREATE TABLE topics (
 -- POSTS
 CREATE TABLE posts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id INTEGER REFERENCES users(id),
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
     content TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT NOW(),
     embedding vector(384),  
@@ -49,8 +49,8 @@ CREATE TABLE post_topics (
 -- INTERACTIONS
 CREATE TABLE interactions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id INTEGER REFERENCES users(id),
-    post_id UUID REFERENCES posts(id),
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    post_id UUID REFERENCES posts(id) ON DELETE CASCADE,
     type TEXT CHECK (type IN ('like', 'skip', 'explore')),
     created_at TIMESTAMP DEFAULT NOW(),
     view_time FLOAT
@@ -59,15 +59,15 @@ CREATE TABLE interactions (
 -- EDGES (post graph)
 CREATE TABLE edges (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    from_post_id UUID REFERENCES posts(id),
-    to_post_id UUID REFERENCES posts(id),
+    from_post_id UUID REFERENCES posts(id) ON DELETE CASCADE,
+    to_post_id UUID REFERENCES posts(id) ON DELETE CASCADE,
     edge_type TEXT CHECK (edge_type IN ('similar', 'opposite', 'topic')),
     weight FLOAT
 );
 
 -- USER PROFILES (vector preferences)
 CREATE TABLE user_profiles (
-    user_id INTEGER PRIMARY KEY REFERENCES users(id),
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     -- preferences (also in ALTER TABLE below)
     diversity_tolerance FLOAT CHECK (diversity_tolerance BETWEEN 0 AND 1),
     randomness FLOAT

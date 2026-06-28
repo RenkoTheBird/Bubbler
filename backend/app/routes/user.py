@@ -41,4 +41,12 @@ def create_user_router(user_service: UserService, interaction_service: Interacti
     async def put_preferences(body: PrefsUpdate, user_id: int = Depends(get_current_user_id)):
         return await user_service.put_prefs(user_id, body)
 
+    @router.delete("/me/posts/{post_id}", status_code=204)
+    async def delete_post(post_id: str, user_id: int = Depends(get_current_user_id)):
+        return await post_service.delete_post(user_id, post_id)
+
+    @router.delete("/me", status_code=204)
+    async def delete_user(user_id: int = Depends(get_current_user_id)):
+        return await user_service.delete_user(user_id)
+
     return router

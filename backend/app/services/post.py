@@ -1,4 +1,5 @@
 from app.ml.embeddings.generate import embed
+from fastapi import HTTPException
 
 class EmbeddingService:
     def embed_text(self, post: str):
@@ -18,3 +19,9 @@ class PostService:
         row = await self.repo.post_user_posts(user_id, post, embedded)
         await self.edge_builder_repo.build_edges_for_post(self.EmbeddingService, row.id, embedded)
         return row
+
+    async def delete_post(self, user_id, post_id):
+        result = await self.repo.delete_post(user_id, post_id)
+        if result == "DELETE 0":
+            raise HTTPException(status_code=404, detail="Post not found")
+        return result

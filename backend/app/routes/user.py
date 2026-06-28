@@ -32,4 +32,12 @@ def create_user_router(user_service: UserService, interaction_service: Interacti
     async def record_interaction(body: InteractionCreate, user_id: int = Depends(get_current_user_id)):
         return await interaction_service.record(user_id, body)
 
+    @router.get("/me/preferences")
+    async def get_preferences(user_id: int = Depends(get_current_user_id)):
+        return await user_service.get_prefs(user_id)
+
+    @router.put("/me/preferences")
+    async def update_preferences(body: PrefsUpdate, user_id: int = Depends(get_current_user_id)):
+        return await user_service.update_prefs(user_id, body)
+
     return router

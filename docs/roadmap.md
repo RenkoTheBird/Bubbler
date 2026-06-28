@@ -237,8 +237,6 @@ async def update_preferences(body: PrefsUpdate, user_id: int = Depends(get_curre
 
 Add `updatePrefs` to `user_repo.py`.
 
-Fix `UserService` — methods reference `self.repo` but constructor sets `self.user_repo`; routes pass `id` but service ignores it.
-
 ### Step 6.2 — Algorithm settings screen
 
 **Create:** `BubblerApp/BubblerApp/AlgorithmSettingsView.swift`

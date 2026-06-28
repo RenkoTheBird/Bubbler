@@ -144,32 +144,12 @@ def ok(ctx: Context, name: str, condition: bool, detail: str = "") -> bool:
 
 
 async def reset_checkpoint_data(pool: asyncpg.Pool) -> None:
-    """Remove prior checkpoint user and related rows so each run starts clean."""
+    """Remove prior checkpoint user; FK ON DELETE CASCADE cleans related rows."""
     async with pool.acquire() as conn:
-        user_id = await conn.fetchval(
-            "SELECT id FROM users WHERE email = $1", CHECKPOINT_EMAIL
+        await conn.execute(
+            "DELETE FROM users WHERE email = $1",
+            CHECKPOINT_EMAIL,
         )
-        if user_id is None:
-            return
-
-        post_ids = [
-            row["id"]
-            for row in await conn.fetch(
-                "SELECT id FROM posts WHERE user_id = $1", user_id
-            )
-        ]
-        if post_ids:
-            await conn.execute(
-                """
-                DELETE FROM edges
-                WHERE from_post_id = ANY($1::uuid[]) OR to_post_id = ANY($1::uuid[])
-                """,
-                post_ids,
-            )
-        await conn.execute("DELETE FROM interactions WHERE user_id = $1", user_id)
-        await conn.execute("DELETE FROM posts WHERE user_id = $1", user_id)
-        await conn.execute("DELETE FROM user_profiles WHERE user_id = $1", user_id)
-        await conn.execute("DELETE FROM users WHERE id = $1", user_id)
 
 
 async def seed_checkpoint_posts(pool: asyncpg.Pool, user_id: int) -> int:

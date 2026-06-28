@@ -18,6 +18,6 @@ class UserService:
 
     async def delete_user(self, user_id):
         result = await self.user_repo.delete_user(user_id)
-        if result == "DELETE 0":
+        if not result:
             raise HTTPException(status_code=404, detail="User not found")
         return result

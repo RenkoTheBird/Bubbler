@@ -22,6 +22,6 @@ class PostService:
 
     async def delete_post(self, user_id, post_id):
         result = await self.repo.delete_post(user_id, post_id)
-        if result == "DELETE 0":
+        if not result:
             raise HTTPException(status_code=404, detail="Post not found")
         return result

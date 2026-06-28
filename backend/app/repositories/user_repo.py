@@ -81,4 +81,8 @@ class UserRepository:
             view_time_weight=rows["view_time_weight"],
             strategy_weights=dict(rows["strategy_weights"]),
         )
-
+    
+    async def delete_user(self, user_id: int) -> bool:
+        async with self.pool.acquire() as conn:
+            result = await conn.execute("DELETE FROM users WHERE id = $1", user_id)
+        return result == "DELETE 1"

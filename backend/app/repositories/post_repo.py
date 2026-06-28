@@ -25,6 +25,11 @@ class PostRepository:
             )
 
         return self._map_row(result)
+
+    async def delete_post(self, user_id: int, post_id: str) -> bool:
+        async with self.pool.acquire() as conn:
+            result = await conn.execute("DELETE FROM posts WHERE id = $1 AND user_id = $2", post_id, user_id)
+        return result == "DELETE 1"
     
     def _map_row(self, row) -> Post:
         return Post(

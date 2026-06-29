@@ -1,6 +1,6 @@
 # Bubbler Roadmap — What to Do Next
 
-Step-by-step plan for a **solo developer**. Plain language, exact file paths. Updated after auth pipeline changes and re-added refactor items.
+Step-by-step plan. Plain language, exact file paths. Updated after auth pipeline changes and re-added refactor items.
 
 ---
 
@@ -32,15 +32,7 @@ Step-by-step plan for a **solo developer**. Plain language, exact file paths. Up
 
 | Area | Status |
 |------|--------|
-| Feed + user routers registered in `startup.py` | ❌ Only auth router today |
-| Auth repo SQL + column alignment | ❌ Broken login query; `password` vs `password_hash` mismatch |
-| Standard OAuth2 token response | ❌ Login returns raw JWT string, not `{access_token, token_type}` |
-| JWT verification on protected routes | ❌ No `get_current_user_id` dependency |
-| Repo pattern unified (instance vs classmethod) | ❌ Services call camelCase methods; repos use snake_case classmethods |
-| `interaction_repo` implemented | ❌ Methods are `pass` stubs |
-| `user_profiles` schema vs model | ❌ Schema missing topic lists, strategy_weights, view_time |
-| Seed script aligned with schema | ❌ Still uses `topic`, `password_hash` vs live DB columns |
-| Edge builder wired on post create | 🟡 Attempted in `post.py` but not correctly connected |
+
 | iOS backend auth (drop Firebase) | ❌ `AuthSession.swift` still uses Firebase |
 | iOS ↔ API | ❌ No `APIClient` in `BubblerApp/` |
 | Graph HTTP route | ❌ No `routes/graph.py` |
@@ -48,42 +40,7 @@ Step-by-step plan for a **solo developer**. Plain language, exact file paths. Up
 | Algorithm settings (wired) | ❌ Settings UI is placeholders |
 | Automated tests / CI | ❌ None |
 
-**Big picture:** Auth pipeline exists on the backend (bcrypt + JWT issuance), and missing refactor files are back. What remains is fixing auth/repo bugs, registering the rest of the routers, protecting routes with JWT, finishing interaction + schema alignment, then connecting iOS and building the graph loop.
-
----
-
-## Backend Layout
-
-```
-backend/
-├── main.py
-├── config.py               # DB + JWT env vars
-├── Pipfile
-├── app/
-│   ├── startup.py          # Pool + router registration (auth only today)
-│   ├── db/schema.sql
-│   ├── routes/
-│   │   ├── auth.py
-│   │   ├── feed.py
-│   │   └── user.py
-│   ├── services/
-│   │   ├── auth.py         # bcrypt + JWT
-│   │   ├── feed.py
-│   │   ├── graph.py
-│   │   ├── post.py
-│   │   ├── user.py
-│   │   └── interaction.py
-│   ├── repositories/
-│   │   ├── auth_repo.py
-│   │   ├── feed_repo.py
-│   │   ├── post_repo.py
-│   │   ├── user_repo.py
-│   │   ├── interaction_repo.py
-│   │   └── edge_builder_repo.py
-│   └── schemas/
-```
-
-`startup.py` owns all wiring — there is no separate `deps.py` yet.
+**Big picture:**  What remains is connecting iOS and building the graph loop.
 
 ---
 
@@ -338,20 +295,6 @@ Register the test target in Xcode (`BubblerApp.xcodeproj`) if not present.
 
 ---
 
-## Suggested Timeline (Solo Dev)
-
-| Phase | Focus | Rough time |
-|-------|-------|------------|
-| 0 | Fix auth bugs + register routers | 2–3 days |
-| 1 | JWT protection | 1–2 days |
-| 2 | Data layer (interactions, seed, edges) | 1 weekend |
-| 3 | iOS backend auth, drop Firebase | 1 weekend |
-| 4 | iOS real feed | 2–3 days |
-| 5 | Graph path | 2–3 weekends |
-| 6 | Algorithm settings | 1–2 weekends |
-| 7 | Tests + CI | 1–2 weekends (start early) |
-| 8 | Deploy basics | 1 weekend |
-
 ---
 
 ## What to Avoid
@@ -369,8 +312,6 @@ Register the test target in Xcode (`BubblerApp.xcodeproj`) if not present.
 **Create:**
 
 ```
-backend/.env.example
-backend/app/security/deps.py
 backend/app/routes/graph.py
 backend/tests/conftest.py
 backend/tests/test_auth.py
@@ -392,18 +333,6 @@ docker-compose.yml
 **Edit next (highest priority):**
 
 ```
-backend/app/repositories/auth_repo.py
-backend/app/services/auth.py
-backend/app/startup.py
-backend/app/repositories/feed_repo.py
-backend/app/repositories/interaction_repo.py
-backend/app/repositories/post_repo.py
-backend/app/services/post.py
-backend/app/services/user.py
-backend/app/services/interaction.py
-backend/app/db/schema.sql
-backend/app/routes/feed.py
-scripts/seed_db.py
 BubblerApp/BubblerApp/AuthSession.swift
 BubblerApp/BubblerApp/ContentView.swift
 BubblerApp/BubblerApp/FeedView.swift
@@ -416,22 +345,3 @@ BubblerApp/BubblerApp/GoogleService-Info.plist
 (Firebase SPM dependency in Xcode)
 ```
 
----
-
-## When You're Stuck
-
-1. **Login 401** — `auth_repo` query returning nothing? Column `password` vs `password_hash`?
-2. **Login 422** — sending JSON instead of form body to `/login`?
-3. **Import error** — service filename vs import (`app.services.feed`, not `feed_service`)?
-4. **Feed empty** — seed data? Embeddings? User has rows in `user_profiles`?
-5. **Opposite strategy crash** — `get_opposite_posts` using `self.pool` on a classmethod?
-
----
-
-## Next Action
-
-If you only do **one thing** next:
-
-> **Phase 0, Steps 0.1–0.3** — fix `auth_repo.py`, return `{access_token, token_type}` from auth, register feed + user routers in `startup.py`.
-
-Then add **`test_auth.py`** (Phase 7.1) so auth stays working as you connect iOS.

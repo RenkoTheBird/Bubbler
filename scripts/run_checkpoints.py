@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Backend checkpoint runner — roadmap Phases 0, 1, and 2.
+Bubbler checkpoint runner — roadmap Phases 0–3.
 
 Prerequisites:
   - Postgres running (credentials in backend/.env, e.g. PORT=5433)
@@ -14,6 +14,13 @@ Optional env overrides (in backend/.env or shell):
   CHECKPOINT_EMAIL=checkpoint@bubbler.com
   CHECKPOINT_USERNAME=ckptuser
   CHECKPOINT_PASSWORD=secret123
+  PHASE3_CHECKPOINT_EMAIL=phase3-checkpoint@bubbler.com
+  PHASE3_CHECKPOINT_USERNAME=phase3ckpt
+
+Phase 3 maps to docs/roadmap.md “Drop Firebase” conditions 1–8:
+  1–4  API auth (register, login, protected route 401/200)
+  5–7  iOS source checks (AuthSession, Keychain, APIClient Bearer header)
+  8    Manual — login + create-account on simulator (printed as SKIP)
 
 How to run
 Terminal 1 — start the API (if not already running):
@@ -43,6 +50,8 @@ from dotenv import load_dotenv
 
 BACKEND_ROOT = Path(__file__).resolve().parent.parent / "backend"
 ROOT = Path(__file__).resolve().parent.parent
+IOS_APP_ROOT = ROOT / "BubblerApp" / "BubblerApp"
+IOS_PROJECT_FILE = ROOT / "BubblerApp" / "BubblerApp.xcodeproj" / "project.pbxproj"
 sys.path.insert(0, str(BACKEND_ROOT))
 sys.path.insert(0, str(ROOT))
 
@@ -59,6 +68,10 @@ from app.db.vector import to_pgvector  # noqa: E402
 CHECKPOINT_EMAIL = os.getenv("CHECKPOINT_EMAIL", "checkpoint@bubbler.com")
 CHECKPOINT_USERNAME = os.getenv("CHECKPOINT_USERNAME", "ckptuser")
 CHECKPOINT_PASSWORD = os.getenv("CHECKPOINT_PASSWORD", "secret123")
+PHASE3_CHECKPOINT_EMAIL = os.getenv(
+    "PHASE3_CHECKPOINT_EMAIL", "phase3-checkpoint@bubbler.com"
+)
+PHASE3_CHECKPOINT_USERNAME = os.getenv("PHASE3_CHECKPOINT_USERNAME", "phase3ckpt")
 API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
 
 SAMPLE_TOPICS = ["tech", "health", "startups"]
@@ -143,13 +156,31 @@ def ok(ctx: Context, name: str, condition: bool, detail: str = "") -> bool:
     return False
 
 
+def skip(name: str, detail: str = "") -> None:
+    print(f"  SKIP  {name}" + (f" — {detail}" if detail else ""))
+
+
+def read_ios_file(name: str) -> str:
+    path = IOS_APP_ROOT / name
+    if not path.is_file():
+        return ""
+    return path.read_text(encoding="utf-8")
+
+
+def ios_swift_sources() -> list[tuple[str, str]]:
+    if not IOS_APP_ROOT.is_dir():
+        return []
+    return [
+        (path.name, path.read_text(encoding="utf-8"))
+        for path in sorted(IOS_APP_ROOT.glob("*.swift"))
+    ]
+
+
 async def reset_checkpoint_data(pool: asyncpg.Pool) -> None:
-    """Remove prior checkpoint user; FK ON DELETE CASCADE cleans related rows."""
+    """Remove prior checkpoint users; ON DELETE CASCADE cleans related rows."""
     async with pool.acquire() as conn:
-        await conn.execute(
-            "DELETE FROM users WHERE email = $1",
-            CHECKPOINT_EMAIL,
-        )
+        for email in (CHECKPOINT_EMAIL, PHASE3_CHECKPOINT_EMAIL):
+            await conn.execute("DELETE FROM users WHERE email = $1", email)
 
 
 async def seed_checkpoint_posts(pool: asyncpg.Pool, user_id: int) -> int:
@@ -308,18 +339,185 @@ async def run_phase_2(ctx: Context) -> None:
     )
 
 
+def run_phase_3(ctx: Context) -> None:
+    """Phase 3 — iOS backend auth (roadmap: drop Firebase checklist, conditions 1–8)."""
+    phase3_token = ""
+
+    # --- 1: POST /register returns {access_token, token_type} ---
+    status, body, raw = ctx.api.request(
+        "POST",
+        "/auth/register",
+        json_body={
+            "username": PHASE3_CHECKPOINT_USERNAME,
+            "email": PHASE3_CHECKPOINT_EMAIL,
+            "password": CHECKPOINT_PASSWORD,
+        },
+    )
+    if status == 409:
+        status, body, raw = ctx.api.request(
+            "POST",
+            "/auth/login",
+            form={
+                "username": PHASE3_CHECKPOINT_EMAIL,
+                "password": CHECKPOINT_PASSWORD,
+            },
+        )
+        ok(
+            ctx,
+            "3.1 POST /register returns {access_token, token_type}",
+            status == 200
+            and isinstance(body, dict)
+            and "access_token" in body
+            and body.get("token_type") == "bearer",
+            raw[:200],
+        )
+    else:
+        ok(ctx, "3.1 POST /register → 200", status == 200, raw[:200])
+        if isinstance(body, dict):
+            ok(ctx, "3.1 response has access_token", "access_token" in body)
+            ok(
+                ctx,
+                "3.1 response has token_type bearer",
+                body.get("token_type") == "bearer",
+            )
+
+    if isinstance(body, dict):
+        phase3_token = body.get("access_token", "")
+
+    # --- 2: POST /login (form: username=email, password) returns token ---
+    status, login_body, raw = ctx.api.request(
+        "POST",
+        "/auth/login",
+        form={
+            "username": PHASE3_CHECKPOINT_EMAIL,
+            "password": CHECKPOINT_PASSWORD,
+        },
+    )
+    ok(ctx, "3.2 POST /auth/login (form) → 200", status == 200, raw[:200])
+    if isinstance(login_body, dict):
+        ok(ctx, "3.2 login response has access_token", "access_token" in login_body)
+        phase3_token = login_body.get("access_token", phase3_token)
+
+    # --- 3: Protected route rejects missing token ---
+    status, _, raw = ctx.api.request("GET", "/feed/me")
+    ok(
+        ctx,
+        "3.3 Protected route rejects missing token (401/403)",
+        status in (401, 403),
+        f"status={status}, body={raw[:120]}",
+    )
+
+    # --- 4: Protected route accepts valid Bearer token ---
+    if not phase3_token:
+        ok(ctx, "3.4 Protected route accepts valid Bearer token (200)", False, "missing token")
+    else:
+        status, feed_body, raw = ctx.api.request("GET", "/feed/me", token=phase3_token)
+        ok(
+            ctx,
+            "3.4 GET /feed/me with Bearer token → 200",
+            status == 200,
+            raw[:200],
+        )
+        ok(
+            ctx,
+            "3.4 feed response is JSON array",
+            isinstance(feed_body, list),
+            str(type(feed_body)),
+        )
+
+    # --- 5: AuthSession calls backend login/register ---
+    auth_session = read_ios_file("AuthSession.swift")
+    ok(ctx, "3.5 AuthSession.swift exists", bool(auth_session))
+    ok(
+        ctx,
+        "3.5 signIn calls APIClient.login",
+        "APIClient.login" in auth_session,
+    )
+    ok(
+        ctx,
+        "3.5 createAccount calls APIClient.register",
+        "APIClient.register" in auth_session,
+    )
+
+    # --- 6: Token stored in Keychain (survives restart) ---
+    ok(
+        ctx,
+        "3.6 AuthSession saves token via KeychainStore.saveAccessToken",
+        "KeychainStore.saveAccessToken" in auth_session,
+    )
+    ok(
+        ctx,
+        "3.6 AuthSession restores session from Keychain on init",
+        "KeychainStore.loadAccessToken" in auth_session,
+    )
+    ok(
+        ctx,
+        "3.6 signOut deletes Keychain token",
+        "KeychainStore.deleteAccessToken" in auth_session,
+    )
+    ok(ctx, "3.6 KeychainStore.swift exists", (IOS_APP_ROOT / "KeychainStore.swift").is_file())
+
+    # --- 7: APIClient sends Authorization: Bearer … ---
+    api_client = read_ios_file("APIClient.swift")
+    ok(ctx, "3.7 APIClient.swift exists", bool(api_client))
+    ok(
+        ctx,
+        "3.7 authorizedRequest sets Authorization Bearer header",
+        'setValue("Bearer' in api_client or "Bearer \\(token)" in api_client,
+    )
+    ok(
+        ctx,
+        "3.7 authorizedRequest reads token from Keychain",
+        "KeychainStore.loadAccessToken" in api_client,
+    )
+
+    # --- 8: Manual simulator test ---
+    skip(
+        "3.8 Login + create-account flows on simulator",
+        "manual — register, kill app, reopen, confirm session persists",
+    )
+
+    # --- Firebase dropped (roadmap checkpoint) ---
+    swift_sources = ios_swift_sources()
+    firebase_imports = [
+        name
+        for name, source in swift_sources
+        if "import Firebase" in source or "FirebaseApp" in source
+    ]
+    ok(
+        ctx,
+        "No Firebase imports in iOS Swift sources",
+        not firebase_imports,
+        ", ".join(firebase_imports) if firebase_imports else "",
+    )
+    ok(
+        ctx,
+        "GoogleService-Info.plist removed",
+        not (IOS_APP_ROOT / "GoogleService-Info.plist").exists(),
+    )
+    if IOS_PROJECT_FILE.is_file():
+        pbxproj = IOS_PROJECT_FILE.read_text(encoding="utf-8")
+        ok(
+            ctx,
+            "Firebase SPM dependency removed from Xcode project",
+            "firebase-ios-sdk" not in pbxproj and "FirebaseAuth" not in pbxproj,
+        )
+    else:
+        ok(ctx, "Xcode project file present", False, str(IOS_PROJECT_FILE))
+
+
 PhaseFn = Callable[[Context], Any]
 
 PHASES: list[tuple[str, str, PhaseFn]] = [
     ("0", "Fix Auth + Register Routers", run_phase_0),
     ("1", "JWT Protection on Routes", run_phase_1),
     ("2", "Backend Data Layer", run_phase_2),
-    # ("3", "iOS Backend Auth", run_phase_3),
+    ("3", "iOS Backend Auth (Drop Firebase)", run_phase_3),
 ]
 
 
 async def main() -> int:
-    print("Bubbler backend checkpoints")
+    print("Bubbler checkpoints (backend + iOS static)")
     print(f"  API:  {API_BASE_URL}")
     print(f"  DB:   {my_env_vars.host}:{my_env_vars.port}/{my_env_vars.database}")
     print(f"  User: {CHECKPOINT_EMAIL}")

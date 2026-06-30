@@ -1,7 +1,4 @@
-/* This schema is mostly for reference.
-   Database will be hosted on supabase for now
-   But this represents the general idea.
-*/
+/* Reference schema for Bubbler. */
 
 -- Required extensions
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -20,7 +17,7 @@ CREATE TABLE users (
 CREATE TABLE topics (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT UNIQUE,
-    parent_topic_id UUID REFERENCES topics(id)
+    parent_topic_id UUID REFERENCES topics(id) ON DELETE SET NULL
 );
 
 -- POSTS
@@ -30,7 +27,7 @@ CREATE TABLE posts (
     content TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT NOW(),
     embedding vector(384),  
-    topic_id UUID REFERENCES topics(id)
+    topic_id UUID REFERENCES topics(id) ON DELETE SET NULL
 );
 
 -- Vector index for similarity search

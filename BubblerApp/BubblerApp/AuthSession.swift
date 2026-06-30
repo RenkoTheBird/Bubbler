@@ -4,53 +4,63 @@
 //
 
 import Combine
-import FirebaseAuth
 import Foundation
 
 @MainActor
 final class AuthSession: ObservableObject {
-    @Published private(set) var user: User?
+    @Published private(set) var userId: Int?
     @Published var authError: String?
     @Published var successMessage: String?
     @Published var isWorking = false
 
-    private var authListener: AuthStateDidChangeListenerHandle?
-
     var isSignedIn: Bool {
-        user != nil
+        KeychainStore.loadAccessToken() != nil
     }
 
     init() {
-        user = Auth.auth().currentUser
-        authListener = Auth.auth().addStateDidChangeListener { [weak self] _, user in
-            Task { @MainActor in
-                self?.user = user
-            }
-        }
-    }
-
-    deinit {
-        if let authListener {
-            Auth.auth().removeStateDidChangeListener(authListener)
-        }
+        userId = Self.restoredUserId()
     }
 
     func signIn(email: String, password: String) async {
         _ = await performAuthAction {
-            try await Auth.auth().signIn(withEmail: normalizedEmail(email), password: password)
+            try await APIClient.login(
+                email: normalizedEmail(email),
+                password: password
+            )
         }
     }
 
-    func createAccount(email: String, password: String, confirmPassword: String) async {
+    func createAccount(
+        username: String,
+        email: String,
+        password: String,
+        confirmPassword: String
+    ) async {
+        let trimmedUsername = username.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedEmail = normalizedEmail(email)
+
+        guard !trimmedUsername.isEmpty else {
+            authError = "Enter a username."
+            return
+        }
+
+        guard trimmedUsername.count <= 20 else {
+            authError = "Username must be 20 characters or fewer."
+            return
+        }
 
         guard !trimmedEmail.isEmpty else {
             authError = "Enter your email address."
             return
         }
 
-        guard password.count >= 6 else {
-            authError = "Password must be at least 6 characters."
+        guard password.count >= 5 else {
+            authError = "Password must be at least 5 characters."
+            return
+        }
+
+        guard password.count <= 40 else {
+            authError = "Password must be 40 characters or fewer."
             return
         }
 
@@ -60,7 +70,11 @@ final class AuthSession: ObservableObject {
         }
 
         let didCreateAccount = await performAuthAction {
-            try await Auth.auth().createUser(withEmail: trimmedEmail, password: password)
+            try await APIClient.register(
+                username: trimmedUsername,
+                email: trimmedEmail,
+                password: password
+            )
         }
 
         if didCreateAccount {
@@ -69,28 +83,26 @@ final class AuthSession: ObservableObject {
     }
 
     func signOut() {
-        do {
-            try Auth.auth().signOut()
-            user = nil
-            authError = nil
-            successMessage = nil
-        } catch {
-            authError = error.localizedDescription
-        }
+        KeychainStore.deleteAccessToken()
+        userId = nil
+        authError = nil
+        successMessage = nil
     }
 
     func clearSuccessMessage() {
         successMessage = nil
     }
 
-    private func performAuthAction(_ action: () async throws -> AuthDataResult) async -> Bool {
+    private func performAuthAction(_ action: () async throws -> AuthResponse) async -> Bool {
         authError = nil
         successMessage = nil
         isWorking = true
         defer { isWorking = false }
 
         do {
-            _ = try await action()
+            let response = try await action()
+            try KeychainStore.saveAccessToken(response.accessToken)
+            userId = response.userId
             return true
         } catch {
             authError = error.localizedDescription
@@ -100,5 +112,29 @@ final class AuthSession: ObservableObject {
 
     private func normalizedEmail(_ email: String) -> String {
         email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    private static func restoredUserId() -> Int? {
+        guard let token = KeychainStore.loadAccessToken() else { return nil }
+
+        let segments = token.split(separator: ".")
+        guard segments.count >= 2 else { return nil }
+
+        var payload = String(segments[1])
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        let padding = 4 - payload.count % 4
+        if padding < 4 {
+            payload += String(repeating: "=", count: padding)
+        }
+
+        guard let data = Data(base64Encoded: payload),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let subject = json["sub"] as? String,
+              let userId = Int(subject) else {
+            return nil
+        }
+
+        return userId
     }
 }

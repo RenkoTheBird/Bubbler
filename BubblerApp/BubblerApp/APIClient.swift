@@ -1,0 +1,122 @@
+//
+//  APIClient.swift
+//  BubblerApp
+//
+
+import Foundation
+
+enum APIConfig {
+    static let baseURL = URL(string: "http://127.0.0.1:8000")!
+}
+
+struct AuthResponse: Decodable {
+    let accessToken: String
+    let tokenType: String
+    let userId: Int
+
+    enum CodingKeys: String, CodingKey {
+        case accessToken = "access_token"
+        case tokenType = "token_type"
+        case userId = "user_id"
+    }
+}
+
+private struct RegisterBody: Encodable {
+    let username: String
+    let email: String
+    let password: String
+}
+
+private struct APIErrorBody: Decodable {
+    let detail: String
+}
+
+enum APIClientError: LocalizedError {
+    case invalidResponse
+    case unauthorized
+    case serverError(statusCode: Int, message: String)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidResponse:
+            return "Unexpected response from the server."
+        case .unauthorized:
+            return "Your session has expired. Please log in again."
+        case .serverError(_, let message):
+            return message
+        }
+    }
+}
+
+enum APIClient {
+    static func login(email: String, password: String) async throws -> AuthResponse {
+        var request = URLRequest(url: APIConfig.baseURL.appending(path: "auth/login"))
+        request.httpMethod = "POST"
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        request.httpBody = formEncodedBody([
+            "username": email,
+            "password": password,
+        ])
+        return try await perform(request)
+    }
+
+    static func register(username: String, email: String, password: String) async throws -> AuthResponse {
+        var request = URLRequest(url: APIConfig.baseURL.appending(path: "auth/register"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(
+            RegisterBody(username: username, email: email, password: password)
+        )
+        return try await perform(request)
+    }
+
+    static func authorizedRequest(
+        path: String,
+        method: String = "GET",
+        body: Data? = nil,
+        contentType: String? = nil
+    ) async throws -> Data {
+        guard let token = KeychainStore.loadAccessToken() else {
+            throw APIClientError.unauthorized
+        }
+
+        var request = URLRequest(url: APIConfig.baseURL.appending(path: path))
+        request.httpMethod = method
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        if let contentType {
+            request.setValue(contentType, forHTTPHeaderField: "Content-Type")
+        }
+        request.httpBody = body
+        return try await performData(request)
+    }
+
+    private static func perform(_ request: URLRequest) async throws -> AuthResponse {
+        let data = try await performData(request)
+        return try JSONDecoder().decode(AuthResponse.self, from: data)
+    }
+
+    private static func performData(_ request: URLRequest) async throws -> Data {
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIClientError.invalidResponse
+        }
+
+        guard (200 ... 299).contains(httpResponse.statusCode) else {
+            let message = (try? JSONDecoder().decode(APIErrorBody.self, from: data).detail)
+                ?? "Request failed with status \(httpResponse.statusCode)."
+            throw APIClientError.serverError(statusCode: httpResponse.statusCode, message: message)
+        }
+
+        return data
+    }
+
+    private static func formEncodedBody(_ fields: [String: String]) -> Data {
+        let allowed = CharacterSet.urlQueryAllowed
+        let pairs = fields.map { key, value in
+            let escapedKey = key.addingPercentEncoding(withAllowedCharacters: allowed) ?? key
+            let escapedValue = value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value
+            return "\(escapedKey)=\(escapedValue)"
+        }
+        return Data(pairs.joined(separator: "&").utf8)
+    }
+}

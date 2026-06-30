@@ -71,37 +71,6 @@ Do **not** remove Firebase until **all** of these pass:
 
 **Only after 1–8:** remove Firebase.
 
-### Step 3.1 — Add `APIClient` + Keychain helper
-
-**Create:** `BubblerApp/BubblerApp/APIClient.swift`
-
-Login uses form-encoded body (OAuth2), not JSON:
-
-```swift
-func login(email: String, password: String) async throws -> AuthResponse {
-    var request = URLRequest(url: baseURL.appendingPathComponent("/login"))
-    request.httpMethod = "POST"
-    request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-    let body = "username=\(email.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? email)&password=\(password.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? password)"
-    request.httpBody = body.data(using: .utf8)
-    ...
-}
-```
-
-Register uses JSON matching `CreateUser`:
-
-```swift
-struct RegisterBody: Encodable {
-    let username: String
-    let email: String
-    let password: String
-}
-```
-
-**Create:** `BubblerApp/BubblerApp/KeychainStore.swift` — save/load/delete `access_token`.
-
-Reference pattern: `ios-app/BubblerApp/App/Services/APIClient.swift` (copy ideas, don't maintain two apps).
-
 ### Step 3.2 — Rewrite `AuthSession.swift`
 
 **File:** `BubblerApp/BubblerApp/AuthSession.swift`

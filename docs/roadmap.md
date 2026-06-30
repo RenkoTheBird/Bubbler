@@ -71,25 +71,6 @@ Do **not** remove Firebase until **all** of these pass:
 
 **Only after 1–8:** remove Firebase.
 
-### Step 3.2 — Rewrite `AuthSession.swift`
-
-**File:** `BubblerApp/BubblerApp/AuthSession.swift`
-
-- Remove `import FirebaseAuth`
-- `signIn` → `APIClient.login` → store token in Keychain → set `isSignedIn = true`
-- `createAccount` → `APIClient.register` → same
-- `signOut` → delete Keychain token
-- On init, restore session if Keychain has valid token
-
-**Update:** `BubblerApp/BubblerApp/ContentView.swift` — remove `FirebaseCore`, `AppDelegate`, `FirebaseApp.configure()`.
-
-**Update:** `CreateAccountView.swift` — collect username (backend requires it).
-
-**Delete (after checklist):**
-
-- `BubblerApp/BubblerApp/GoogleService-Info.plist`
-- Firebase SPM dependency in Xcode
-
 **Checkpoint:** Register → login → token in Keychain → no Firebase imports.
 
 ---

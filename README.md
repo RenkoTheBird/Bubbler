@@ -14,6 +14,8 @@ Bubbler/
 │       ├── BubblerAppApp.swift
 │       ├── ContentView.swift
 │       ├── AuthSession.swift
+│       ├── APIClient.swift
+│       ├── KeychainStore.swift
 │       ├── LoginView.swift
 │       ├── CreateAccountView.swift
 │       ├── FeedView.swift
@@ -22,7 +24,6 @@ Bubbler/
 │       ├── SettingsView.swift
 │       ├── BubbleDetail.swift
 │       ├── BubblerLogoView.swift
-│       ├── GoogleService-Info.plist
 │       └── Assets.xcassets/
 │
 ├── ios-app/                      # Feature-based iOS scaffold (in progress)

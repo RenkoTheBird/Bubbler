@@ -8,24 +8,17 @@ import Foundation
 
 @MainActor
 final class AuthSession: ObservableObject {
-    @Published private(set) var user: BackendUser?
+    @Published private(set) var userId: Int?
     @Published var authError: String?
     @Published var successMessage: String?
     @Published var isWorking = false
-    @Published private(set) var isRestoringSession = false
-
-    private let client: BackendClient
-    private let storage: UserDefaults
-    private let sessionUserKey = "bubbler.sessionUser"
 
     var isSignedIn: Bool {
-        user != nil
+        KeychainStore.loadAccessToken() != nil
     }
 
-    init(client: BackendClient = .shared, storage: UserDefaults = .standard) {
-        self.client = client
-        self.storage = storage
-        self.user = Self.storedUser(from: storage, key: sessionUserKey)
+    init() {
+        userId = Self.restoredUserId()
     }
 
     func signIn(email: String, password: String) async {
@@ -42,20 +35,44 @@ final class AuthSession: ObservableObject {
         }
 
         _ = await performAuthAction {
-            saveSession(try await client.loginSession(email: trimmedEmail, password: password))
+            try await APIClient.login(
+                email: trimmedEmail,
+                password: password
+            )
         }
     }
 
-    func createAccount(email: String, password: String, confirmPassword: String) async {
+    func createAccount(
+        username: String,
+        email: String,
+        password: String,
+        confirmPassword: String
+    ) async {
+        let trimmedUsername = username.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedEmail = normalizedEmail(email)
+
+        guard !trimmedUsername.isEmpty else {
+            authError = "Enter a username."
+            return
+        }
+
+        guard trimmedUsername.count <= 20 else {
+            authError = "Username must be 20 characters or fewer."
+            return
+        }
 
         guard !trimmedEmail.isEmpty else {
             authError = "Enter your email address."
             return
         }
 
-        guard password.count >= 6 else {
-            authError = "Password must be at least 6 characters."
+        guard password.count >= 5 else {
+            authError = "Password must be at least 5 characters."
+            return
+        }
+
+        guard password.count <= 40 else {
+            authError = "Password must be 40 characters or fewer."
             return
         }
 
@@ -65,11 +82,11 @@ final class AuthSession: ObservableObject {
         }
 
         let didCreateAccount = await performAuthAction {
-            saveSession(try await client.registerSession(
-                username: username(from: trimmedEmail),
+            try await APIClient.register(
+                username: trimmedUsername,
                 email: trimmedEmail,
                 password: password
-            ))
+            )
         }
 
         if didCreateAccount {
@@ -77,24 +94,9 @@ final class AuthSession: ObservableObject {
         }
     }
 
-    func restoreSession() async {
-        guard let token = SessionTokenStore.load() else {
-            return
-        }
-
-        authError = nil
-        isRestoringSession = true
-        defer { isRestoringSession = false }
-
-        do {
-            saveSession(try await client.session(token: token))
-        } catch {
-            clearStoredSession()
-        }
-    }
-
     func signOut() {
-        clearStoredSession()
+        KeychainStore.deleteAccessToken()
+        userId = nil
         authError = nil
         successMessage = nil
     }
@@ -103,14 +105,16 @@ final class AuthSession: ObservableObject {
         successMessage = nil
     }
 
-    private func performAuthAction(_ action: () async throws -> Void) async -> Bool {
+    private func performAuthAction(_ action: () async throws -> AuthResponse) async -> Bool {
         authError = nil
         successMessage = nil
         isWorking = true
         defer { isWorking = false }
 
         do {
-            try await action()
+            let response = try await action()
+            try KeychainStore.saveAccessToken(response.accessToken)
+            userId = response.userId
             return true
         } catch {
             authError = error.localizedDescription
@@ -122,36 +126,27 @@ final class AuthSession: ObservableObject {
         email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
-    private func saveSession(_ response: AuthResponse) {
-        user = response.user
-        SessionTokenStore.save(response.sessionToken)
+    private static func restoredUserId() -> Int? {
+        guard let token = KeychainStore.loadAccessToken() else { return nil }
 
-        if let encodedUser = try? JSONEncoder().encode(response.user) {
-            storage.set(encodedUser, forKey: sessionUserKey)
+        let segments = token.split(separator: ".")
+        guard segments.count >= 2 else { return nil }
+
+        var payload = String(segments[1])
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        let padding = 4 - payload.count % 4
+        if padding < 4 {
+            payload += String(repeating: "=", count: padding)
         }
-    }
 
-    private func clearStoredSession() {
-        user = nil
-        SessionTokenStore.delete()
-        storage.removeObject(forKey: sessionUserKey)
-    }
-
-    private static func storedUser(from storage: UserDefaults, key: String) -> BackendUser? {
-        guard let data = storage.data(forKey: key) else {
+        guard let data = Data(base64Encoded: payload),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let subject = json["sub"] as? String,
+              let userId = Int(subject) else {
             return nil
         }
 
-        return try? JSONDecoder().decode(BackendUser.self, from: data)
-    }
-
-    private func username(from email: String) -> String {
-        let prefix = email.split(separator: "@").first.map(String.init) ?? "bubbler"
-        let safeCharacters = prefix.map { character in
-            character.isLetter || character.isNumber ? character : "_"
-        }
-
-        let username = String(safeCharacters).trimmingCharacters(in: CharacterSet(charactersIn: "_"))
-        return username.isEmpty ? "bubbler" : username
+        return userId
     }
 }

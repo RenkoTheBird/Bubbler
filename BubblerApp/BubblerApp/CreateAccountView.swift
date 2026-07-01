@@ -10,6 +10,7 @@ import SwiftUI
 struct CreateAccountView: View {
     @EnvironmentObject private var authSession: AuthSession
     
+    @State private var username: String = ""
     @State private var email: String = ""
     @State private var password: String = ""
     @State private var confirmPassword: String = ""
@@ -50,6 +51,21 @@ struct CreateAccountView: View {
                 }
                 .padding(.bottom, 25)
                 
+                // Username
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Username")
+                        .foregroundColor(.white.opacity(0.8))
+                        .font(.caption)
+
+                    TextField("Choose a username", text: $username)
+                        .padding()
+                        .background(Color.white.opacity(0.2))
+                        .cornerRadius(14)
+                        .foregroundColor(.white)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                }
+
                 // Email
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Email")
@@ -104,6 +120,7 @@ struct CreateAccountView: View {
                 Button(action: {
                     Task {
                         await authSession.createAccount(
+                            username: username,
                             email: email,
                             password: password,
                             confirmPassword: confirmPassword

@@ -3,43 +3,32 @@ class AuthRepository:
     def __init__(self, pool):
         self.pool = pool
 
-    async def get_user_by_email(self, email: str):
+    async def post_login_info(self, email_or_username: str):
         async with self.pool.acquire() as conn:
             password_column = await self._password_column(conn)
             return await conn.fetchrow(
                 f"""
-                SELECT id, username, email, {password_column} AS password_hash
+                SELECT id, {password_column} AS password
                 FROM users
                 WHERE lower(email) = lower($1)
+                   OR lower(username) = lower($1)
                 LIMIT 1
                 """,
-                email,
+                email_or_username,
             )
 
-    async def create_user(self, username: str, email: str, password_hash: str):
+    async def post_registration_info(self, username: str, email: str, password: str):
         async with self.pool.acquire() as conn:
             password_column = await self._password_column(conn)
-            return await conn.fetchrow(
+            return await conn.fetchval(
                 f"""
                 INSERT INTO users (username, email, {password_column})
                 VALUES ($1, lower($2), $3)
-                RETURNING id, username, email
+                RETURNING id
                 """,
                 username,
                 email,
-                password_hash,
-            )
-
-    async def get_user_by_id(self, user_id: int):
-        async with self.pool.acquire() as conn:
-            return await conn.fetchrow(
-                """
-                SELECT id, username, email
-                FROM users
-                WHERE id = $1
-                LIMIT 1
-                """,
-                user_id,
+                password,
             )
 
     async def _password_column(self, conn) -> str:

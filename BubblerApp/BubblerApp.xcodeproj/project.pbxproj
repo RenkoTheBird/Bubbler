@@ -6,11 +6,6 @@
 	objectVersion = 77;
 	objects = {
 
-/* Begin PBXBuildFile section */
-		DD8D4C442FE0F533007131BB /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = DD8D4C432FE0F533007131BB /* FirebaseCore */; };
-		DD8D4C462FE10879007131BB /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = DD8D4C452FE10879007131BB /* FirebaseAuth */; };
-/* End PBXBuildFile section */
-
 /* Begin PBXFileReference section */
 		DDC692462FC13838007276EC /* BubblerApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BubblerApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -28,8 +23,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				DD8D4C442FE0F533007131BB /* FirebaseCore in Frameworks */,
-				DD8D4C462FE10879007131BB /* FirebaseAuth in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -71,10 +64,6 @@
 				DDC692482FC13838007276EC /* BubblerApp */,
 			);
 			name = BubblerApp;
-			packageProductDependencies = (
-				DD8D4C432FE0F533007131BB /* FirebaseCore */,
-				DD8D4C452FE10879007131BB /* FirebaseAuth */,
-			);
 			productName = BubblerApp;
 			productReference = DDC692462FC13838007276EC /* BubblerApp.app */;
 			productType = "com.apple.product-type.application";
@@ -103,9 +92,6 @@
 			);
 			mainGroup = DDC6923D2FC13838007276EC;
 			minimizedProjectReferenceProxies = 1;
-			packageReferences = (
-				DD8D4C422FE0F22A007131BB /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
-			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = DDC692472FC13838007276EC /* Products */;
 			projectDirPath = "";
@@ -348,30 +334,6 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
-
-/* Begin XCRemoteSwiftPackageReference section */
-		DD8D4C422FE0F22A007131BB /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/firebase/firebase-ios-sdk.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 12.14.0;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		DD8D4C432FE0F533007131BB /* FirebaseCore */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = DD8D4C422FE0F22A007131BB /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseCore;
-		};
-		DD8D4C452FE10879007131BB /* FirebaseAuth */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = DD8D4C422FE0F22A007131BB /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseAuth;
-		};
-/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = DDC6923E2FC13838007276EC /* Project object */;
 }

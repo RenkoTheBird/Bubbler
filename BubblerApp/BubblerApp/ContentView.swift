@@ -13,9 +13,7 @@ struct ContentView: View {
 
     var body: some View {
         NavigationStack {
-            if authSession.isRestoringSession && !authSession.isSignedIn {
-                ProgressView("Restoring session...")
-            } else if authSession.isSignedIn {
+            if authSession.isSignedIn {
                 FeedView()
             } else {
                 LoginView()
@@ -48,9 +46,6 @@ struct ContentView: View {
                 try? await Task.sleep(for: .seconds(2))
                 authSession.clearSuccessMessage()
             }
-        }
-        .task {
-            await authSession.restoreSession()
         }
     }
 }

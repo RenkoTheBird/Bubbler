@@ -1,7 +1,4 @@
-/* This schema is mostly for reference.
-   Database will be hosted on supabase for now
-   But this represents the general idea.
-*/
+/* Reference schema for Bubbler. */
 
 -- Required extensions
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -10,9 +7,9 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 -- USERS
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
-    username TEXT NOT NULL,
-    email TEXT NOT NULL,
-    password_hash TEXT NOT NULL,
+    username VARCHAR(20) NOT NULL,
+    email VARCHAR(80) UNIQUE NOT NULL,
+    password VARCHAR(60) NOT NULL,
     created_at TIMESTAMP DEFAULT NOW()
 );
 
@@ -20,17 +17,17 @@ CREATE TABLE users (
 CREATE TABLE topics (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT UNIQUE,
-    parent_topic_id UUID REFERENCES topics(id)
+    parent_topic_id UUID REFERENCES topics(id) ON DELETE SET NULL
 );
 
 -- POSTS
 CREATE TABLE posts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id INTEGER REFERENCES users(id),
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
     content TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT NOW(),
     embedding vector(384),  
-    topic_id UUID REFERENCES topics(id)
+    topic_id UUID REFERENCES topics(id) ON DELETE SET NULL
 );
 
 -- Vector index for similarity search
@@ -49,25 +46,35 @@ CREATE TABLE post_topics (
 -- INTERACTIONS
 CREATE TABLE interactions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id INTEGER REFERENCES users(id),
-    post_id UUID REFERENCES posts(id),
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    post_id UUID REFERENCES posts(id) ON DELETE CASCADE,
     type TEXT CHECK (type IN ('like', 'skip', 'explore')),
-    created_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT NOW(),
+    view_time FLOAT
 );
 
 -- EDGES (post graph)
 CREATE TABLE edges (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    from_post_id UUID REFERENCES posts(id),
-    to_post_id UUID REFERENCES posts(id),
+    from_post_id UUID REFERENCES posts(id) ON DELETE CASCADE,
+    to_post_id UUID REFERENCES posts(id) ON DELETE CASCADE,
     edge_type TEXT CHECK (edge_type IN ('similar', 'opposite', 'topic')),
     weight FLOAT
 );
 
 -- USER PROFILES (vector preferences)
 CREATE TABLE user_profiles (
-    user_id INTEGER PRIMARY KEY REFERENCES users(id),
-    embedding vector,
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    -- preferences (also in ALTER TABLE below)
     diversity_tolerance FLOAT CHECK (diversity_tolerance BETWEEN 0 AND 1),
     randomness FLOAT
 );
+
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS preferred_topics TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS blacklisted_topics TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS use_view_time BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS view_time_weight FLOAT DEFAULT 0.1;
+-- 
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS strategy_weights JSONB NOT NULL DEFAULT 
+'{"similar":0.7,"graph":0.2,"opposite":0.0,"random":0.1}';
+--

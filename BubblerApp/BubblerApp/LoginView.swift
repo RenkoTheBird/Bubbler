@@ -9,6 +9,7 @@ import SwiftUI
 
 struct LoginView: View {
     @EnvironmentObject private var authSession: AuthSession
+    @EnvironmentObject private var backendConnection: BackendConnection
     
     @State private var email: String = ""
     @State private var password: String = ""
@@ -50,6 +51,8 @@ struct LoginView: View {
                     Text("See what you actually care about")
                         .font(.subheadline)
                         .foregroundColor(.white.opacity(0.85))
+
+                    backendStatus
                 }
                 .padding(.bottom, 30)
                 
@@ -142,9 +145,49 @@ struct LoginView: View {
             }
             .padding(.horizontal, 28)
         }
+        .task {
+            await backendConnection.refresh()
+        }
+    }
+
+    private var backendStatus: some View {
+        HStack(spacing: 7) {
+            Circle()
+                .fill(backendStatusColor)
+                .frame(width: 8, height: 8)
+
+            Text(backendStatusText)
+                .font(.caption.weight(.semibold))
+                .foregroundColor(.white.opacity(0.85))
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var backendStatusText: String {
+        switch backendConnection.state {
+        case .checking:
+            return "Checking backend"
+        case .connected:
+            return "Backend connected"
+        case .unavailable:
+            return "Backend unavailable"
+        }
+    }
+
+    private var backendStatusColor: Color {
+        switch backendConnection.state {
+        case .checking:
+            return .yellow
+        case .connected:
+            return .green
+        case .unavailable:
+            return .red
+        }
     }
 }
 
 #Preview {
     LoginView()
+        .environmentObject(AuthSession())
+        .environmentObject(BackendConnection())
 }

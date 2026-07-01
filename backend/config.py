@@ -28,6 +28,7 @@ class EnvVars:
         self.db_pass = getenv("DATABASE_PASSWORD")
         self.host = getenv("HOST")
         self.port = getenv("PORT")
+        self.session_secret = getenv("SESSION_SECRET")
         # helps format parse it properly 
         self.db_url = f"postgresql://{self.db_user}:{quote_plus(self.db_pass)}@{self.host}:{self.port}/{self.database}"
         logger.info("Environment variables loaded successfully")

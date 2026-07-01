@@ -4,40 +4,45 @@
 //
 
 import Combine
-import FirebaseAuth
 import Foundation
 
 @MainActor
 final class AuthSession: ObservableObject {
-    @Published private(set) var user: User?
+    @Published private(set) var user: BackendUser?
     @Published var authError: String?
     @Published var successMessage: String?
     @Published var isWorking = false
+    @Published private(set) var isRestoringSession = false
 
-    private var authListener: AuthStateDidChangeListenerHandle?
+    private let client: BackendClient
+    private let storage: UserDefaults
+    private let sessionUserKey = "bubbler.sessionUser"
 
     var isSignedIn: Bool {
         user != nil
     }
 
-    init() {
-        user = Auth.auth().currentUser
-        authListener = Auth.auth().addStateDidChangeListener { [weak self] _, user in
-            Task { @MainActor in
-                self?.user = user
-            }
-        }
-    }
-
-    deinit {
-        if let authListener {
-            Auth.auth().removeStateDidChangeListener(authListener)
-        }
+    init(client: BackendClient = .shared, storage: UserDefaults = .standard) {
+        self.client = client
+        self.storage = storage
+        self.user = Self.storedUser(from: storage, key: sessionUserKey)
     }
 
     func signIn(email: String, password: String) async {
+        let trimmedEmail = normalizedEmail(email)
+
+        guard !trimmedEmail.isEmpty else {
+            authError = "Enter your email address."
+            return
+        }
+
+        guard !password.isEmpty else {
+            authError = "Enter your password."
+            return
+        }
+
         _ = await performAuthAction {
-            try await Auth.auth().signIn(withEmail: normalizedEmail(email), password: password)
+            saveSession(try await client.loginSession(email: trimmedEmail, password: password))
         }
     }
 
@@ -60,7 +65,11 @@ final class AuthSession: ObservableObject {
         }
 
         let didCreateAccount = await performAuthAction {
-            try await Auth.auth().createUser(withEmail: trimmedEmail, password: password)
+            saveSession(try await client.registerSession(
+                username: username(from: trimmedEmail),
+                email: trimmedEmail,
+                password: password
+            ))
         }
 
         if didCreateAccount {
@@ -68,29 +77,40 @@ final class AuthSession: ObservableObject {
         }
     }
 
-    func signOut() {
-        do {
-            try Auth.auth().signOut()
-            user = nil
-            authError = nil
-            successMessage = nil
-        } catch {
-            authError = error.localizedDescription
+    func restoreSession() async {
+        guard let token = SessionTokenStore.load() else {
+            return
         }
+
+        authError = nil
+        isRestoringSession = true
+        defer { isRestoringSession = false }
+
+        do {
+            saveSession(try await client.session(token: token))
+        } catch {
+            clearStoredSession()
+        }
+    }
+
+    func signOut() {
+        clearStoredSession()
+        authError = nil
+        successMessage = nil
     }
 
     func clearSuccessMessage() {
         successMessage = nil
     }
 
-    private func performAuthAction(_ action: () async throws -> AuthDataResult) async -> Bool {
+    private func performAuthAction(_ action: () async throws -> Void) async -> Bool {
         authError = nil
         successMessage = nil
         isWorking = true
         defer { isWorking = false }
 
         do {
-            _ = try await action()
+            try await action()
             return true
         } catch {
             authError = error.localizedDescription
@@ -100,5 +120,38 @@ final class AuthSession: ObservableObject {
 
     private func normalizedEmail(_ email: String) -> String {
         email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    private func saveSession(_ response: AuthResponse) {
+        user = response.user
+        SessionTokenStore.save(response.sessionToken)
+
+        if let encodedUser = try? JSONEncoder().encode(response.user) {
+            storage.set(encodedUser, forKey: sessionUserKey)
+        }
+    }
+
+    private func clearStoredSession() {
+        user = nil
+        SessionTokenStore.delete()
+        storage.removeObject(forKey: sessionUserKey)
+    }
+
+    private static func storedUser(from storage: UserDefaults, key: String) -> BackendUser? {
+        guard let data = storage.data(forKey: key) else {
+            return nil
+        }
+
+        return try? JSONDecoder().decode(BackendUser.self, from: data)
+    }
+
+    private func username(from email: String) -> String {
+        let prefix = email.split(separator: "@").first.map(String.init) ?? "bubbler"
+        let safeCharacters = prefix.map { character in
+            character.isLetter || character.isNumber ? character : "_"
+        }
+
+        let username = String(safeCharacters).trimmingCharacters(in: CharacterSet(charactersIn: "_"))
+        return username.isEmpty ? "bubbler" : username
     }
 }

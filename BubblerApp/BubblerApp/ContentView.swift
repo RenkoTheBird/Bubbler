@@ -6,22 +6,16 @@
 //
 
 import SwiftUI
-import FirebaseCore
-
-class AppDelegate: NSObject, UIApplicationDelegate {
-    func application(_ application: UIApplication,
-                     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
-        FirebaseApp.configure()
-        return true
-    }
-}
 
 struct ContentView: View {
     @StateObject private var authSession = AuthSession()
+    @StateObject private var backendConnection = BackendConnection()
 
     var body: some View {
         NavigationStack {
-            if authSession.isSignedIn {
+            if authSession.isRestoringSession && !authSession.isSignedIn {
+                ProgressView("Restoring session...")
+            } else if authSession.isSignedIn {
                 FeedView()
             } else {
                 LoginView()
@@ -29,6 +23,7 @@ struct ContentView: View {
         }
         .id(authSession.isSignedIn)
         .environmentObject(authSession)
+        .environmentObject(backendConnection)
         .overlay(alignment: .top) {
             if let successMessage = authSession.successMessage {
                 Text(successMessage)
@@ -53,6 +48,9 @@ struct ContentView: View {
                 try? await Task.sleep(for: .seconds(2))
                 authSession.clearSuccessMessage()
             }
+        }
+        .task {
+            await authSession.restoreSession()
         }
     }
 }

@@ -1,6 +1,7 @@
 from config import my_env_vars
 from app.services.auth import AuthService
 from app.routes.auth import create_auth_router
+from app.routes.system import create_system_router
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 import asyncpg
@@ -23,7 +24,7 @@ logging.basicConfig(
 @asynccontextmanager
 async def lifespan(fastapi: FastAPI):
     try:
-        pool = await asyncpg.create_pool(my_env_vars.db_url)
+        pool = await asyncpg.create_pool(my_env_vars.db_url, min_size=1, max_size=5)
         logger.info("Database pool created successfully")
     except Exception as exc:
         logger.error(f"Failed to create database pool: {exc}")
@@ -34,9 +35,11 @@ async def lifespan(fastapi: FastAPI):
     
     #start routers 
     auth_router = create_auth_router(auth_service)
+    system_router = create_system_router(pool)
     
     #register routers 
     fastapi.include_router(auth_router)
+    fastapi.include_router(system_router)
     
     
     yield

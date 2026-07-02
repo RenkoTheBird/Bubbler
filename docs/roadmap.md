@@ -79,21 +79,6 @@ Do **not** remove Firebase until **all** of these pass:
 
 **Goal:** `FeedView` shows API posts, not hard-coded cards.
 
-### Step 4.1 — Add models + view model
-
-**Create:** `BubblerApp/BubblerApp/Post.swift`, `FeedViewModel.swift`
-
-```swift
-@MainActor
-final class FeedViewModel: ObservableObject {
-    @Published var posts: [Post] = []
-
-    func loadFeed(token: String) async {
-        posts = try await APIClient.shared.get("/feed/me", token: token)
-    }
-}
-```
-
 ### Step 4.2 — Wire `FeedView.swift`
 
 Replace hard-coded `feedCard(...)` placeholders with `ForEach(viewModel.posts)`. Pass token from `AuthSession`.

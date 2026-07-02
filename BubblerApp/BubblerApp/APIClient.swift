@@ -70,6 +70,14 @@ enum APIClient {
         return try await perform(request)
     }
 
+    static func get<T: Decodable>(_ path: String, token: String) async throws -> T {
+        var request = URLRequest(url: APIConfig.baseURL.appending(path: path))
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let data = try await performData(request)
+        return try apiJSONDecoder.decode(T.self, from: data)
+    }
+
     static func authorizedRequest(
         path: String,
         method: String = "GET",
@@ -89,6 +97,28 @@ enum APIClient {
         request.httpBody = body
         return try await performData(request)
     }
+
+    private static let apiJSONDecoder: JSONDecoder = {
+        let decoder = JSONDecoder()
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let dateString = try container.decode(String.self)
+            if let date = formatter.date(from: dateString) {
+                return date
+            }
+            formatter.formatOptions = [.withInternetDateTime]
+            if let date = formatter.date(from: dateString) {
+                return date
+            }
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Invalid date: \(dateString)"
+            )
+        }
+        return decoder
+    }()
 
     private static func perform(_ request: URLRequest) async throws -> AuthResponse {
         let data = try await performData(request)

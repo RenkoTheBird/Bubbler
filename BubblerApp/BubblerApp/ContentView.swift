@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var authSession = AuthSession()
+    @StateObject private var backendConnection = BackendConnection()
 
     var body: some View {
         NavigationStack {
@@ -20,6 +21,7 @@ struct ContentView: View {
         }
         .id(authSession.isSignedIn)
         .environmentObject(authSession)
+        .environmentObject(backendConnection)
         .overlay(alignment: .top) {
             if let successMessage = authSession.successMessage {
                 Text(successMessage)

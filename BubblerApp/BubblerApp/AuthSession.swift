@@ -22,9 +22,21 @@ final class AuthSession: ObservableObject {
     }
 
     func signIn(email: String, password: String) async {
+        let trimmedEmail = normalizedEmail(email)
+
+        guard !trimmedEmail.isEmpty else {
+            authError = "Enter your email address."
+            return
+        }
+
+        guard !password.isEmpty else {
+            authError = "Enter your password."
+            return
+        }
+
         _ = await performAuthAction {
             try await APIClient.login(
-                email: normalizedEmail(email),
+                email: trimmedEmail,
                 password: password
             )
         }

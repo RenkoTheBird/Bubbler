@@ -130,45 +130,6 @@ struct FeedView: View {
                         }
                     }
 
-                    NavigationLink {
-                        GraphFeedView()
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "point.3.connected.trianglepath.dotted")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                                .padding(10)
-                                .background(Color.white.opacity(0.12))
-                                .clipShape(Circle())
-
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Open Graph Feed")
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-
-                                Text("Explore the session loop and connected post choices.")
-                                    .font(.caption)
-                                    .foregroundColor(.white.opacity(0.72))
-                            }
-
-                            Spacer()
-
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.white.opacity(0.45))
-                        }
-                        .padding(16)
-                        .background(
-                            RoundedRectangle(cornerRadius: 22)
-                                .fill(Color.white.opacity(0.10))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 22)
-                                        .stroke(Color.white.opacity(0.18), lineWidth: 1)
-                                )
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal)
-                    
                     // feed stream
                     VStack(spacing: 18) {
                         if viewModel.isLoading && viewModel.posts.isEmpty {

@@ -57,20 +57,6 @@ Step-by-step plan. Plain language, exact file paths. Updated after the iOS clien
 
 **Goal:** One current post + tap-to-choose next posts (DAG path).
 
-### Step 5.1 — Graph feed on iOS
-
-**Create:** `BubblerApp/BubblerApp/Features/Graph/GraphFeedView.swift`, `BubblerApp/BubblerApp/Features/Graph/GraphFeedViewModel.swift`
-
-Flow: `GET /feed/me/session` → first post → `GET /graph/posts/{id}/next` → show choices → on tap, `POST /users/me/interactions` + load next.
-
-Reuse styling from `BubblerApp/BubblerApp/Features/Profile/BubbleDetail.swift`.
-
-**Update:** `BubblerApp/BubblerApp/Navigation/ContentView.swift` or `BubblerApp/BubblerApp/Features/Feed/FeedView.swift` to route into `GraphFeedView` when the loop works.
-
-### Step 5.2 — View time on interactions
-
-Track seconds on each post; send `view_time` with interaction POST.
-
 **Checkpoint:** Tap through 3–4 posts; each step loads new choices.
 
 ---

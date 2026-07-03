@@ -14,7 +14,7 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             if authSession.isSignedIn {
-                FeedView()
+                GraphFeedView()
             } else {
                 LoginView()
             }

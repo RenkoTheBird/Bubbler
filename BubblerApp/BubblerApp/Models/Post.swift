@@ -1,16 +1,15 @@
-//
-//  Post.swift
-//  BubblerApp
-//
+import Foundation 
 
-import Foundation
-
-struct Post: Decodable, Identifiable, Sendable {
+// Codable: decode FastAPI JSON
+// Identifiable: SwiftUI list compatibility
+struct Post: Codable, Identifiable {
     let id: String
-    let userId: Int?
+    let userId: Int
     let content: String
-    let createdAt: Date?
+    let createdAt: Date
     let topic: String?
+
+    // Optional on frontend but here for compatibility
     let embedding: [Double]?
 
     enum CodingKeys: String, CodingKey {
@@ -18,7 +17,7 @@ struct Post: Decodable, Identifiable, Sendable {
         case userId = "user_id"
         case content
         case createdAt = "created_at"
-        case topic
         case embedding
+        case topic
     }
 }

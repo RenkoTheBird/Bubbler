@@ -77,14 +77,6 @@ Track seconds on each post; send `view_time` with interaction POST.
 
 ## Phase 6 — User-Controlled Algorithm
 
-**Goal:** Diversity, randomness, topic lists, view-time — per `docs/api_contracts.md`.
-
-### Step 6.1 — Algorithm settings screen
-
-**Create:** `BubblerApp/BubblerApp/Features/Settings/AlgorithmSettingsView.swift`
-
-Wire from `BubblerApp/BubblerApp/Features/Settings/SettingsView.swift` via the “Bubble Sensitivity” row. Load/save through `BubblerApp/BubblerApp/Core/APIClient.swift` with JWT auth.
-
 **Checkpoint:** Changing randomness shuffles results; blacklisting a topic removes those posts.
 
 ---

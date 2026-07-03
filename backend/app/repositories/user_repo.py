@@ -1,3 +1,5 @@
+import json
+
 from app.schemas.user import UserProfile
 
 DEFAULT_PREFS = UserProfile(
@@ -56,20 +58,39 @@ class UserRepository:
             strategy_weights=dict(rows["strategy_weights"]),
         )
     
-    async def update_prefs(self, user_id: int, body) -> UserProfile:
+    async def put_prefs(self, user_id: int, body) -> UserProfile:
         async with self.pool.acquire() as conn:
             rows = await conn.fetchrow("""
-                UPDATE user_profiles
-                SET diversity_tolerance = $1,
-                    randomness = $2,
-                    preferred_topics = $3,
-                    blacklisted_topics = $4,
-                    use_view_time = $5,
-                    view_time_weight = $6
-                WHERE user_id = $7,
+                INSERT INTO user_profiles (
+                    user_id,
+                    diversity_tolerance,
+                    randomness,
+                    preferred_topics,
+                    blacklisted_topics,
+                    use_view_time,
+                    view_time_weight,
+                    strategy_weights
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
+                ON CONFLICT (user_id) DO UPDATE
+                SET diversity_tolerance = EXCLUDED.diversity_tolerance,
+                    randomness = EXCLUDED.randomness,
+                    preferred_topics = EXCLUDED.preferred_topics,
+                    blacklisted_topics = EXCLUDED.blacklisted_topics,
+                    use_view_time = EXCLUDED.use_view_time,
+                    view_time_weight = EXCLUDED.view_time_weight,
+                    strategy_weights = EXCLUDED.strategy_weights
                 RETURNING *;
-            """, body.diversity_tolerance, body.randomness, body.preferred_topics, body.blacklisted_topics,
-                 body.use_view_time, body.view_time_weight, user_id)
+            """,
+            user_id,
+            body.diversity_tolerance,
+            body.randomness,
+            body.preferred_topics,
+            body.blacklisted_topics,
+            body.use_view_time,
+            body.view_time_weight,
+            json.dumps(body.strategy_weights),
+            )
             
         return UserProfile(
             user_id=rows["user_id"],

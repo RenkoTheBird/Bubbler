@@ -98,6 +98,22 @@ enum APIClient {
         return try await performData(request)
     }
 
+    static func getPreferences() async throws -> UserPreferences {
+        let data = try await authorizedRequest(path: "user/me/preferences")
+        return try apiJSONDecoder.decode(UserPreferences.self, from: data)
+    }
+
+    static func updatePreferences(_ payload: PreferencesUpdatePayload) async throws -> UserPreferences {
+        let body = try JSONEncoder().encode(payload)
+        let data = try await authorizedRequest(
+            path: "user/me/preferences",
+            method: "PUT",
+            body: body,
+            contentType: "application/json"
+        )
+        return try apiJSONDecoder.decode(UserPreferences.self, from: data)
+    }
+
     private static let apiJSONDecoder: JSONDecoder = {
         let decoder = JSONDecoder()
         let formatter = ISO8601DateFormatter()

@@ -73,7 +73,12 @@ struct SettingsView: View {
                     settingsSection(title: "Bubble System") {
                         settingsRow(icon: "bubble.left.and.bubble.right.fill", title: "Manage Interests")
                         settingsRow(icon: "arrow.counterclockwise", title: "Reset Bubble Profile")
-                        settingsRow(icon: "slider.horizontal.3", title: "Bubble Sensitivity")
+                        NavigationLink {
+                            PreferencesSettingsView()
+                        } label: {
+                            settingsRow(icon: "slider.horizontal.3", title: "Bubble Sensitivity")
+                        }
+                        .buttonStyle(.plain)
                     }
                     
                     // app

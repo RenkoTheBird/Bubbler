@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Bubbler checkpoint runner — roadmap Phases 0–4.
+Bubbler checkpoint runner — roadmap Phases 0–6.
 
 Prerequisites:
   - Postgres running (credentials in backend/.env, e.g. PORT=5433)
@@ -25,6 +25,16 @@ Phase 3 maps to docs/roadmap.md “Drop Firebase” conditions 1–8:
 Phase 4 maps to docs/roadmap.md “Connect iOS to Real Feed Data”:
   1    Signed-in user sees real post content from the database
 
+Phase 5 maps to docs/roadmap.md “Graph Path (Core Product)”:
+  1    Session route returns a current post candidate
+  2    Graph route returns tap-through next choices across 3–4 posts
+  3    iOS graph UI loads session/current/next-choice wiring
+
+Phase 6 maps to docs/roadmap.md “User-Controlled Algorithm”:
+  1    Randomness can reshuffle ranked results
+  2    Blacklisting a topic removes it from the feed
+  3    iOS settings UI exposes randomness + blacklisted topics
+
 How to run
 Terminal 1 — start the API (if not already running):
 
@@ -45,6 +55,7 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Callable
 from urllib.parse import urlencode
 
@@ -74,6 +85,7 @@ except Exception:  # pragma: no cover - fallback keeps checkpoints runnable
 
 from config import my_env_vars  # noqa: E402
 from app.repositories.edge_builder_repo import EdgeBuilderRepo  # noqa: E402
+from app.services.feed import RankingService  # noqa: E402
 from app.services.post import EmbeddingService  # noqa: E402
 from app.ml.embeddings.generate import embed  # noqa: E402
 from app.db.vector import to_pgvector  # noqa: E402
@@ -254,6 +266,87 @@ async def fetch_posts_by_id(pool: asyncpg.Pool, post_ids: list[str]) -> dict[str
         )
 
     return {str(row["id"]): dict(row) for row in rows}
+
+
+async def fetch_user_posts(pool: asyncpg.Pool, user_id: int) -> list[dict[str, Any]]:
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT
+                p.id::text AS id,
+                p.content,
+                t.name AS topic,
+                p.created_at
+            FROM posts p
+            LEFT JOIN topics t ON t.id = p.topic_id
+            WHERE p.user_id = $1
+            ORDER BY p.created_at DESC
+            """,
+            user_id,
+        )
+
+    return [dict(row) for row in rows]
+
+
+async def ensure_dense_graph_edges(pool: asyncpg.Pool, post_ids: list[str]) -> None:
+    if len(post_ids) < 2:
+        return
+
+    async with pool.acquire() as conn:
+        for from_index, from_post_id in enumerate(post_ids):
+            for to_index, to_post_id in enumerate(post_ids):
+                if from_post_id == to_post_id:
+                    continue
+
+                distance = abs(from_index - to_index)
+                weight = max(0.2, 1.0 - (distance * 0.05))
+                await conn.execute(
+                    """
+                    INSERT INTO edges (from_post_id, to_post_id, edge_type, weight)
+                    VALUES ($1::uuid, $2::uuid, 'similar', $3)
+                    ON CONFLICT DO NOTHING
+                    """,
+                    from_post_id,
+                    to_post_id,
+                    weight,
+                )
+
+
+def visible_posts(body: Any) -> list[dict[str, Any]]:
+    if not isinstance(body, list):
+        return []
+
+    return [
+        post
+        for post in body
+        if isinstance(post, dict)
+        and str(post.get("id", "")).strip()
+        and str(post.get("content", "")).strip()
+    ]
+
+
+def post_ids(posts: list[dict[str, Any]]) -> list[str]:
+    return [str(post.get("id", "")).strip() for post in posts if str(post.get("id", "")).strip()]
+
+
+def preferences_payload(body: Any, **overrides: Any) -> dict[str, Any]:
+    data = body if isinstance(body, dict) else {}
+    payload = {
+        "diversity_tolerance": float(data.get("diversity_tolerance", 0.4)),
+        "randomness": float(data.get("randomness", 0.3)),
+        "preferred_topics": list(data.get("preferred_topics", [])),
+        "blacklisted_topics": list(data.get("blacklisted_topics", [])),
+        "use_view_time": bool(data.get("use_view_time", False)),
+        "view_time_weight": float(data.get("view_time_weight", 0.1)),
+        "strategy_weights": dict(
+            data.get(
+                "strategy_weights",
+                {"similar": 0.7, "graph": 0.2, "opposite": 0.0, "random": 0.1},
+            )
+        ),
+    }
+    payload.update(overrides)
+    return payload
 
 
 # --- Phase runners (add Phase 3+ below) ---
@@ -612,6 +705,304 @@ async def run_phase_4(ctx: Context) -> None:
     )
 
 
+async def run_phase_5(ctx: Context) -> None:
+    """Phase 5 — graph path runtime + iOS graph wiring checks."""
+    can_run_runtime = ctx.pool is not None and ctx.user_id is not None and bool(ctx.token)
+    if not can_run_runtime:
+        ok(ctx, "5.1 Graph runtime prerequisites (pool, user_id, token)", False)
+    else:
+        status, body, raw = ctx.api.request("GET", "/feed/me/session", token=ctx.token)
+        ok(ctx, "5.1 GET /feed/me/session → 200", status == 200, raw[:200])
+        session_posts = visible_posts(body)
+        ok(
+            ctx,
+            "5.1 Session route returns current post candidates",
+            len(session_posts) > 0,
+            f"visible_posts={len(session_posts)}",
+        )
+
+        user_posts = await fetch_user_posts(ctx.pool, ctx.user_id)
+        ok(
+            ctx,
+            "5.2 Checkpoint user has at least 4 posts for graph traversal",
+            len(user_posts) >= 4,
+            f"user_posts={len(user_posts)}",
+        )
+
+        if len(user_posts) >= 4:
+            candidate_post_ids = post_ids(user_posts)
+            await ensure_dense_graph_edges(ctx.pool, candidate_post_ids)
+
+            current_post_id = candidate_post_ids[0]
+            visited_ids = [current_post_id]
+
+            for step in range(1, 4):
+                status, next_body, raw = ctx.api.request(
+                    "GET",
+                    f"/graph/posts/{current_post_id}/next",
+                    token=ctx.token,
+                )
+                if not ok(
+                    ctx,
+                    f"5.2 Step {step} GET /graph/posts/{{post_id}}/next → 200",
+                    status == 200,
+                    raw[:200],
+                ):
+                    break
+
+                next_choices = [
+                    post
+                    for post in visible_posts(next_body)
+                    if str(post.get("id", "")).strip() != current_post_id
+                ]
+                ok(
+                    ctx,
+                    f"5.2 Step {step} loads connected choices",
+                    len(next_choices) > 0,
+                    f"choices={len(next_choices)}",
+                )
+
+                next_node = next(
+                    (
+                        post
+                        for post in next_choices
+                        if str(post.get("id", "")).strip()
+                        and str(post.get("id", "")).strip() not in visited_ids
+                    ),
+                    None,
+                )
+                if not ok(
+                    ctx,
+                    f"5.2 Step {step} offers a new post to tap",
+                    next_node is not None,
+                    f"visited={len(visited_ids)}",
+                ):
+                    break
+
+                current_post_id = str(next_node["id"]).strip()
+                visited_ids.append(current_post_id)
+
+            ok(
+                ctx,
+                "5.2 Tap-through path reaches 4 unique posts",
+                len(set(visited_ids)) >= 4,
+                f"visited={len(set(visited_ids))}",
+            )
+
+    api_client = read_ios_file("Core/APIClient.swift")
+    ok(ctx, "5.3 APIClient.swift exists", bool(api_client))
+    ok(
+        ctx,
+        "5.3 APIClient fetches graph session feed",
+        "authorizedRequest(path: \"feed/me/session\")" in api_client,
+    )
+    ok(
+        ctx,
+        "5.3 APIClient fetches graph next choices",
+        'authorizedRequest(path: "graph/posts/\\(postID)/next")' in api_client,
+    )
+
+    graph_view_model = read_ios_file("Features/Graph/GraphFeedViewModel.swift")
+    ok(ctx, "5.4 GraphFeedViewModel.swift exists", bool(graph_view_model))
+    ok(
+        ctx,
+        "5.4 GraphFeedViewModel loads session posts",
+        "APIClient.getSessionFeed()" in graph_view_model,
+    )
+    ok(
+        ctx,
+        "5.4 GraphFeedViewModel loads connected next choices",
+        "APIClient.getNextGraphPosts(for: node.id)" in graph_view_model,
+    )
+    ok(
+        ctx,
+        "5.4 GraphFeedViewModel records explore taps",
+        "byRecording: .explore" in graph_view_model,
+    )
+
+    graph_view = read_ios_file("Features/Graph/GraphFeedView.swift")
+    ok(ctx, "5.5 GraphFeedView.swift exists", bool(graph_view))
+    ok(
+        ctx,
+        "5.5 GraphFeedView renders the current post",
+        "if let node = viewModel.currentNode" in graph_view,
+    )
+    ok(
+        ctx,
+        "5.5 GraphFeedView renders connected choices",
+        "ForEach(viewModel.nextChoices)" in graph_view,
+    )
+    ok(
+        ctx,
+        "5.5 GraphFeedView taps a choice to advance",
+        "await viewModel.choose(node, using: authSession)" in graph_view,
+    )
+
+
+async def run_phase_6(ctx: Context) -> None:
+    """Phase 6 — randomness + blacklisted topics runtime and settings checks."""
+    ranking_service = RankingService()
+    ranking_posts = [
+        {"id": "alpha", "topic": "tech", "similarity": 0.5},
+        {"id": "beta", "topic": "health", "similarity": 0.5},
+        {"id": "gamma", "topic": "startups", "similarity": 0.5},
+        {"id": "delta", "topic": "music", "similarity": 0.5},
+    ]
+
+    deterministic_order = post_ids(
+        ranking_service.apply_preferences(
+            SimpleNamespace(
+                randomness=0.0,
+                preferred_topics=[],
+                blacklisted_topics=[],
+            ),
+            [dict(post) for post in ranking_posts],
+        )
+    )
+    ok(
+        ctx,
+        "6.1 Zero randomness keeps equal-score ranking stable",
+        deterministic_order == ["alpha", "beta", "gamma", "delta"],
+        str(deterministic_order),
+    )
+
+    randomized_orders = {
+        tuple(
+            post_ids(
+                ranking_service.apply_preferences(
+                    SimpleNamespace(
+                        randomness=1.0,
+                        preferred_topics=[],
+                        blacklisted_topics=[],
+                    ),
+                    [dict(post) for post in ranking_posts],
+                )
+            )
+        )
+        for _ in range(8)
+    }
+    ok(
+        ctx,
+        "6.1 Randomness can reshuffle ranked results",
+        len(randomized_orders) > 1,
+        f"unique_orders={len(randomized_orders)}",
+    )
+
+    if not ctx.token:
+        ok(ctx, "6.2 Preferences API token available", False, "missing token from earlier phase")
+    else:
+        status, pref_body, raw = ctx.api.request("GET", "/user/me/preferences", token=ctx.token)
+        ok(ctx, "6.2 GET /user/me/preferences → 200", status == 200, raw[:200])
+
+        candidate_topic = ""
+        if ctx.pool is not None and ctx.user_id is not None:
+            for post in await fetch_user_posts(ctx.pool, ctx.user_id):
+                topic = str(post.get("topic") or "").strip()
+                if topic:
+                    candidate_topic = topic
+                    break
+
+        if not candidate_topic:
+            candidate_topic = SAMPLE_TOPICS[0] if SAMPLE_TOPICS else ""
+
+        ok(ctx, "6.2 Topic available for blacklist test", bool(candidate_topic), candidate_topic)
+        if candidate_topic:
+            tuned_payload = preferences_payload(
+                pref_body,
+                randomness=0.0,
+                preferred_topics=[],
+                blacklisted_topics=[],
+                strategy_weights={
+                    "similar": 1.0,
+                    "graph": 0.0,
+                    "opposite": 0.0,
+                    "random": 0.0,
+                },
+                use_view_time=False,
+            )
+            status, tuned_body, raw = ctx.api.request(
+                "PUT",
+                "/user/me/preferences",
+                json_body=tuned_payload,
+                token=ctx.token,
+            )
+            ok(ctx, "6.2 PUT /user/me/preferences saves baseline algorithm settings", status == 200, raw[:200])
+            if isinstance(tuned_body, dict):
+                ok(ctx, "6.2 Baseline randomness saved as 0", tuned_body.get("randomness") == 0.0)
+
+            blacklisted_payload = preferences_payload(
+                tuned_body if isinstance(tuned_body, dict) else pref_body,
+                blacklisted_topics=[candidate_topic],
+            )
+            status, saved_body, raw = ctx.api.request(
+                "PUT",
+                "/user/me/preferences",
+                json_body=blacklisted_payload,
+                token=ctx.token,
+            )
+            ok(ctx, "6.3 PUT /user/me/preferences saves a blacklisted topic", status == 200, raw[:200])
+            if isinstance(saved_body, dict):
+                saved_blacklist = list(saved_body.get("blacklisted_topics", []))
+                ok(
+                    ctx,
+                    "6.3 Blacklisted topic persists in saved preferences",
+                    candidate_topic in saved_blacklist,
+                    str(saved_blacklist),
+                )
+
+            status, feed_body, raw = ctx.api.request("GET", "/feed/me", token=ctx.token)
+            ok(ctx, "6.3 GET /feed/me after blacklist → 200", status == 200, raw[:200])
+            blacklisted_posts = [
+                post
+                for post in visible_posts(feed_body)
+                if str(post.get("topic") or "").strip().lower() == candidate_topic.lower()
+            ]
+            ok(
+                ctx,
+                "6.3 Blacklisted topic is removed from feed results",
+                len(blacklisted_posts) == 0,
+                f"topic={candidate_topic}, matches={len(blacklisted_posts)}",
+            )
+
+    settings_view_model = read_ios_file("Features/Settings/PreferencesSettingsViewModel.swift")
+    ok(ctx, "6.4 PreferencesSettingsViewModel.swift exists", bool(settings_view_model))
+    ok(
+        ctx,
+        "6.4 PreferencesSettingsViewModel loads saved preferences",
+        "APIClient.getPreferences()" in settings_view_model,
+    )
+    ok(
+        ctx,
+        "6.4 PreferencesSettingsViewModel saves preferences",
+        "APIClient.updatePreferences" in settings_view_model,
+    )
+
+    settings_view = read_ios_file("Features/Settings/PreferencesSettingsView.swift")
+    ok(ctx, "6.5 PreferencesSettingsView.swift exists", bool(settings_view))
+    ok(
+        ctx,
+        "6.5 Settings exposes a Randomness slider",
+        'title: "Randomness"' in settings_view,
+    )
+    ok(
+        ctx,
+        "6.5 Settings exposes Blacklisted Topics editing",
+        'title: "Blacklisted Topics"' in settings_view,
+    )
+
+    graph_view_model = read_ios_file("Features/Graph/GraphFeedViewModel.swift")
+    ok(
+        ctx,
+        "6.6 GraphFeedViewModel filters blacklisted session posts",
+        "!proposedCurrent.isBlacklistedTopic" in graph_view_model,
+    )
+    ok(
+        ctx,
+        "6.6 GraphFeedViewModel filters blacklisted next choices",
+        "!choice.isBlacklistedTopic" in graph_view_model,
+    )
+
+
 PhaseFn = Callable[[Context], Any]
 
 PHASES: list[tuple[str, str, PhaseFn]] = [
@@ -620,6 +1011,8 @@ PHASES: list[tuple[str, str, PhaseFn]] = [
     ("2", "Backend Data Layer", run_phase_2),
     ("3", "iOS Backend Auth (Drop Firebase)", run_phase_3),
     ("4", "Connect iOS to Real Feed Data", run_phase_4),
+    ("5", "Graph Path (Core Product)", run_phase_5),
+    ("6", "User-Controlled Algorithm", run_phase_6),
 ]
 
 

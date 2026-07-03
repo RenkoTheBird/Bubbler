@@ -114,6 +114,26 @@ enum APIClient {
         return try apiJSONDecoder.decode(UserPreferences.self, from: data)
     }
 
+    static func getSessionFeed() async throws -> [Post] {
+        let data = try await authorizedRequest(path: "feed/me/session")
+        return try apiJSONDecoder.decode([Post].self, from: data)
+    }
+
+    static func getNextGraphPosts(for postID: String) async throws -> [Post] {
+        let data = try await authorizedRequest(path: "graph/posts/\(postID)/next")
+        return try apiJSONDecoder.decode([Post].self, from: data)
+    }
+
+    static func recordInteraction(_ payload: GraphInteractionPayload) async throws {
+        let body = try JSONEncoder().encode(payload)
+        _ = try await authorizedRequest(
+            path: "user/me/interactions",
+            method: "POST",
+            body: body,
+            contentType: "application/json"
+        )
+    }
+
     private static let apiJSONDecoder: JSONDecoder = {
         let decoder = JSONDecoder()
         let formatter = ISO8601DateFormatter()

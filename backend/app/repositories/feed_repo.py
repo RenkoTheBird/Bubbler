@@ -83,14 +83,42 @@ class FeedRepository:
         results = []
 
         async with self.pool.acquire() as conn:
+            if not yesterday_post or not liked_topic:
+                rows = await conn.fetch(
+                    """
+                    SELECT p.id, p.content, t.name AS topic, p.created_at, p.user_id
+                    FROM posts p
+                    LEFT JOIN topics t ON t.id = p.topic_id
+                    WHERE p.embedding IS NOT NULL
+                    ORDER BY RANDOM()
+                    LIMIT 6
+                    """
+                )
+                return [
+                    {
+                        "id": r["id"],
+                        "content": r["content"],
+                        "topic": r["topic"],
+                        "created_at": r["created_at"],
+                        "user_id": r["user_id"],
+                    }
+                    for r in rows
+                ]
+
             for target in similarity_targets:
                 post = await conn.fetchrow(
                     """
-                    SELECT *,
-                        1 - (embedding <=> $1::vector) AS similarity
-                    FROM posts
-                    WHERE topic_id = $2
-                    ORDER BY ABS((1 - (embedding <=> $1::vector)) - $3)
+                    SELECT
+                        p.id,
+                        p.content,
+                        t.name AS topic,
+                        p.created_at,
+                        p.user_id,
+                        1 - (p.embedding <=> $1::vector) AS similarity
+                    FROM posts p
+                    LEFT JOIN topics t ON t.id = p.topic_id
+                    WHERE p.topic_id = $2
+                    ORDER BY ABS((1 - (p.embedding <=> $1::vector)) - $3)
                     LIMIT 1
                     """,
                     to_pgvector(yesterday_post),

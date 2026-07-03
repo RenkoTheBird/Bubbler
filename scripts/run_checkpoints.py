@@ -171,8 +171,8 @@ def ios_swift_sources() -> list[tuple[str, str]]:
     if not IOS_APP_ROOT.is_dir():
         return []
     return [
-        (path.name, path.read_text(encoding="utf-8"))
-        for path in sorted(IOS_APP_ROOT.glob("*.swift"))
+        (str(path.relative_to(IOS_APP_ROOT)), path.read_text(encoding="utf-8"))
+        for path in sorted(IOS_APP_ROOT.rglob("*.swift"))
     ]
 
 
@@ -426,7 +426,7 @@ def run_phase_3(ctx: Context) -> None:
         )
 
     # --- 5: AuthSession calls backend login/register ---
-    auth_session = read_ios_file("AuthSession.swift")
+    auth_session = read_ios_file("Core/AuthSession.swift")
     ok(ctx, "3.5 AuthSession.swift exists", bool(auth_session))
     ok(
         ctx,
@@ -455,10 +455,14 @@ def run_phase_3(ctx: Context) -> None:
         "3.6 signOut deletes Keychain token",
         "KeychainStore.deleteAccessToken" in auth_session,
     )
-    ok(ctx, "3.6 KeychainStore.swift exists", (IOS_APP_ROOT / "KeychainStore.swift").is_file())
+    ok(
+        ctx,
+        "3.6 KeychainStore.swift exists",
+        (IOS_APP_ROOT / "Core" / "KeychainStore.swift").is_file(),
+    )
 
     # --- 7: APIClient sends Authorization: Bearer … ---
-    api_client = read_ios_file("APIClient.swift")
+    api_client = read_ios_file("Core/APIClient.swift")
     ok(ctx, "3.7 APIClient.swift exists", bool(api_client))
     ok(
         ctx,

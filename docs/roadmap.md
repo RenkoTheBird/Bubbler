@@ -53,28 +53,6 @@ Step-by-step plan. Plain language, exact file paths. Updated after the iOS clien
 - Everything below is **still to do**. Completed work appears only in the table above.
 - Code blocks are examples — match your files as you implement.
 
----
-
-## Phase 4 — Connect iOS to Real Feed Data
-
-**Goal:** Use the feed infrastructure that already exists under `Features/Feed/` and render API-backed posts in the UI.
-
-### Step 4.2 — Wire `Features/Feed/FeedView.swift`
-
-Replace hard-coded `feedCard(...)` placeholders in `BubblerApp/BubblerApp/Features/Feed/FeedView.swift` with a `ForEach(viewModel.posts)`.
-
-Use:
-
-- `BubblerApp/BubblerApp/Features/Feed/FeedViewModel.swift`
-- `BubblerApp/BubblerApp/Core/AuthSession.swift`
-- `BubblerApp/BubblerApp/Core/KeychainStore.swift` or a session-driven token handoff
-
-Keep the current visual styling, but make the content source real.
-
-**Checkpoint:** Signed-in user sees real post content from the database.
-
----
-
 ## Phase 5 — Graph Path (Core Product)
 
 **Goal:** One current post + tap-to-choose next posts (DAG path).

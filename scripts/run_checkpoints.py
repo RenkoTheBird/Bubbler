@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Bubbler checkpoint runner — roadmap Phases 0–3.
+Bubbler checkpoint runner — roadmap Phases 0–4.
 
 Prerequisites:
   - Postgres running (credentials in backend/.env, e.g. PORT=5433)
@@ -21,6 +21,9 @@ Phase 3 maps to docs/roadmap.md “Drop Firebase” conditions 1–8:
   1–4  API auth (register, login, protected route 401/200)
   5–7  iOS source checks (AuthSession, Keychain, APIClient Bearer header)
   8    Manual — login + create-account on simulator (printed as SKIP)
+
+Phase 4 maps to docs/roadmap.md “Connect iOS to Real Feed Data”:
+  1    Signed-in user sees real post content from the database
 
 How to run
 Terminal 1 — start the API (if not already running):
@@ -57,6 +60,18 @@ sys.path.insert(0, str(ROOT))
 
 load_dotenv(BACKEND_ROOT / ".env")
 
+try:
+    from seed_db import SAMPLE_POSTS as SEEDED_SAMPLE_POSTS  # noqa: E402
+    from seed_db import SAMPLE_TOPICS as SEEDED_SAMPLE_TOPICS  # noqa: E402
+except Exception:  # pragma: no cover - fallback keeps checkpoints runnable
+    SEEDED_SAMPLE_TOPICS = ["tech", "health", "startups"]
+    SEEDED_SAMPLE_POSTS = [
+        ("I love building side projects.", "tech"),
+        ("Morning runs clear my head.", "health"),
+        ("This startup idea needs validation.", "startups"),
+        ("Hot take: tabs over spaces.", "tech"),
+    ]
+
 from config import my_env_vars  # noqa: E402
 from app.repositories.edge_builder_repo import EdgeBuilderRepo  # noqa: E402
 from app.services.post import EmbeddingService  # noqa: E402
@@ -74,13 +89,8 @@ PHASE3_CHECKPOINT_EMAIL = os.getenv(
 PHASE3_CHECKPOINT_USERNAME = os.getenv("PHASE3_CHECKPOINT_USERNAME", "phase3ckpt")
 API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
 
-SAMPLE_TOPICS = ["tech", "health", "startups"]
-SAMPLE_POSTS = [
-    ("I love building side projects.", "tech"),
-    ("Morning runs clear my head.", "health"),
-    ("This startup idea needs validation.", "startups"),
-    ("Hot take: tabs over spaces.", "tech"),
-]
+SAMPLE_TOPICS = list(SEEDED_SAMPLE_TOPICS)
+SAMPLE_POSTS = list(SEEDED_SAMPLE_POSTS)
 
 REQUIRED_OPENAPI_PATHS = [
     "/auth/login",
@@ -227,6 +237,23 @@ async def seed_checkpoint_posts(pool: asyncpg.Pool, user_id: int) -> int:
 async def edge_count(pool: asyncpg.Pool) -> int:
     async with pool.acquire() as conn:
         return await conn.fetchval("SELECT COUNT(*) FROM edges") or 0
+
+
+async def fetch_posts_by_id(pool: asyncpg.Pool, post_ids: list[str]) -> dict[str, dict[str, Any]]:
+    if not post_ids:
+        return {}
+
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT id::text AS id, content, user_id, created_at
+            FROM posts
+            WHERE id::text = ANY($1::text[])
+            """,
+            post_ids,
+        )
+
+    return {str(row["id"]): dict(row) for row in rows}
 
 
 # --- Phase runners (add Phase 3+ below) ---
@@ -510,6 +537,81 @@ def run_phase_3(ctx: Context) -> None:
         ok(ctx, "Xcode project file present", False, str(IOS_PROJECT_FILE))
 
 
+async def run_phase_4(ctx: Context) -> None:
+    """Phase 4 — iOS feed shows real database-backed post content."""
+    if ctx.pool is None:
+        ok(ctx, "4.1 Database pool available", False)
+        return
+
+    if not ctx.token:
+        ok(ctx, "4.1 Signed-in user token available", False, "missing token from earlier phase")
+        return
+
+    status, body, raw = ctx.api.request("GET", "/feed/me", token=ctx.token)
+    ok(ctx, "4.1 GET /feed/me for signed-in user → 200", status == 200, raw[:200])
+    ok(ctx, "4.1 Feed response is JSON array", isinstance(body, list), str(type(body)))
+
+    posts = body if isinstance(body, list) else []
+    visible_posts = [
+        post
+        for post in posts
+        if isinstance(post, dict)
+        and str(post.get("id", "")).strip()
+        and str(post.get("content", "")).strip()
+    ]
+    ok(
+        ctx,
+        "4.1 Feed returns visible posts with ids and content",
+        len(visible_posts) > 0,
+        f"visible_posts={len(visible_posts)}",
+    )
+
+    if visible_posts:
+        db_posts = await fetch_posts_by_id(
+            ctx.pool, [str(post["id"]).strip() for post in visible_posts]
+        )
+        matching_posts = [
+            post
+            for post in visible_posts
+            if db_posts.get(str(post["id"]).strip(), {}).get("content") == post.get("content")
+        ]
+        ok(
+            ctx,
+            "4.1 Feed post content matches database rows",
+            len(matching_posts) == len(visible_posts),
+            f"matched={len(matching_posts)}/{len(visible_posts)}",
+        )
+
+    feed_view_model = read_ios_file("Features/Feed/FeedViewModel.swift")
+    ok(ctx, "4.2 FeedViewModel.swift exists", bool(feed_view_model))
+    ok(
+        ctx,
+        "4.2 FeedViewModel fetches GET /feed/me",
+        'APIClient.get("feed/me", token: token)' in feed_view_model,
+    )
+
+    feed_view = read_ios_file("Features/Feed/FeedView.swift")
+    ok(ctx, "4.3 FeedView.swift exists", bool(feed_view))
+    ok(
+        ctx,
+        "4.3 FeedView renders FeedViewModel.posts",
+        "ForEach(viewModel.posts)" in feed_view,
+    )
+    ok(
+        ctx,
+        "4.3 FeedView passes fetched posts into PostCardView",
+        "PostCardView(post: post)" in feed_view,
+    )
+
+    post_card = read_ios_file("Components/PostCardView.swift")
+    ok(ctx, "4.4 PostCardView.swift exists", bool(post_card))
+    ok(
+        ctx,
+        "4.4 PostCardView displays post.content",
+        "Text(post.content)" in post_card,
+    )
+
+
 PhaseFn = Callable[[Context], Any]
 
 PHASES: list[tuple[str, str, PhaseFn]] = [
@@ -517,6 +619,7 @@ PHASES: list[tuple[str, str, PhaseFn]] = [
     ("1", "JWT Protection on Routes", run_phase_1),
     ("2", "Backend Data Layer", run_phase_2),
     ("3", "iOS Backend Auth (Drop Firebase)", run_phase_3),
+    ("4", "Connect iOS to Real Feed Data", run_phase_4),
 ]
 
 

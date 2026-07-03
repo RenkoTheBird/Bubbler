@@ -19,7 +19,7 @@ final class AuthSession: ObservableObject {
     }
 
     init() {
-        accessToken = KeychainStore.currentAccessToken
+        accessToken = KeychainStore.loadAccessToken()
         userId = Self.restoredUserId(from: accessToken)
     }
 

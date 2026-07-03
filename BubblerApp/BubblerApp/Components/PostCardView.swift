@@ -92,14 +92,15 @@ struct PostCardView: View {
 
         PostCardView(
             post: Post(
-                id: UUID().uuidString,
-                userId: 42,
-                content: "AI systems are beginning to exhibit autonomous decision loops.",
+                id: "preview-post",
+                userId: 0,
+                content: "",
                 createdAt: .now.addingTimeInterval(-2_700),
-                topic: "Tech",
+                topic: nil,
                 embedding: nil
             )
         )
         .padding()
+        .redacted(reason: .placeholder)
     }
 }

@@ -10,6 +10,10 @@ enum KeychainStore {
     private static let service = "com.bubbler.access-token"
     private static let account = "access_token"
 
+    static var currentAccessToken: String? {
+        loadAccessToken()
+    }
+
     static func saveAccessToken(_ token: String) throws {
         let data = Data(token.utf8)
 

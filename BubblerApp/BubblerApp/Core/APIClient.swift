@@ -131,6 +131,10 @@ enum APIClient {
             throw APIClientError.invalidResponse
         }
 
+        if httpResponse.statusCode == 401 {
+            throw APIClientError.unauthorized
+        }
+
         guard (200 ... 299).contains(httpResponse.statusCode) else {
             let message = (try? JSONDecoder().decode(APIErrorBody.self, from: data).detail)
                 ?? "Request failed with status \(httpResponse.statusCode)."

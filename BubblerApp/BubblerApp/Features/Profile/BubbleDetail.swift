@@ -97,10 +97,10 @@ struct BubbleDetail: View {
                     VStack(spacing: 14) {
                         
                         //PLACEHOLDERS
-                        bubbleCard("Insight stream initializing…")
-                        bubbleCard("Trending signals detected")
-                        bubbleCard("Engagement rising in this bubble")
-                        bubbleCard("Recommended deep dive content")
+                        bubbleCard("Posts connected to this bubble will appear here after your feed has data.")
+                        bubbleCard("Your interactions in the feed will shape the context shown in this view.")
+                        bubbleCard("Use the feed to grow this bubble with real topics and activity.")
+                        bubbleCard("Seeded content can be added later when the database is ready.")
                     }
                     .padding(.horizontal)
                     

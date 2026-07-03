@@ -8,6 +8,24 @@
 import SwiftUI
 
 struct FeedView: View {
+    @EnvironmentObject private var authSession: AuthSession
+    @StateObject private var viewModel = FeedViewModel()
+
+    private var activeTopics: [String] {
+        var seen = Set<String>()
+
+        return viewModel.posts
+            .compactMap { post in
+                guard let topic = post.topic?.trimmingCharacters(in: .whitespacesAndNewlines),
+                      !topic.isEmpty else {
+                    return nil
+                }
+                return topic
+            }
+            .filter { topic in
+                seen.insert(topic.lowercased()).inserted
+            }
+    }
     
     var body: some View {
         
@@ -96,54 +114,54 @@ struct FeedView: View {
                     .frame(maxWidth: .infinity)
                     
                     // bubble strip
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        
-                        HStack(spacing: 14) {
-                            bubbleChip("Tech", "desktopcomputer", .blue, true)
-                            bubbleChip("Sports", "basketball.fill", .green, false)
-                            bubbleChip("Space", "globe.americas.fill", .purple, false)
-                            bubbleChip("AI", "brain.head.profile", .pink, true)
-                            bubbleChip("Music", "music.note", .orange, false)
+                    if !activeTopics.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 14) {
+                                ForEach(Array(activeTopics.enumerated()), id: \.offset) { item in
+                                    bubbleChip(
+                                        item.element,
+                                        topicIcon(for: item.element),
+                                        topicColor(for: item.element),
+                                        item.offset == 0
+                                    )
+                                }
+                            }
+                            .padding(.horizontal)
                         }
-                        .padding(.horizontal)
                     }
                     
                     // feed stream
                     VStack(spacing: 18) {
-                        
-                        feedCard(
-                            bubble: "Tech",
-                            title: "AI systems are beginning to exhibit autonomous decision loops",
-                            subtitle: "High resonance in your Tech bubble",
-                            color: .blue
-                        )
-                        
-                        feedCard(
-                            bubble: "Space",
-                            title: "NASA Artemis missions enter long-duration phase testing",
-                            subtitle: "Pulled from your Space interest field",
-                            color: .purple
-                        )
-                        
-                        feedCard(
-                            bubble: "AI",
-                            title: "Agent-based models are evolving into multi-step reasoning systems",
-                            subtitle: "Your AI bubble is highly active",
-                            color: .pink
-                        )
-                        
-                        feedCard(
-                            bubble: "Sports",
-                            title: "Playoff momentum is shifting across key teams",
-                            subtitle: "Detected from Sports bubble activity",
-                            color: .green
-                        )
+                        if viewModel.isLoading && viewModel.posts.isEmpty {
+                            stateCard(
+                                title: "Loading your feed",
+                                message: "Pulling the latest posts from Bubbler.",
+                                showsProgress: true
+                            )
+                        } else if let errorMessage = viewModel.errorMessage {
+                            stateCard(
+                                title: "Couldn't load the feed",
+                                message: errorMessage
+                            )
+                        } else if viewModel.posts.isEmpty {
+                            stateCard(
+                                title: "No posts yet",
+                                message: "Posts from the database will show up here after the feed has data."
+                            )
+                        } else {
+                            ForEach(viewModel.posts) { post in
+                                PostCardView(post: post)
+                            }
+                        }
                     }
                     .padding(.horizontal)
                     
                     Spacer().frame(height: 40)
                 }
             }
+        }
+        .task(id: authSession.accessToken) {
+            await viewModel.loadFeed(using: authSession)
         }
     }
     
@@ -175,59 +193,77 @@ struct FeedView: View {
         )
     }
     
-    // feed card
-    private func feedCard(bubble: String, title: String, subtitle: String, color: Color) -> some View {
-        
+    private func topicIcon(for topic: String) -> String {
+        switch topic.lowercased() {
+        case "tech", "technology":
+            return "desktopcomputer"
+        case "sports":
+            return "basketball.fill"
+        case "space", "science":
+            return "globe.americas.fill"
+        case "ai":
+            return "brain.head.profile"
+        case "music":
+            return "music.note"
+        default:
+            return "circle.grid.2x2.fill"
+        }
+    }
+
+    private func topicColor(for topic: String) -> Color {
+        switch topic.lowercased() {
+        case "tech", "technology":
+            return .blue
+        case "sports":
+            return .green
+        case "space", "science":
+            return .purple
+        case "ai":
+            return .pink
+        case "music":
+            return .orange
+        default:
+            return .cyan
+        }
+    }
+
+    private func stateCard(title: String, message: String, showsProgress: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            
-            // top label
             HStack {
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(color)
-                        .frame(width: 8, height: 8)
-                        .shadow(color: color.opacity(0.8), radius: 6)
-                    
-                    Text(bubble.uppercased())
-                        .font(.caption.bold())
-                        .foregroundColor(.white.opacity(0.85))
-                        .tracking(1)
+                if showsProgress {
+                    ProgressView()
+                        .tint(.white)
                 }
-                
+
+                Text(title)
+                    .font(.headline)
+                    .foregroundColor(.white)
+
                 Spacer()
             }
-            
-            Text(title)
-                .font(.headline)
-                .foregroundColor(.white)
-                .multilineTextAlignment(.leading)
-            
-            Text(subtitle)
+
+            Text(message)
                 .font(.caption)
                 .foregroundColor(.white.opacity(0.7))
-            
         }
         .padding(16)
         .background(
             ZStack {
-                
-                // main layer
                 RoundedRectangle(cornerRadius: 22)
                     .fill(Color.white.opacity(0.10))
-                
-                // subtle glow
+
                 RoundedRectangle(cornerRadius: 22)
-                    .stroke(color.opacity(0.25), lineWidth: 1)
-                
-                // soft highlight
+                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
+
                 RoundedRectangle(cornerRadius: 22)
                     .stroke(Color.white.opacity(0.08), lineWidth: 1)
             }
         )
-        .shadow(color: color.opacity(0.15), radius: 20, x: 0, y: 10)
+        .shadow(color: Color.white.opacity(0.08), radius: 20, x: 0, y: 10)
     }
 }
 
 #Preview {
     FeedView()
+        .environmentObject(AuthSession())
 }

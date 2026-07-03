@@ -8,17 +8,19 @@ import Foundation
 
 @MainActor
 final class AuthSession: ObservableObject {
+    @Published private(set) var accessToken: String?
     @Published private(set) var userId: Int?
     @Published var authError: String?
     @Published var successMessage: String?
     @Published var isWorking = false
 
     var isSignedIn: Bool {
-        KeychainStore.loadAccessToken() != nil
+        accessToken != nil
     }
 
     init() {
-        userId = Self.restoredUserId()
+        accessToken = KeychainStore.currentAccessToken
+        userId = Self.restoredUserId(from: accessToken)
     }
 
     func signIn(email: String, password: String) async {
@@ -96,6 +98,7 @@ final class AuthSession: ObservableObject {
 
     func signOut() {
         KeychainStore.deleteAccessToken()
+        accessToken = nil
         userId = nil
         authError = nil
         successMessage = nil
@@ -114,6 +117,7 @@ final class AuthSession: ObservableObject {
         do {
             let response = try await action()
             try KeychainStore.saveAccessToken(response.accessToken)
+            accessToken = response.accessToken
             userId = response.userId
             return true
         } catch {
@@ -126,8 +130,8 @@ final class AuthSession: ObservableObject {
         email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
-    private static func restoredUserId() -> Int? {
-        guard let token = KeychainStore.loadAccessToken() else { return nil }
+    private static func restoredUserId(from token: String?) -> Int? {
+        guard let token else { return nil }
 
         let segments = token.split(separator: ".")
         guard segments.count >= 2 else { return nil }

@@ -153,9 +153,9 @@ struct ProfileView: View {
                             .padding(.horizontal, 35)
                         
                         // PLACEHOLDER DATA
-                        feedSnippet(" NASA Artemis mission is trending inside Space bubble")
-                        feedSnippet(" AI activity increased by 32% today")
-                        feedSnippet(" Sports bubble engagement is rising")
+                        feedSnippet("Your bubble trail will appear here once you start interacting with real posts.")
+                        feedSnippet("Likes, skips, and views will shape the topics shown in your profile.")
+                        feedSnippet("Seeded posts can be added later to start building your activity trail.")
                     }
                     
                     Spacer().frame(height: 40)

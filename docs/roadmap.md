@@ -59,10 +59,6 @@ Step-by-step plan. Plain language, exact file paths. Updated after the iOS clien
 
 **Goal:** Use the feed infrastructure that already exists under `Features/Feed/` and render API-backed posts in the UI.
 
-### Step 4.1 — Align the reusable post card with current models
-
-Update `BubblerApp/BubblerApp/Components/PostCardView.swift` so it renders the current `BubblerApp/BubblerApp/Models/Post.swift` shape. Right now it still expects fields that are not present on the merged model.
-
 ### Step 4.2 — Wire `Features/Feed/FeedView.swift`
 
 Replace hard-coded `feedCard(...)` placeholders in `BubblerApp/BubblerApp/Features/Feed/FeedView.swift` with a `ForEach(viewModel.posts)`.

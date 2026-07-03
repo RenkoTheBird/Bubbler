@@ -15,7 +15,7 @@ class Post(BaseModel):
     content: str
     embedding: Optional[list[float]] = None
     created_at: datetime.datetime
-    topic: str
+    topic: Optional[str] = None
 
 
 class Interaction(BaseModel):

@@ -8,53 +8,40 @@ Bubbler/
 ├── README.md
 ├── .gitignore
 │
-├── BubblerApp/                   # Active SwiftUI iOS client (Xcode project)
+├── BubblerApp/                   # SwiftUI iOS client  
 │   ├── BubblerApp.xcodeproj
 │   └── BubblerApp/
-│       ├── BubblerAppApp.swift
-│       ├── ContentView.swift
-│       ├── AuthSession.swift
-│       ├── APIClient.swift
-│       ├── KeychainStore.swift
-│       ├── LoginView.swift
-│       ├── CreateAccountView.swift
-│       ├── FeedView.swift
-│       ├── ProfileView.swift
-│       ├── SearchView.swift
-│       ├── SettingsView.swift
-│       ├── BubbleDetail.swift
-│       ├── BubblerLogoView.swift
-│       └── Assets.xcassets/
-│
-├── ios-app/                      # Feature-based iOS scaffold (in progress)
-│   └── BubblerApp/
 │       ├── App/
-│       │   ├── BubblerApp.swift
-│       │   ├── Components/
-│       │   │   ├── BubbleView.swift
-│       │   │   ├── PostView.swift
-│       │   │   └── RootView.swift
-│       │   ├── Features/
-│       │   │   ├── Auth/
-│       │   │   ├── Feed/
-│       │   │   │   ├── FeedView.swift
-│       │   │   │   └── FeedViewModel.swift
-│       │   │   ├── Graph/
-│       │   │   ├── Post/
-│       │   │   └── Profile/
-│       │   ├── Models/
-│       │   │   ├── User.swift
-│       │   │   ├── Post.swift
-│       │   │   └── Topic.swift
-│       │   ├── Services/
-│       │   │   ├── APIClient.swift
-│       │   │   └── AuthService.swift
-│       │   ├── Utils/
-│       │   │   └── Extensions.swift
-│       │   └── Views/
-│       │       └── PostView.swift
-│       └── Assets/
-│           └── bubbler 1.0.png
+│       │   └── BubblerAppApp.swift
+│       ├── Navigation/
+│       │   └── ContentView.swift
+│       ├── Core/
+│       │   ├── APIClient.swift
+│       │   ├── AuthSession.swift
+│       │   ├── BackendConnection.swift
+│       │   └── KeychainStore.swift
+│       ├── Models/
+│       │   ├── Post.swift
+│       │   ├── Topic.swift
+│       │   └── User.swift
+│       ├── Components/
+│       │   ├── BubblerLogoView.swift
+│       │   └── PostCardView.swift
+│       ├── Features/
+│       │   ├── Auth/
+│       │   │   ├── CreateAccountView.swift
+│       │   │   └── LoginView.swift
+│       │   ├── Feed/
+│       │   │   ├── FeedView.swift
+│       │   │   └── FeedViewModel.swift
+│       │   ├── Profile/
+│       │   │   ├── BubbleDetail.swift
+│       │   │   └── ProfileView.swift
+│       │   ├── Search/
+│       │   │   └── SearchView.swift
+│       │   └── Settings/
+│       │       └── SettingsView.swift
+│       └── Assets.xcassets/
 │
 ├── backend/                      # FastAPI backend
 │   ├── main.py                   # FastAPI entrypoint
@@ -75,7 +62,7 @@ Bubbler/
 │       ├── db/
 │       │   ├── schema.sql
 │       │   ├── vector.py
-│       │   └── migrations/       # (empty — Alembic planned)
+│       │   └── migrations/       # (empty for now)
 │       │
 │       ├── schemas/              # Pydantic schemas
 │       │   ├── user.py

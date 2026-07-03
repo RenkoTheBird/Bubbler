@@ -1,6 +1,6 @@
 # Bubbler Roadmap — What to Do Next
 
-Step-by-step plan. Plain language, exact file paths. Updated after auth pipeline changes and re-added refactor items.
+Step-by-step plan. Plain language, exact file paths. Updated after the iOS client merge/reorg and backend-auth integration.
 
 ---
 
@@ -25,7 +25,10 @@ Step-by-step plan. Plain language, exact file paths. Updated after auth pipeline
 | User prefs query | `backend/app/repositories/user_repo.py` | `getPrefs`; `preferred_topics` typo fixed |
 | Interaction repo file | `backend/app/repositories/interaction_repo.py` | Class exists |
 | Edge builder | `backend/app/repositories/edge_builder_repo.py` | `build_edges_for_post` |
-| iOS UI shell | `BubblerApp/BubblerApp/` | Login, create account, feed, profile, settings, bubble detail |
+| iOS client layout | `BubblerApp/BubblerApp/` | Merged into one feature-based client: `App/`, `Navigation/`, `Core/`, `Models/`, `Components/`, `Features/` |
+| iOS backend auth | `BubblerApp/BubblerApp/Core/AuthSession.swift` | Login/register call the backend and persist JWT in Keychain |
+| iOS API client | `BubblerApp/BubblerApp/Core/APIClient.swift` | Handles auth calls, bearer auth, and JSON/date decoding |
+| iOS feed fetch layer | `BubblerApp/BubblerApp/Features/Feed/FeedViewModel.swift` | Fetches `GET /feed/me` with bearer token |
 | Seed script skeleton | `scripts/seed_db.py` | Sample posts + embeddings |
 
 ### Not done yet (your backlog)
@@ -33,14 +36,14 @@ Step-by-step plan. Plain language, exact file paths. Updated after auth pipeline
 | Area | Status |
 |------|--------|
 
-| iOS backend auth (drop Firebase) | ❌ `AuthSession.swift` still uses Firebase |
-| iOS ↔ API | ❌ No `APIClient` in `BubblerApp/` |
-| Graph HTTP route | ❌ No `routes/graph.py` |
-| Graph path UI | ❌ Feed is mock data |
-| Algorithm settings (wired) | ❌ Settings UI is placeholders |
+| Feed UI wiring | ❌ `BubblerApp/BubblerApp/Features/Feed/FeedView.swift` still renders hard-coded cards instead of `FeedViewModel.posts` |
+| Reusable post card | ❌ `BubblerApp/BubblerApp/Components/PostCardView.swift` does not yet match the current `Post` model |
+| Graph HTTP route | ❌ No `backend/app/routes/graph.py` |
+| Graph path UI | ❌ No `BubblerApp/BubblerApp/Features/Graph/` flow yet |
+| Algorithm settings (wired) | ❌ `BubblerApp/BubblerApp/Features/Settings/SettingsView.swift` is still placeholder UI |
 | Automated tests / CI | ❌ None |
 
-**Big picture:**  What remains is connecting iOS and building the graph loop.
+**Big picture:** Backend auth and the iOS app merge are in place. What remains is wiring the real feed, then building the graph loop and algorithm controls on top of the new structure.
 
 ---
 
@@ -50,13 +53,20 @@ Step-by-step plan. Plain language, exact file paths. Updated after auth pipeline
 - Everything below is **still to do**. Completed work appears only in the table above.
 - Code blocks are examples — match your files as you implement.
 
-## Phase 3 — iOS: Drop Firebase, Use Backend Auth
+## Phase 3 — iOS Auth Cleanup And Verification
 
-**Goal:** Login and register hit your FastAPI backend; JWT stored in Keychain.
+**Goal:** Treat backend auth as the canonical path and clean up any migration leftovers after the client merge.
 
-### Conditions for dropping Firebase
+### Current baseline
 
-Do **not** remove Firebase until **all** of these pass:
+- `BubblerApp/BubblerApp/Core/AuthSession.swift` already calls backend login/register.
+- `BubblerApp/BubblerApp/Core/APIClient.swift` already sends form login, JSON register, and bearer-authenticated requests.
+- `BubblerApp/BubblerApp/Core/KeychainStore.swift` is the token source of truth.
+- `BubblerApp/BubblerApp/Navigation/ContentView.swift` already gates the app on `authSession.isSignedIn`.
+
+### Step 3.1 — Verify the merged auth flow end-to-end
+
+Make sure these still pass after the folder reorg:
 
 | # | Condition | How to verify |
 |---|-----------|---------------|
@@ -64,24 +74,42 @@ Do **not** remove Firebase until **all** of these pass:
 | 2 | `POST /login` (form: username=email, password=…) returns token | curl / Swagger |
 | 3 | Protected route rejects missing token (401) | curl without header |
 | 4 | Protected route accepts valid token (200) | curl with `Bearer` |
-| 5 | iOS `AuthSession` calls backend login/register | Network log |
+| 5 | `BubblerApp/BubblerApp/Core/AuthSession.swift` calls backend login/register | Network log |
 | 6 | Token stored in Keychain (survives restart) | Kill app, reopen |
-| 7 | `APIClient` sends `Authorization: Bearer …` | Debug log |
+| 7 | `BubblerApp/BubblerApp/Core/APIClient.swift` sends `Authorization: Bearer …` | Debug log |
 | 8 | Login + create-account flows work on simulator | Manual test |
 
-**Only after 1–8:** remove Firebase.
+### Step 3.2 — Remove any project-level leftovers
 
-**Checkpoint:** Register → login → token in Keychain → no Firebase imports.
+Audit for anything left over from the old auth/client setup:
+
+- `BubblerApp/BubblerApp.xcodeproj`
+- any stale `GoogleService-Info.plist`
+- any Firebase package reference that is no longer used
+
+**Checkpoint:** Register → login → token survives restart → sign out clears session → no stale Firebase/project leftovers.
 
 ---
 
 ## Phase 4 — Connect iOS to Real Feed Data
 
-**Goal:** `FeedView` shows API posts, not hard-coded cards.
+**Goal:** Use the feed infrastructure that already exists under `Features/Feed/` and render API-backed posts in the UI.
 
-### Step 4.2 — Wire `FeedView.swift`
+### Step 4.1 — Align the reusable post card with current models
 
-Replace hard-coded `feedCard(...)` placeholders with `ForEach(viewModel.posts)`. Pass token from `AuthSession`.
+Update `BubblerApp/BubblerApp/Components/PostCardView.swift` so it renders the current `BubblerApp/BubblerApp/Models/Post.swift` shape. Right now it still expects fields that are not present on the merged model.
+
+### Step 4.2 — Wire `Features/Feed/FeedView.swift`
+
+Replace hard-coded `feedCard(...)` placeholders in `BubblerApp/BubblerApp/Features/Feed/FeedView.swift` with a `ForEach(viewModel.posts)`.
+
+Use:
+
+- `BubblerApp/BubblerApp/Features/Feed/FeedViewModel.swift`
+- `BubblerApp/BubblerApp/Core/AuthSession.swift`
+- `BubblerApp/BubblerApp/Core/KeychainStore.swift` or a session-driven token handoff
+
+Keep the current visual styling, but make the content source real.
 
 **Checkpoint:** Signed-in user sees real post content from the database.
 
@@ -93,13 +121,13 @@ Replace hard-coded `feedCard(...)` placeholders with `ForEach(viewModel.posts)`.
 
 ### Step 5.1 — Graph feed on iOS
 
-**Create:** `BubblerApp/BubblerApp/GraphFeedView.swift`, `GraphFeedViewModel.swift`
+**Create:** `BubblerApp/BubblerApp/Features/Graph/GraphFeedView.swift`, `BubblerApp/BubblerApp/Features/Graph/GraphFeedViewModel.swift`
 
 Flow: `GET /feed/me/session` → first post → `GET /graph/posts/{id}/next` → show choices → on tap, `POST /users/me/interactions` + load next.
 
-Reuse styling from `BubbleDetail.swift`.
+Reuse styling from `BubblerApp/BubblerApp/Features/Profile/BubbleDetail.swift`.
 
-**Update:** `ContentView.swift` — swap to `GraphFeedView` when the loop works.
+**Update:** `BubblerApp/BubblerApp/Navigation/ContentView.swift` or `BubblerApp/BubblerApp/Features/Feed/FeedView.swift` to route into `GraphFeedView` when the loop works.
 
 ### Step 5.2 — View time on interactions
 
@@ -115,9 +143,9 @@ Track seconds on each post; send `view_time` with interaction POST.
 
 ### Step 6.1 — Algorithm settings screen
 
-**Create:** `BubblerApp/BubblerApp/AlgorithmSettingsView.swift`
+**Create:** `BubblerApp/BubblerApp/Features/Settings/AlgorithmSettingsView.swift`
 
-Wire from `SettingsView.swift` “Bubble Sensitivity” row. Load/save via `APIClient` + JWT.
+Wire from `BubblerApp/BubblerApp/Features/Settings/SettingsView.swift` via the “Bubble Sensitivity” row. Load/save through `BubblerApp/BubblerApp/Core/APIClient.swift` with JWT auth.
 
 **Checkpoint:** Changing randomness shuffles results; blacklisting a topic removes those posts.
 
@@ -127,7 +155,7 @@ Wire from `SettingsView.swift` “Bubble Sensitivity” row. Load/save via `APIC
 
 **Goal:** Catch regressions automatically — especially auth and import wiring.
 
-Run this **in parallel** with Phases 0–2; add a test each time you fix an endpoint.
+Run this **in parallel** with Phases 3–6; add a test each time you fix an endpoint.
 
 ### Step 7.1 — Backend tests
 
@@ -234,8 +262,8 @@ Register the test target in Xcode (`BubblerApp.xcodeproj`) if not present.
 
 ## What to Avoid
 
-1. **Removing Firebase before the 8-condition checklist passes.**
-2. **Maintaining `ios-app/`** — copy patterns into `BubblerApp/`, then ignore the old folder.
+1. **Leaving stale Firebase or legacy project config behind** after backend auth is already working.
+2. **Re-introducing a second iOS client tree** instead of continuing inside `BubblerApp/BubblerApp/`.
 3. **Sending JSON to `/login`** — it expects form-urlencoded (`username`, `password`).
 4. **Skipping tests after auth changes** — login/register are easy to break silently.
 5. **Graph visualization UI** — bubbles + path trail in `ProfileView` is enough.
@@ -244,7 +272,7 @@ Register the test target in Xcode (`BubblerApp.xcodeproj`) if not present.
 
 ## File Checklist
 
-**Create:**
+**Create next:**
 
 ```
 backend/app/routes/graph.py
@@ -253,13 +281,9 @@ backend/tests/test_auth.py
 backend/tests/test_feed.py
 .github/workflows/backend.yml
 .github/workflows/ios.yml
-BubblerApp/BubblerApp/APIClient.swift
-BubblerApp/BubblerApp/KeychainStore.swift
-BubblerApp/BubblerApp/Post.swift
-BubblerApp/BubblerApp/FeedViewModel.swift
-BubblerApp/BubblerApp/GraphFeedView.swift
-BubblerApp/BubblerApp/GraphFeedViewModel.swift
-BubblerApp/BubblerApp/AlgorithmSettingsView.swift
+BubblerApp/BubblerApp/Features/Graph/GraphFeedView.swift
+BubblerApp/BubblerApp/Features/Graph/GraphFeedViewModel.swift
+BubblerApp/BubblerApp/Features/Settings/AlgorithmSettingsView.swift
 BubblerApp/BubblerAppTests/AuthSessionTests.swift
 BubblerApp/BubblerAppTests/APIClientTests.swift
 docker-compose.yml
@@ -268,15 +292,16 @@ docker-compose.yml
 **Edit next (highest priority):**
 
 ```
-BubblerApp/BubblerApp/AuthSession.swift
-BubblerApp/BubblerApp/ContentView.swift
-BubblerApp/BubblerApp/FeedView.swift
+BubblerApp/BubblerApp/Components/PostCardView.swift
+BubblerApp/BubblerApp/Features/Feed/FeedView.swift
+BubblerApp/BubblerApp/Navigation/ContentView.swift
+BubblerApp/BubblerApp/Features/Settings/SettingsView.swift
 ```
 
-**Delete (only after Phase 3 checklist):**
+**Audit / delete if still present:**
 
 ```
 BubblerApp/BubblerApp/GoogleService-Info.plist
-(Firebase SPM dependency in Xcode)
+(Firebase package references in `BubblerApp/BubblerApp.xcodeproj`)
 ```
 

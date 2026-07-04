@@ -28,14 +28,31 @@ class RankingService:
 
     def apply_preferences(self, prefs, posts: List[str]):
         filtered = []
+        preferred_topics = {
+            topic.strip().casefold()
+            for topic in prefs.preferred_topics
+            if isinstance(topic, str) and topic.strip()
+        }
+        blacklisted_topics = {
+            topic.strip().casefold()
+            for topic in prefs.blacklisted_topics
+            if isinstance(topic, str) and topic.strip()
+        }
 
         for post in posts:
-            if post["topic"] in prefs.blacklisted_topics:
+            post_topic = post.get("topic")
+            normalized_topic = (
+                post_topic.strip().casefold()
+                if isinstance(post_topic, str) and post_topic.strip()
+                else None
+            )
+
+            if normalized_topic and normalized_topic in blacklisted_topics:
                 continue
 
             score = post.get("similarity", 0)
 
-            if post["topic"] in prefs.preferred_topics:
+            if normalized_topic and normalized_topic in preferred_topics:
                 score += 0.3
 
             score += random.random() * prefs.randomness
@@ -139,7 +156,7 @@ class FeedService:
 
     async def get_new_session_posts(self, userId: int):
         prefs = await self.PrefRepo.get_prefs(userId)
-        return await self.repo.get_new_session_posts(prefs.diversity_tolerance, [], None)
+        return await self.repo.get_new_session_posts(prefs.diversity_tolerance, None, None)
     
     async def get_next_posts(self, post_id):
         neighbors = await self.repo.get_neighbors(post_id, limit=4)

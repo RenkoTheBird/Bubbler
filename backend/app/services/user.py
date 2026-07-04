@@ -14,7 +14,7 @@ class UserService:
         return await self.user_repo.get_prefs(user_id)
     
     async def put_prefs(self, user_id, body):
-        return await self.user_repo.put_prefs(user_id, body)
+        return await self.user_repo.save_prefs(user_id, body)
 
     async def delete_user(self, user_id):
         result = await self.user_repo.delete_user(user_id)

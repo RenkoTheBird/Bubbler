@@ -299,7 +299,9 @@ async def ensure_dense_graph_edges(pool: asyncpg.Pool, post_ids: list[str]) -> N
                     continue
 
                 distance = abs(from_index - to_index)
-                weight = max(0.2, 1.0 - (distance * 0.05))
+                # Use very large weights so these deterministic edges outrank
+                # any organically generated similarity edges already in the DB.
+                weight = 100.0 - distance
                 await conn.execute(
                     """
                     INSERT INTO edges (from_post_id, to_post_id, edge_type, weight)

@@ -53,20 +53,6 @@ Step-by-step plan. Plain language, exact file paths. Updated after the iOS clien
 - Everything below is **still to do**. Completed work appears only in the table above.
 - Code blocks are examples — match your files as you implement.
 
-## Phase 5 — Graph Path (Core Product)
-
-**Goal:** One current post + tap-to-choose next posts (DAG path).
-
-**Checkpoint:** Tap through 3–4 posts; each step loads new choices.
-
----
-
-## Phase 6 — User-Controlled Algorithm
-
-**Checkpoint:** Changing randomness shuffles results; blacklisting a topic removes those posts.
-
----
-
 ## Phase 7 — Testing & CI
 
 **Goal:** Catch regressions automatically — especially auth and import wiring.

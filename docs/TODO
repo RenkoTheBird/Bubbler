@@ -1,0 +1,9 @@
+-- BEFORE PRODUCTION
+add media support
+edit posts ability
+docker deploy/compose infra
+determine proper topic system
+
+-- IMPORTANT CHECKS
+DB efficiency
+routing efficiency/gotchas

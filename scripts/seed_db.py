@@ -42,34 +42,38 @@ async def main():
             """
             INSERT INTO users (username, email, password)
             VALUES ('demo', 'demo@bubbler.test', 'not-a-real-hash')
-            ON CONFLICT (email) DO UPDATE SET username = EXCLUDED.username
+            ON CONFLICT ((lower(email))) DO UPDATE SET username = EXCLUDED.username
             RETURNING id
             """
         )
 
-        topic_ids = {}
         for name in SAMPLE_TOPICS:
-            topic_id = await conn.fetchval(
+            await conn.execute(
                 """
                 INSERT INTO topics (name)
                 VALUES ($1)
-                ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
-                RETURNING id
+                ON CONFLICT (name) DO NOTHING
                 """,
                 name,
             )
-            topic_ids[name] = topic_id
 
         for content, topic_name in SAMPLE_POSTS:
             vector = embed(content)
-            topic_id = topic_ids[topic_name]
             post_id = await conn.fetchval(
                 """
-                INSERT INTO posts (user_id, content, topic_id, embedding)
-                VALUES ($1, $2, $3, $4::vector)
+                INSERT INTO posts (user_id, content, embedding)
+                VALUES ($1, $2, $3::vector)
                 RETURNING id
                 """,
-                user_id, content, topic_id, to_pgvector(vector),
+                user_id, content, to_pgvector(vector),
+            )
+            await conn.execute(
+                """
+                INSERT INTO post_topics (post_id, topic_name)
+                VALUES ($1, $2)
+                ON CONFLICT DO NOTHING
+                """,
+                post_id, topic_name,
             )
             await edge_builder_repo.build_edges_for_post(
                 embedding_service, post_id, vector

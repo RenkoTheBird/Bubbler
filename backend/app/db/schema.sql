@@ -8,15 +8,18 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(20) NOT NULL,
-    email VARCHAR(80) UNIQUE NOT NULL,
+    email VARCHAR(80) NOT NULL,
     password VARCHAR(60) NOT NULL,
     created_at TIMESTAMP DEFAULT NOW()
 );
 
--- TOPICS
+CREATE UNIQUE INDEX users_email_lower_idx ON users (lower(email));
+CREATE UNIQUE INDEX users_username_lower_idx ON users (lower(username));
+
+-- TOPICS (name stored canonical lowercase)
 CREATE TABLE topics (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name TEXT UNIQUE,
+    name TEXT NOT NULL UNIQUE,
     parent_topic_id UUID REFERENCES topics(id) ON DELETE SET NULL
 );
 
@@ -26,55 +29,65 @@ CREATE TABLE posts (
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
     content TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT NOW(),
-    embedding vector(384),  
-    topic_id UUID REFERENCES topics(id) ON DELETE SET NULL
+    embedding vector(384)
 );
 
--- Vector index for similarity search
+CREATE INDEX posts_user_id_idx ON posts (user_id);
+
 CREATE INDEX posts_embedding_idx
 ON posts
 USING hnsw (embedding vector_cosine_ops);
 
--- POST-TOPICS (many-to-many with weight)
+-- POST-TOPICS (every post has >= 1 row; names resolve without joining topics)
 CREATE TABLE post_topics (
-    post_id UUID REFERENCES posts(id) ON DELETE CASCADE,
-    topic_id UUID REFERENCES topics(id) ON DELETE CASCADE,
-    weight FLOAT,
-    PRIMARY KEY (post_id, topic_id)
+    post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    topic_name TEXT NOT NULL REFERENCES topics(name) ON UPDATE CASCADE ON DELETE RESTRICT,
+    weight FLOAT NOT NULL DEFAULT 1.0,
+    PRIMARY KEY (post_id, topic_name)
 );
+
+CREATE INDEX post_topics_topic_name_idx ON post_topics (topic_name);
 
 -- INTERACTIONS
 CREATE TABLE interactions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-    post_id UUID REFERENCES posts(id) ON DELETE CASCADE,
-    type TEXT CHECK (type IN ('like', 'skip', 'explore')),
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    type TEXT NOT NULL CHECK (type IN ('like', 'skip', 'explore')),
     created_at TIMESTAMP DEFAULT NOW(),
-    view_time FLOAT
+    view_time FLOAT,
+    UNIQUE (user_id, post_id)
 );
+
+CREATE INDEX interactions_user_id_created_at_idx ON interactions (user_id, created_at DESC);
 
 -- EDGES (post graph)
 CREATE TABLE edges (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    from_post_id UUID REFERENCES posts(id) ON DELETE CASCADE,
-    to_post_id UUID REFERENCES posts(id) ON DELETE CASCADE,
-    edge_type TEXT CHECK (edge_type IN ('similar', 'opposite', 'topic')),
-    weight FLOAT
+    from_post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    to_post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    edge_type TEXT NOT NULL CHECK (edge_type IN ('similar', 'opposite', 'topic')),
+    weight FLOAT,
+    UNIQUE (from_post_id, to_post_id, edge_type)
 );
+
+CREATE INDEX edges_from_post_id_idx ON edges (from_post_id);
 
 -- USER PROFILES (vector preferences)
 CREATE TABLE user_profiles (
     user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    -- preferences (also in ALTER TABLE below)
     diversity_tolerance FLOAT CHECK (diversity_tolerance BETWEEN 0 AND 1),
-    randomness FLOAT
+    randomness FLOAT,
+    use_view_time BOOLEAN NOT NULL DEFAULT FALSE,
+    view_time_weight FLOAT DEFAULT 0.1,
+    strategy_weights JSONB NOT NULL DEFAULT
+        '{"similar":0.7,"graph":0.2,"opposite":0.0,"random":0.1}'
 );
 
-ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS preferred_topics TEXT[] NOT NULL DEFAULT '{}';
-ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS blacklisted_topics TEXT[] NOT NULL DEFAULT '{}';
-ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS use_view_time BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS view_time_weight FLOAT DEFAULT 0.1;
--- 
-ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS strategy_weights JSONB NOT NULL DEFAULT 
-'{"similar":0.7,"graph":0.2,"opposite":0.0,"random":0.1}';
---
+-- USER TOPIC PREFERENCES (normalized; replaces preferred_topics/blacklisted_topics arrays)
+CREATE TABLE user_topic_prefs (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    topic_id UUID NOT NULL REFERENCES topics(id) ON DELETE CASCADE,
+    preference_type TEXT NOT NULL CHECK (preference_type IN ('preferred', 'blacklisted')),
+    PRIMARY KEY (user_id, topic_id)
+);

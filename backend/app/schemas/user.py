@@ -1,4 +1,32 @@
-from pydantic import BaseModel, EmailStr , Field
+import datetime
+
+from pydantic import BaseModel, EmailStr, Field
+
+DEFAULT_STRATEGY_WEIGHTS: dict[str, float] = {
+    "similar": 0.7,
+    "graph": 0.2,
+    "opposite": 0.0,
+    "random": 0.1,
+}
+
+
+def default_user_prefs(user_id: int = 0) -> "UserProfile":
+    return UserProfile(
+        user_id=user_id,
+        diversity_tolerance=0.4,
+        randomness=0.3,
+        preferred_topics=[],
+        blacklisted_topics=[],
+        strategy_weights=dict(DEFAULT_STRATEGY_WEIGHTS),
+    )
+
+
+class UserInfo(BaseModel):
+    id: int
+    username: str
+    email: EmailStr
+    created_at: datetime.datetime
+
 
 # Doesnt need ID or Register Time autofilled by DB 
 class CreateUser(BaseModel):

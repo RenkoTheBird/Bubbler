@@ -15,7 +15,7 @@ def create_user_router(user_service: UserService, interaction_service: Interacti
 
     @router.put("/me/profile/email")
     async def put_email(email: str, user_id: int = Depends(get_current_user_id)):
-        return await user_service.put_email(user_id)
+        return await user_service.put_email(email, user_id)
 
     @router.get("/me")
     async def get_user_interactions(user_id: int = Depends(get_current_user_id)):

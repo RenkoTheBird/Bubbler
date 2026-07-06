@@ -70,24 +70,34 @@ class StrategyService:
 
     async def get_candidates(self, embedding, prefs):
         strategies = []
+        weights = prefs.strategy_weights
 
-        if prefs.strategy_weights.get("similar", 0) > 0:
-            similar = await self.repo.get_similar_posts(embedding, limit=10)
-            strategies.append(("similar", similar))
+        async with self.repo.acquire() as conn:
+            similar_posts = None
+            if weights.get("similar", 0) > 0 or weights.get("graph", 0) > 0:
+                similar_posts = await self.repo.get_similar_posts(
+                    embedding, limit=10, conn=conn
+                )
+                if weights.get("similar", 0) > 0:
+                    strategies.append(("similar", similar_posts))
 
-        if prefs.strategy_weights.get("opposite", 0) > 0:
-            opposite = await self.repo.get_opposite_posts(embedding, limit=10)
-            strategies.append(("opposite", opposite))
+            if weights.get("opposite", 0) > 0:
+                opposite = await self.repo.get_opposite_posts(
+                    embedding, limit=10, conn=conn
+                )
+                strategies.append(("opposite", opposite))
 
-        if prefs.strategy_weights.get("graph", 0) > 0:
-            base = await self.repo.get_similar_posts(embedding, limit=5)
-            expandedIds = await self.service.expand_posts(base)
-            graphPosts = await self.repo.get_posts_by_ids(expandedIds)
-            strategies.append(("graph", graphPosts))
+            if weights.get("graph", 0) > 0:
+                base = (similar_posts or await self.repo.get_similar_posts(
+                    embedding, limit=5, conn=conn
+                ))[:5]
+                expanded_ids = await self.service.expand_posts(base, conn=conn)
+                graph_posts = await self.repo.get_posts_by_ids(expanded_ids, conn=conn)
+                strategies.append(("graph", graph_posts))
 
-        if prefs.strategy_weights.get("random", 0) > 0:
-            randomPosts = await self.repo.get_random_posts(limit=10)
-            strategies.append(("random", randomPosts))
+            if weights.get("random", 0) > 0:
+                random_posts = await self.repo.get_random_posts(limit=10, conn=conn)
+                strategies.append(("random", random_posts))
 
         return strategies
 
@@ -128,10 +138,10 @@ class FeedService:
                 seeds.append(p)
 
         seedPosts = seeds[:10]
-        expandedIds = await self.GraphService.expand_posts(seedPosts)
-        allIds = set(p["id"] for p in seedPosts) | set(expandedIds)
-
-        expandedPosts = await self.repo.get_posts_by_ids(list(allIds))
+        async with self.repo.acquire() as conn:
+            expandedIds = await self.GraphService.expand_posts(seedPosts, conn=conn)
+            allIds = set(p["id"] for p in seedPosts) | set(expandedIds)
+            expandedPosts = await self.repo.get_posts_by_ids(list(allIds), conn=conn)
 
         seedMap = {p["id"]: p for p in seeds}
 
@@ -159,6 +169,7 @@ class FeedService:
         return await self.repo.get_new_session_posts(prefs.diversity_tolerance, None, None)
     
     async def get_next_posts(self, post_id):
-        neighbors = await self.repo.get_neighbors(post_id, limit=4)
-        ids = [n["to_post_id"] for n in neighbors]
-        return await self.repo.get_posts_by_ids(ids)
+        async with self.repo.acquire() as conn:
+            neighbors = await self.repo.get_neighbors(post_id, limit=4, conn=conn)
+            ids = [n["to_post_id"] for n in neighbors]
+            return await self.repo.get_posts_by_ids(ids, conn=conn)

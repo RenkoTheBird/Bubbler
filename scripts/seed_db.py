@@ -18,7 +18,6 @@ load_dotenv(BACKEND_ROOT / ".env")
 
 from backend.config import my_env_vars
 from backend.app.repositories.edge_builder_repo import EdgeBuilderRepo
-from backend.app.services.post import EmbeddingService
 from backend.app.ml.embeddings.generate import embed
 from backend.app.db.vector import to_pgvector
 
@@ -35,14 +34,13 @@ SAMPLE_POSTS = [
 async def main():
     pool = await asyncpg.create_pool(my_env_vars.db_url)
     edge_builder_repo = EdgeBuilderRepo(pool)
-    embedding_service = EmbeddingService()
 
     async with pool.acquire() as conn:
         user_id = await conn.fetchval(
             """
             INSERT INTO users (username, email, password)
             VALUES ('demo', 'demo@bubbler.test', 'not-a-real-hash')
-            ON CONFLICT ((lower(email))) DO UPDATE SET username = EXCLUDED.username
+            ON CONFLICT (email_lower) DO UPDATE SET username = EXCLUDED.username
             RETURNING id
             """
         )
@@ -75,9 +73,7 @@ async def main():
                 """,
                 post_id, topic_name,
             )
-            await edge_builder_repo.build_edges_for_post(
-                embedding_service, post_id, vector
-            )
+            await edge_builder_repo.build_edges_for_post(post_id, vector)
             print("Inserted post", post_id)
 
     await pool.close()

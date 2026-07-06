@@ -238,9 +238,7 @@ async def seed_checkpoint_posts(pool: asyncpg.Pool, user_id: int) -> int:
                 topic_ids[topic_name],
                 to_pgvector(vector),
             )
-            await edge_builder.build_edges_for_post(
-                embedding_service, post_id, vector
-            )
+            await edge_builder.build_edges_for_post(post_id, vector)
             inserted += 1
 
     return inserted

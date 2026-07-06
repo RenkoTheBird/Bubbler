@@ -10,11 +10,13 @@ CREATE TABLE users (
     username VARCHAR(20) NOT NULL,
     email VARCHAR(80) NOT NULL,
     password VARCHAR(60) NOT NULL,
+    email_lower TEXT GENERATED ALWAYS AS (lower(email)) STORED,
+    username_lower TEXT GENERATED ALWAYS AS (lower(username)) STORED,
     created_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE UNIQUE INDEX users_email_lower_idx ON users (lower(email));
-CREATE UNIQUE INDEX users_username_lower_idx ON users (lower(username));
+CREATE UNIQUE INDEX users_email_lower_idx ON users (email_lower);
+CREATE UNIQUE INDEX users_username_lower_idx ON users (username_lower);
 
 -- TOPICS (name stored canonical lowercase)
 CREATE TABLE topics (
@@ -47,6 +49,24 @@ CREATE TABLE post_topics (
 );
 
 CREATE INDEX post_topics_topic_name_idx ON post_topics (topic_name);
+
+-- Denormalized post row with highest-weight topic (see feed_sql.py)
+CREATE VIEW posts_with_topic AS
+SELECT
+    p.id,
+    p.content,
+    p.created_at,
+    p.user_id,
+    p.embedding,
+    pt.topic
+FROM posts p
+LEFT JOIN LATERAL (
+    SELECT topic_name AS topic
+    FROM post_topics
+    WHERE post_id = p.id
+    ORDER BY weight DESC
+    LIMIT 1
+) pt ON true;
 
 -- INTERACTIONS
 CREATE TABLE interactions (

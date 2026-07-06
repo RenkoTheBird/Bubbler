@@ -5,6 +5,7 @@
 # Usage (from repo root):
 #   ./scripts/start_backend.sh              # start DB (Docker), apply schema, run API
 #   ./scripts/start_backend.sh --seed       # same, plus insert sample posts
+#   ./scripts/start_backend.sh --rebuild-db # drop public schema and reapply schema.sql
 #   ./scripts/start_backend.sh --no-docker  # use Postgres already running (see backend/.env)
 #
 set -euo pipefail
@@ -21,6 +22,7 @@ API_PORT="${BUBBLER_API_PORT:-8000}"
 
 USE_DOCKER=true
 RUN_SEED=false
+REBUILD_DB="${BUBBLER_REBUILD_DB:-false}"
 
 usage() {
   cat <<'EOF'
@@ -28,6 +30,7 @@ Start the Bubbler backend (Postgres + FastAPI).
 
 Options:
   --seed         Insert sample topics/posts after setup (scripts/seed_db.py)
+  --rebuild-db   Drop the public schema and reapply schema.sql (wipes local data)
   --no-docker    Skip Docker; connect to Postgres using backend/.env
   -h, --help     Show this help
 
@@ -36,10 +39,12 @@ Environment overrides:
   BUBBLER_DB_IMAGE       Postgres image (default: pgvector/pgvector:pg16)
   BUBBLER_API_HOST       Uvicorn bind host (default: 127.0.0.1)
   BUBBLER_API_PORT       Uvicorn bind port (default: 8000)
+  BUBBLER_REBUILD_DB     Set to 1/true to rebuild the database (same as --rebuild-db)
 
 Examples:
   ./scripts/start_backend.sh
   ./scripts/start_backend.sh --seed
+  ./scripts/start_backend.sh --rebuild-db --seed
   ./scripts/start_backend.sh --no-docker
 EOF
 }
@@ -48,6 +53,10 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --seed)
       RUN_SEED=true
+      shift
+      ;;
+    --rebuild-db)
+      REBUILD_DB=true
       shift
       ;;
     --no-docker)
@@ -118,6 +127,24 @@ apply_schema() {
   else
     PGPASSWORD="$DATABASE_PASSWORD" psql -h "$HOST" -p "$PORT" -U "$DB_USER" -d "$DATABASE" -f "$SCHEMA"
   fi
+}
+
+rebuild_database() {
+  log "Rebuilding database (dropping public schema; all local data will be lost)"
+  local reset_sql
+  reset_sql="$(cat <<SQL
+DROP SCHEMA IF EXISTS public CASCADE;
+CREATE SCHEMA public;
+GRANT ALL ON SCHEMA public TO "$DB_USER";
+GRANT ALL ON SCHEMA public TO public;
+SQL
+)"
+  if $USE_DOCKER; then
+    docker exec -i "$CONTAINER_NAME" psql -U "$DB_USER" -d "$DATABASE" <<<"$reset_sql"
+  else
+    PGPASSWORD="$DATABASE_PASSWORD" psql -h "$HOST" -p "$PORT" -U "$DB_USER" -d "$DATABASE" <<<"$reset_sql"
+  fi
+  apply_schema
 }
 
 wait_for_postgres() {
@@ -217,8 +244,10 @@ main() {
     verify_local_postgres
   fi
 
-  if schema_is_applied; then
-    log "Database schema already applied"
+  if [[ "$REBUILD_DB" == true || "$REBUILD_DB" == 1 ]]; then
+    rebuild_database
+  elif schema_is_applied; then
+    log "Database schema already applied (use --rebuild-db after schema changes)"
   else
     apply_schema
   fi

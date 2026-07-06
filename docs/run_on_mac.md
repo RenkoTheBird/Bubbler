@@ -5,6 +5,9 @@ Steps 2 and 3 are the main ones.
 In a terminal, from the Bubbler/ folder/directory, run
 ./scripts/start_backend.sh --seed
 
+If the database needs to be rebuilt (schema changed):
+./scripts/start_backend.sh --rebuild-db --seed
+
 When you see "Uvicorn running on..." you are clear.
 
 Then in XCode:
@@ -90,6 +93,7 @@ You can also open [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) to br
 ```bash
 ./scripts/start_backend.sh              # start without seed data
 ./scripts/start_backend.sh --seed         # include sample posts
+./scripts/start_backend.sh --rebuild-db   # wipe DB and reapply schema.sql
 ./scripts/start_backend.sh --no-docker  # use an existing Postgres instance
 ./scripts/start_backend.sh --help
 ```
@@ -167,6 +171,16 @@ pip install pipenv
 # or
 brew install pipenv
 ```
+
+### Schema changed and the API errors on startup
+
+The startup script only applies `schema.sql` on a fresh database. After pulling schema changes, rebuild and re-seed:
+
+```bash
+./scripts/start_backend.sh --rebuild-db --seed
+```
+
+This drops all tables in the local database and reapplies the current schema.
 
 ### First backend start is slow
 

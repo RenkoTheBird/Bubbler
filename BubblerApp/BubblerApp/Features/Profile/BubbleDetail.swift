@@ -16,7 +16,7 @@ struct BubbleDetail: View {
         
         ZStack {
             
-            // darker gradient
+            // Background
             LinearGradient(
                 colors: [
                     bubbleColor.opacity(0.8),
@@ -34,7 +34,7 @@ struct BubbleDetail: View {
                     
                     Spacer().frame(height: 25)
                     
-                    // ssymmetrical center piece
+                    // MARK: - Core Bubble Identity
                     VStack(spacing: 14) {
                         
                         ZStack {
@@ -67,7 +67,7 @@ struct BubbleDetail: View {
                     }
                     .frame(maxWidth: .infinity)
                     
-                    // context card 
+                    // MARK: - Context Card
                     VStack(spacing: 10) {
                         
                         Text("Context Layer")
@@ -93,16 +93,68 @@ struct BubbleDetail: View {
                     )
                     .padding(.horizontal)
                     
-                    // feed stack
+                    // MARK: - Content Nodes 
                     VStack(spacing: 14) {
                         
-                        //PLACEHOLDERS
-                        bubbleCard("Posts connected to this bubble will appear here after your feed has data.")
-                        bubbleCard("Your interactions in the feed will shape the context shown in this view.")
-                        bubbleCard("Use the feed to grow this bubble with real topics and activity.")
-                        bubbleCard("Seeded content can be added later when the database is ready.")
+                        NavigationLink {
+                            BubbleDetail(bubbleName: "Trending", bubbleColor: .orange)
+                        } label: {
+                            bubbleCard("Trending signals detected")
+                        }
+                        
+                        NavigationLink {
+                            BubbleDetail(bubbleName: "Insights", bubbleColor: .purple)
+                        } label: {
+                            bubbleCard("Insight stream initializing…")
+                        }
+                        
+                        NavigationLink {
+                            BubbleDetail(bubbleName: "Engagement", bubbleColor: .green)
+                        } label: {
+                            bubbleCard("Engagement rising in this bubble")
+                        }
+                        
+                        NavigationLink {
+                            BubbleDetail(bubbleName: "Deep Dive", bubbleColor: .blue)
+                        } label: {
+                            bubbleCard("Recommended deep dive content")
+                        }
                     }
                     .padding(.horizontal)
+                    
+                    // MARK: - Related Bubbles
+                    VStack(alignment: .leading, spacing: 14) {
+                        
+                        Text("Related Bubbles")
+                            .font(.title3.bold())
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 20)
+                        
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            
+                            HStack(spacing: 14) {
+                                
+                                NavigationLink {
+                                    BubbleDetail(bubbleName: "AI", bubbleColor: .pink)
+                                } label: {
+                                    relatedBubble("AI", icon: "brain.head.profile", color: .pink)
+                                }
+                                
+                                NavigationLink {
+                                    BubbleDetail(bubbleName: "Tech", bubbleColor: .blue)
+                                } label: {
+                                    relatedBubble("Tech", icon: "desktopcomputer", color: .blue)
+                                }
+                                
+                                NavigationLink {
+                                    BubbleDetail(bubbleName: "Space", bubbleColor: .purple)
+                                } label: {
+                                    relatedBubble("Space", icon: "globe.americas.fill", color: .purple)
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
+                    }
                     
                     Spacer().frame(height: 30)
                 }
@@ -110,7 +162,7 @@ struct BubbleDetail: View {
         }
     }
     
-    // unified card
+    // MARK: - Content Card
     private func bubbleCard(_ text: String) -> some View {
         
         Text(text)
@@ -128,8 +180,33 @@ struct BubbleDetail: View {
                     )
             )
     }
+    
+    // MARK: - Related Bubble Node
+    private func relatedBubble(_ title: String, icon: String, color: Color) -> some View {
+        
+        VStack(spacing: 10) {
+            
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.12))
+                    .frame(width: 70, height: 70)
+                
+                Circle()
+                    .fill(color.opacity(0.22))
+                    .frame(width: 55, height: 55)
+                    .overlay(
+                        Image(systemName: icon)
+                            .foregroundColor(.white)
+                    )
+            }
+            
+            Text(title)
+                .font(.caption.bold())
+                .foregroundColor(.white.opacity(0.9))
+        }
+    }
 }
-//PLACEHOLDER
+
 #Preview {
     BubbleDetail(bubbleName: "Tech", bubbleColor: .blue)
 }

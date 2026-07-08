@@ -1,4 +1,5 @@
 import datetime
+from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -10,13 +11,17 @@ DEFAULT_STRATEGY_WEIGHTS: dict[str, float] = {
 }
 
 
+class TopicPreference(BaseModel):
+    topic: str
+    preference_type: Literal["preferred", "blacklisted"]
+
+
 def default_user_prefs(user_id: int = 0) -> "UserProfile":
     return UserProfile(
         user_id=user_id,
         diversity_tolerance=0.4,
         randomness=0.3,
-        preferred_topics=[],
-        blacklisted_topics=[],
+        topic_preferences=[],
         strategy_weights=dict(DEFAULT_STRATEGY_WEIGHTS),
     )
 
@@ -42,8 +47,7 @@ class UserProfile(BaseModel):
     # preferences
     diversity_tolerance: float
     randomness: float
-    preferred_topics: list[str]
-    blacklisted_topics: list[str]
+    topic_preferences: list[TopicPreference]
     use_view_time: bool = False
     view_time_weight: float = 0.1
 
@@ -55,8 +59,7 @@ class PrefsUpdate(BaseModel):
     # preferences (defaults removed)
     diversity_tolerance: float
     randomness: float
-    preferred_topics: list[str]
-    blacklisted_topics: list[str]
+    topic_preferences: list[TopicPreference]
     use_view_time: bool
     view_time_weight: float
 

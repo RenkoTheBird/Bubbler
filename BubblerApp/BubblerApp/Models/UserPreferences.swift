@@ -5,12 +5,26 @@
 
 import Foundation
 
+struct TopicPreference: Codable, Equatable {
+    var topic: String
+    var preferenceType: PreferenceType
+
+    enum PreferenceType: String, Codable {
+        case preferred
+        case blacklisted
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case topic
+        case preferenceType = "preference_type"
+    }
+}
+
 struct UserPreferences: Codable, Equatable {
     let userId: Int
     var diversityTolerance: Double
     var randomness: Double
-    var preferredTopics: [String]
-    var blacklistedTopics: [String]
+    var topicPreferences: [TopicPreference]
     var useViewTime: Bool
     var viewTimeWeight: Double
     var strategyWeights: FeedStrategyWeights
@@ -19,8 +33,7 @@ struct UserPreferences: Codable, Equatable {
         case userId = "user_id"
         case diversityTolerance = "diversity_tolerance"
         case randomness
-        case preferredTopics = "preferred_topics"
-        case blacklistedTopics = "blacklisted_topics"
+        case topicPreferences = "topic_preferences"
         case useViewTime = "use_view_time"
         case viewTimeWeight = "view_time_weight"
         case strategyWeights = "strategy_weights"
@@ -30,23 +43,49 @@ struct UserPreferences: Codable, Equatable {
         userId: 0,
         diversityTolerance: 0.4,
         randomness: 0.3,
-        preferredTopics: [],
-        blacklistedTopics: [],
+        topicPreferences: [],
         useViewTime: false,
         viewTimeWeight: 0.1,
         strategyWeights: .default
     )
 
+    var preferredTopics: [String] {
+        topicPreferences
+            .filter { $0.preferenceType == .preferred }
+            .map(\.topic)
+    }
+
+    var blacklistedTopics: [String] {
+        topicPreferences
+            .filter { $0.preferenceType == .blacklisted }
+            .map(\.topic)
+    }
+
     var updatePayload: PreferencesUpdatePayload {
         PreferencesUpdatePayload(
             diversityTolerance: diversityTolerance,
             randomness: randomness,
-            preferredTopics: preferredTopics,
-            blacklistedTopics: blacklistedTopics,
+            topicPreferences: topicPreferences,
             useViewTime: useViewTime,
             viewTimeWeight: viewTimeWeight,
             strategyWeights: strategyWeights
         )
+    }
+
+    mutating func updatePreferredTopics(_ topics: [String]) {
+        let preferred = TopicPreferenceList.cleaned(topics).map {
+            TopicPreference(topic: $0, preferenceType: .preferred)
+        }
+        let blacklisted = topicPreferences.filter { $0.preferenceType == .blacklisted }
+        topicPreferences = Self.mergeTopicPreferences(preferred: preferred, blacklisted: blacklisted)
+    }
+
+    mutating func updateBlacklistedTopics(_ topics: [String]) {
+        let blacklisted = TopicPreferenceList.cleaned(topics).map {
+            TopicPreference(topic: $0, preferenceType: .blacklisted)
+        }
+        let preferred = topicPreferences.filter { $0.preferenceType == .preferred }
+        topicPreferences = Self.mergeTopicPreferences(preferred: preferred, blacklisted: blacklisted)
     }
 
     func sanitized() -> UserPreferences {
@@ -60,20 +99,41 @@ struct UserPreferences: Codable, Equatable {
             userId: userId,
             diversityTolerance: diversityTolerance.clamped(to: 0 ... 1),
             randomness: randomness.clamped(to: 0 ... 1),
-            preferredTopics: preferred,
-            blacklistedTopics: blacklist,
+            topicPreferences: Self.mergeTopicPreferences(
+                preferred: preferred.map { TopicPreference(topic: $0, preferenceType: .preferred) },
+                blacklisted: blacklist.map { TopicPreference(topic: $0, preferenceType: .blacklisted) }
+            ),
             useViewTime: useViewTime,
             viewTimeWeight: viewTimeWeight.clamped(to: 0 ... 1),
             strategyWeights: strategyWeights.normalized()
         )
+    }
+
+    private static func mergeTopicPreferences(
+        preferred: [TopicPreference],
+        blacklisted: [TopicPreference]
+    ) -> [TopicPreference] {
+        var seen = Set<String>()
+        var merged: [TopicPreference] = []
+
+        for pref in preferred + blacklisted {
+            let key = pref.topic.lowercased()
+            guard seen.insert(key).inserted else {
+                continue
+            }
+            merged.append(pref)
+        }
+
+        return merged.sorted {
+            $0.topic.localizedCaseInsensitiveCompare($1.topic) == .orderedAscending
+        }
     }
 }
 
 struct PreferencesUpdatePayload: Codable {
     var diversityTolerance: Double
     var randomness: Double
-    var preferredTopics: [String]
-    var blacklistedTopics: [String]
+    var topicPreferences: [TopicPreference]
     var useViewTime: Bool
     var viewTimeWeight: Double
     var strategyWeights: FeedStrategyWeights
@@ -81,8 +141,7 @@ struct PreferencesUpdatePayload: Codable {
     enum CodingKeys: String, CodingKey {
         case diversityTolerance = "diversity_tolerance"
         case randomness
-        case preferredTopics = "preferred_topics"
-        case blacklistedTopics = "blacklisted_topics"
+        case topicPreferences = "topic_preferences"
         case useViewTime = "use_view_time"
         case viewTimeWeight = "view_time_weight"
         case strategyWeights = "strategy_weights"

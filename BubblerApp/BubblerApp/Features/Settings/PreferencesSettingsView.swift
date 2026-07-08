@@ -158,8 +158,14 @@ struct PreferencesSettingsView: View {
                 subtitle: "These topics get extra weight in your bubble.",
                 icon: "heart.fill",
                 iconColor: .pink,
-                topics: $viewModel.preferences.preferredTopics,
-                conflictingTopics: $viewModel.preferences.blacklistedTopics
+                topics: Binding(
+                    get: { viewModel.preferences.preferredTopics },
+                    set: { viewModel.preferences.updatePreferredTopics($0) }
+                ),
+                conflictingTopics: Binding(
+                    get: { viewModel.preferences.blacklistedTopics },
+                    set: { viewModel.preferences.updateBlacklistedTopics($0) }
+                )
             )
 
             PreferenceTopicsEditor(
@@ -167,8 +173,14 @@ struct PreferencesSettingsView: View {
                 subtitle: "These topics are filtered out of your recommendations.",
                 icon: "nosign",
                 iconColor: .orange,
-                topics: $viewModel.preferences.blacklistedTopics,
-                conflictingTopics: $viewModel.preferences.preferredTopics
+                topics: Binding(
+                    get: { viewModel.preferences.blacklistedTopics },
+                    set: { viewModel.preferences.updateBlacklistedTopics($0) }
+                ),
+                conflictingTopics: Binding(
+                    get: { viewModel.preferences.preferredTopics },
+                    set: { viewModel.preferences.updatePreferredTopics($0) }
+                )
             )
         }
     }

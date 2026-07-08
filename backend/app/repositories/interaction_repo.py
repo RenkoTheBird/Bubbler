@@ -1,3 +1,4 @@
+from app.db.feed_sql import POSTS_WITH_TOPIC_VIEW
 from app.schemas.post import Interaction
 
 
@@ -11,6 +12,9 @@ class InteractionRepository:
                 """
                 INSERT INTO interactions (user_id, post_id, type, view_time)
                 VALUES ($1, $2, $3, $4)
+                ON CONFLICT (user_id, post_id) DO UPDATE
+                SET type = EXCLUDED.type,
+                    view_time = EXCLUDED.view_time
                 """,
                 user_id, post_id, type, view_time,
             )
@@ -18,8 +22,8 @@ class InteractionRepository:
     async def get_recent_interactions(self, user_id: int, limit: int = 50) -> list[Interaction]:
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(
-                """
-                SELECT sub.*, pt.topic_name AS topic
+                f"""
+                SELECT sub.*, pwt.topic
                 FROM (
                     SELECT *
                     FROM interactions
@@ -27,13 +31,7 @@ class InteractionRepository:
                     ORDER BY created_at DESC
                     LIMIT $2
                 ) sub
-                LEFT JOIN LATERAL (
-                    SELECT topic_name
-                    FROM post_topics
-                    WHERE post_id = sub.post_id
-                    ORDER BY weight DESC
-                    LIMIT 1
-                ) pt ON true
+                LEFT JOIN {POSTS_WITH_TOPIC_VIEW} pwt ON pwt.id = sub.post_id
                 ORDER BY sub.created_at DESC
                 """,
                 user_id, limit,

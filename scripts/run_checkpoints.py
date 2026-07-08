@@ -84,6 +84,7 @@ except Exception:  # pragma: no cover - fallback keeps checkpoints runnable
     ]
 
 from config import my_env_vars  # noqa: E402
+from app.db.topics import DEFAULT_TOPIC  # noqa: E402
 from app.repositories.edge_builder_repo import EdgeBuilderRepo  # noqa: E402
 from app.services.feed import RankingService  # noqa: E402
 from app.services.post import EmbeddingService  # noqa: E402
@@ -212,31 +213,45 @@ async def seed_checkpoint_posts(pool: asyncpg.Pool, user_id: int) -> int:
     inserted = 0
 
     async with pool.acquire() as conn:
-        topic_ids: dict[str, Any] = {}
         for name in SAMPLE_TOPICS:
-            topic_id = await conn.fetchval(
+            await conn.execute(
                 """
                 INSERT INTO topics (name)
                 VALUES ($1)
-                ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
-                RETURNING id
+                ON CONFLICT (name) DO NOTHING
                 """,
                 name,
             )
-            topic_ids[name] = topic_id
+
+        await conn.execute(
+            """
+            INSERT INTO topics (name)
+            VALUES ($1)
+            ON CONFLICT (name) DO NOTHING
+            """,
+            DEFAULT_TOPIC,
+        )
 
         for content, topic_name in SAMPLE_POSTS:
             vector = embed(content)
             post_id = await conn.fetchval(
                 """
-                INSERT INTO posts (user_id, content, topic_id, embedding)
-                VALUES ($1, $2, $3, $4::vector)
+                INSERT INTO posts (user_id, content, embedding)
+                VALUES ($1, $2, $3::vector)
                 RETURNING id
                 """,
                 user_id,
                 content,
-                topic_ids[topic_name],
                 to_pgvector(vector),
+            )
+            await conn.execute(
+                """
+                INSERT INTO post_topics (post_id, topic_name)
+                VALUES ($1, $2)
+                ON CONFLICT DO NOTHING
+                """,
+                post_id,
+                topic_name,
             )
             await edge_builder.build_edges_for_post(post_id, vector)
             inserted += 1
@@ -271,14 +286,13 @@ async def fetch_user_posts(pool: asyncpg.Pool, user_id: int) -> list[dict[str, A
         rows = await conn.fetch(
             """
             SELECT
-                p.id::text AS id,
-                p.content,
-                t.name AS topic,
-                p.created_at
-            FROM posts p
-            LEFT JOIN topics t ON t.id = p.topic_id
-            WHERE p.user_id = $1
-            ORDER BY p.created_at DESC
+                pwt.id::text AS id,
+                pwt.content,
+                pwt.topic,
+                pwt.created_at
+            FROM posts_with_topic pwt
+            WHERE pwt.user_id = $1
+            ORDER BY pwt.created_at DESC
             """,
             user_id,
         )
@@ -334,8 +348,7 @@ def preferences_payload(body: Any, **overrides: Any) -> dict[str, Any]:
     payload = {
         "diversity_tolerance": float(data.get("diversity_tolerance", 0.4)),
         "randomness": float(data.get("randomness", 0.3)),
-        "preferred_topics": list(data.get("preferred_topics", [])),
-        "blacklisted_topics": list(data.get("blacklisted_topics", [])),
+        "topic_preferences": list(data.get("topic_preferences", [])),
         "use_view_time": bool(data.get("use_view_time", False)),
         "view_time_weight": float(data.get("view_time_weight", 0.1)),
         "strategy_weights": dict(
@@ -347,6 +360,16 @@ def preferences_payload(body: Any, **overrides: Any) -> dict[str, Any]:
     }
     payload.update(overrides)
     return payload
+
+
+def blacklisted_topics_from_prefs(body: Any) -> list[str]:
+    if not isinstance(body, dict):
+        return []
+    return [
+        str(pref.get("topic", "")).strip()
+        for pref in body.get("topic_preferences", [])
+        if isinstance(pref, dict) and pref.get("preference_type") == "blacklisted"
+    ]
 
 
 # --- Phase runners (add Phase 3+ below) ---
@@ -853,8 +876,7 @@ async def run_phase_6(ctx: Context) -> None:
         ranking_service.apply_preferences(
             SimpleNamespace(
                 randomness=0.0,
-                preferred_topics=[],
-                blacklisted_topics=[],
+                topic_preferences=[],
             ),
             [dict(post) for post in ranking_posts],
         )
@@ -872,8 +894,7 @@ async def run_phase_6(ctx: Context) -> None:
                 ranking_service.apply_preferences(
                     SimpleNamespace(
                         randomness=1.0,
-                        preferred_topics=[],
-                        blacklisted_topics=[],
+                        topic_preferences=[],
                     ),
                     [dict(post) for post in ranking_posts],
                 )
@@ -910,8 +931,7 @@ async def run_phase_6(ctx: Context) -> None:
             tuned_payload = preferences_payload(
                 pref_body,
                 randomness=0.0,
-                preferred_topics=[],
-                blacklisted_topics=[],
+                topic_preferences=[],
                 strategy_weights={
                     "similar": 1.0,
                     "graph": 0.0,
@@ -932,7 +952,9 @@ async def run_phase_6(ctx: Context) -> None:
 
             blacklisted_payload = preferences_payload(
                 tuned_body if isinstance(tuned_body, dict) else pref_body,
-                blacklisted_topics=[candidate_topic],
+                topic_preferences=[
+                    {"topic": candidate_topic, "preference_type": "blacklisted"},
+                ],
             )
             status, saved_body, raw = ctx.api.request(
                 "PUT",
@@ -942,7 +964,7 @@ async def run_phase_6(ctx: Context) -> None:
             )
             ok(ctx, "6.3 PUT /user/me/preferences saves a blacklisted topic", status == 200, raw[:200])
             if isinstance(saved_body, dict):
-                saved_blacklist = list(saved_body.get("blacklisted_topics", []))
+                saved_blacklist = blacklisted_topics_from_prefs(saved_body)
                 ok(
                     ctx,
                     "6.3 Blacklisted topic persists in saved preferences",

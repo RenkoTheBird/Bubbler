@@ -1,6 +1,7 @@
 from typing import List
 
-from app.db.feed_sql import POST_PRIMARY_TOPIC_LATERAL, POSTS_WITH_TOPIC_COLUMNS
+from app.db.feed_sql import POSTS_BASE_FROM, POSTS_WITH_TOPIC_COLUMNS
+from app.db.topics import DEFAULT_TOPIC
 from app.schemas.post import Post
 from app.db.vector import to_pgvector
 
@@ -16,17 +17,22 @@ class PostRepository:
             posts = await conn.fetch(
                 f"""
                 SELECT {POSTS_WITH_TOPIC_COLUMNS}
-                FROM posts p
-                {POST_PRIMARY_TOPIC_LATERAL}
-                WHERE p.user_id = $1
-                ORDER BY p.created_at DESC
+                {POSTS_BASE_FROM}
+                WHERE pwt.user_id = $1
+                ORDER BY pwt.created_at DESC
                 """,
                 id,
             )
 
         return [self._map_row(post) for post in posts]
 
-    async def post_user_posts(self, id: int, post: str, embeddedPost: List[float]):
+    async def post_user_posts(
+        self,
+        id: int,
+        post: str,
+        embeddedPost: List[float],
+        edge_builder=None,
+    ):
         vec = to_pgvector(embeddedPost)
 
         async with self.pool.acquire() as conn:
@@ -51,24 +57,35 @@ class PostRepository:
                     LIMIT 1
                     """,
                     post_id, vec,
+                ) or DEFAULT_TOPIC
+
+                await conn.execute(
+                    """
+                    INSERT INTO topics (name)
+                    VALUES ($1)
+                    ON CONFLICT (name) DO NOTHING
+                    """,
+                    topic_name,
+                )
+                await conn.execute(
+                    """
+                    INSERT INTO post_topics (post_id, topic_name)
+                    VALUES ($1, $2)
+                    ON CONFLICT DO NOTHING
+                    """,
+                    post_id, topic_name,
                 )
 
-                if topic_name:
-                    await conn.execute(
-                        """
-                        INSERT INTO post_topics (post_id, topic_name)
-                        VALUES ($1, $2)
-                        ON CONFLICT DO NOTHING
-                        """,
-                        post_id, topic_name,
+                if edge_builder is not None:
+                    await edge_builder.build_edges_for_post(
+                        post_id, embeddedPost, conn=conn,
                     )
 
                 row = await conn.fetchrow(
                     f"""
                     SELECT {POSTS_WITH_TOPIC_COLUMNS}
-                    FROM posts p
-                    {POST_PRIMARY_TOPIC_LATERAL}
-                    WHERE p.id = $1
+                    {POSTS_BASE_FROM}
+                    WHERE pwt.id = $1
                     """,
                     post_id,
                 )

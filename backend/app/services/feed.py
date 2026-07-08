@@ -2,6 +2,22 @@ import random
 import datetime
 from typing import List
 
+from app.schemas.user import TopicPreference
+
+
+def _topic_sets(topic_preferences: list[TopicPreference]) -> tuple[set[str], set[str]]:
+    preferred: set[str] = set()
+    blacklisted: set[str] = set()
+    for pref in topic_preferences:
+        if not isinstance(pref.topic, str) or not pref.topic.strip():
+            continue
+        normalized = pref.topic.strip().casefold()
+        if pref.preference_type == "preferred":
+            preferred.add(normalized)
+        elif pref.preference_type == "blacklisted":
+            blacklisted.add(normalized)
+    return preferred, blacklisted
+
 
 class PreferenceService:
     def update_from_interactions(self, prefs, interactions):
@@ -16,7 +32,16 @@ class PreferenceService:
 
         sortedTopics = sorted(topicScores.items(), key=lambda x: x[1], reverse=True)
 
-        prefs.preferred_topics = [t[0] for t in sortedTopics[:5]]
+        blacklisted = [
+            pref for pref in prefs.topic_preferences
+            if pref.preference_type == "blacklisted"
+        ]
+        preferred = [
+            TopicPreference(topic=name, preference_type="preferred")
+            for name, _ in sortedTopics[:5]
+            if isinstance(name, str) and name.strip()
+        ]
+        prefs.topic_preferences = blacklisted + preferred
 
         return prefs
 
@@ -28,16 +53,7 @@ class RankingService:
 
     def apply_preferences(self, prefs, posts: List[str]):
         filtered = []
-        preferred_topics = {
-            topic.strip().casefold()
-            for topic in prefs.preferred_topics
-            if isinstance(topic, str) and topic.strip()
-        }
-        blacklisted_topics = {
-            topic.strip().casefold()
-            for topic in prefs.blacklisted_topics
-            if isinstance(topic, str) and topic.strip()
-        }
+        preferred_topics, blacklisted_topics = _topic_sets(prefs.topic_preferences)
 
         for post in posts:
             post_topic = post.get("topic")

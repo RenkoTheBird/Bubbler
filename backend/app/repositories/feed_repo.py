@@ -2,8 +2,8 @@ from contextlib import asynccontextmanager
 from typing import Any, List
 
 from app.db.feed_sql import (
-    POST_PRIMARY_TOPIC_LATERAL,
     POSTS_BASE_FROM,
+    POSTS_TABLESAMPLE_FROM,
     POSTS_WITH_TOPIC_COLUMNS,
 )
 from app.db.vector import to_pgvector
@@ -49,11 +49,11 @@ class FeedRepository:
         order = "ASC" if ascending else "DESC"
         rows = await conn.fetch(
             f"""
-            SELECT p.id, p.content, pt.topic,
-                   1 - (p.embedding <=> $1::vector) AS similarity
+            SELECT pwt.id, pwt.content, pwt.topic,
+                   1 - (pwt.embedding <=> $1::vector) AS similarity
             {POSTS_BASE_FROM}
-            WHERE p.embedding IS NOT NULL
-            ORDER BY p.embedding <=> $1::vector {order}
+            WHERE pwt.embedding IS NOT NULL
+            ORDER BY pwt.embedding <=> $1::vector {order}
             LIMIT $2
             """,
             to_pgvector(embedded_post),
@@ -65,8 +65,7 @@ class FeedRepository:
         rows = await conn.fetch(
             f"""
             SELECT {POSTS_WITH_TOPIC_COLUMNS}
-            FROM posts p TABLESAMPLE BERNOULLI ({_RANDOM_SAMPLE_PERCENT})
-            {POST_PRIMARY_TOPIC_LATERAL}
+            {POSTS_TABLESAMPLE_FROM.format(sample_percent=_RANDOM_SAMPLE_PERCENT)}
             WHERE p.embedding IS NOT NULL
             LIMIT $1
             """,
@@ -76,8 +75,7 @@ class FeedRepository:
             rows = await conn.fetch(
                 f"""
                 SELECT {POSTS_WITH_TOPIC_COLUMNS}
-                FROM posts p TABLESAMPLE BERNOULLI (100)
-                {POST_PRIMARY_TOPIC_LATERAL}
+                {POSTS_TABLESAMPLE_FROM.format(sample_percent=100)}
                 WHERE p.embedding IS NOT NULL
                 LIMIT $1
                 """,
@@ -175,10 +173,10 @@ class FeedRepository:
                 f"""
                 SELECT {POSTS_WITH_TOPIC_COLUMNS}
                 {POSTS_BASE_FROM}
-                WHERE p.embedding IS NOT NULL
-                  AND pt.topic IS NOT NULL
-                  AND LOWER(pt.topic) = LOWER($2)
-                ORDER BY ABS((1 - (p.embedding <=> $1::vector)) - $3), p.created_at DESC
+                WHERE pwt.embedding IS NOT NULL
+                  AND pwt.topic IS NOT NULL
+                  AND LOWER(pwt.topic) = LOWER($2)
+                ORDER BY ABS((1 - (pwt.embedding <=> $1::vector)) - $3), pwt.created_at DESC
                 LIMIT 6
                 """,
                 to_pgvector(yesterday_post),
@@ -197,7 +195,7 @@ class FeedRepository:
         query = f"""
             SELECT {POSTS_WITH_TOPIC_COLUMNS}
             {POSTS_BASE_FROM}
-            WHERE p.id = ANY($1::uuid[])
+            WHERE pwt.id = ANY($1::uuid[])
         """
 
         async def _run(connection):

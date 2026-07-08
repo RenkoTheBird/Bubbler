@@ -1,8 +1,7 @@
-import json
-
 from app.db.jsonb import normalize_strategy_weights
 from app.schemas.user import (
     DEFAULT_STRATEGY_WEIGHTS,
+    TopicPreference,
     UserInfo,
     UserProfile,
     default_user_prefs,
@@ -13,17 +12,16 @@ class UserRepository:
     def __init__(self, pool):
         self.pool = pool
 
-    def _build_user_profile(self, rows) -> UserProfile:
+    def _build_user_profile(self, row, topic_preferences: list[TopicPreference]) -> UserProfile:
         return UserProfile(
-            user_id=rows["user_id"],
-            diversity_tolerance=rows["diversity_tolerance"],
-            randomness=rows["randomness"],
-            preferred_topics=list(rows["preferred_topics"]),
-            blacklisted_topics=list(rows["blacklisted_topics"]),
-            use_view_time=rows["use_view_time"],
-            view_time_weight=rows["view_time_weight"],
+            user_id=row["user_id"],
+            diversity_tolerance=row["diversity_tolerance"],
+            randomness=row["randomness"],
+            topic_preferences=topic_preferences,
+            use_view_time=row["use_view_time"],
+            view_time_weight=row["view_time_weight"],
             strategy_weights=normalize_strategy_weights(
-                rows["strategy_weights"],
+                row["strategy_weights"],
                 defaults=DEFAULT_STRATEGY_WEIGHTS,
             ),
         )
@@ -35,6 +33,63 @@ class UserRepository:
             email=row["email"],
             created_at=row["created_at"],
         )
+
+    async def _fetch_topic_prefs(self, conn, user_id: int) -> list[TopicPreference]:
+        rows = await conn.fetch(
+            """
+            SELECT t.name AS topic, utp.preference_type
+            FROM user_topic_prefs utp
+            JOIN topics t ON t.id = utp.topic_id
+            WHERE utp.user_id = $1
+            ORDER BY t.name
+            """,
+            user_id,
+        )
+        return [
+            TopicPreference(topic=row["topic"], preference_type=row["preference_type"])
+            for row in rows
+        ]
+
+    async def _sync_topic_prefs(
+        self,
+        conn,
+        user_id: int,
+        topic_preferences: list[TopicPreference],
+    ) -> None:
+        await conn.execute("DELETE FROM user_topic_prefs WHERE user_id = $1", user_id)
+
+        seen: set[tuple[str, str]] = set()
+        for pref in topic_preferences:
+            if not isinstance(pref.topic, str):
+                continue
+            normalized = pref.topic.strip().lower()
+            if not normalized:
+                continue
+            key = (normalized, pref.preference_type)
+            if key in seen:
+                continue
+            seen.add(key)
+
+            topic_id = await conn.fetchval(
+                """
+                INSERT INTO topics (name)
+                VALUES ($1)
+                ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+                RETURNING id
+                """,
+                normalized,
+            )
+            await conn.execute(
+                """
+                INSERT INTO user_topic_prefs (user_id, topic_id, preference_type)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (user_id, topic_id) DO UPDATE
+                SET preference_type = EXCLUDED.preference_type
+                """,
+                user_id,
+                topic_id,
+                pref.preference_type,
+            )
 
     async def get_profile_info(self, user_id: int) -> UserInfo | None:
         async with self.pool.acquire() as conn:
@@ -72,48 +127,50 @@ class UserRepository:
 
     async def get_prefs(self, user_id: int) -> UserProfile:
         async with self.pool.acquire() as conn:
-            rows = await conn.fetchrow("""SELECT * FROM user_profiles WHERE user_id = $1""", user_id)
+            row = await conn.fetchrow(
+                "SELECT * FROM user_profiles WHERE user_id = $1",
+                user_id,
+            )
+            if not row:
+                return default_user_prefs(user_id)
 
-        if not rows:
-            return default_user_prefs(user_id)
+            topic_preferences = await self._fetch_topic_prefs(conn, user_id)
 
-        return self._build_user_profile(rows)
+        return self._build_user_profile(row, topic_preferences)
 
     async def save_prefs(self, user_id: int, body) -> UserProfile:
         async with self.pool.acquire() as conn:
-            rows = await conn.fetchrow("""
-                INSERT INTO user_profiles (
+            async with conn.transaction():
+                row = await conn.fetchrow(
+                    """
+                    INSERT INTO user_profiles (
+                        user_id,
+                        diversity_tolerance,
+                        randomness,
+                        use_view_time,
+                        view_time_weight,
+                        strategy_weights
+                    )
+                    VALUES ($1, $2, $3, $4, $5, $6::jsonb)
+                    ON CONFLICT (user_id) DO UPDATE
+                    SET diversity_tolerance = EXCLUDED.diversity_tolerance,
+                        randomness = EXCLUDED.randomness,
+                        use_view_time = EXCLUDED.use_view_time,
+                        view_time_weight = EXCLUDED.view_time_weight,
+                        strategy_weights = EXCLUDED.strategy_weights
+                    RETURNING *;
+                    """,
                     user_id,
-                    diversity_tolerance,
-                    randomness,
-                    preferred_topics,
-                    blacklisted_topics,
-                    use_view_time,
-                    view_time_weight,
-                    strategy_weights
+                    body.diversity_tolerance,
+                    body.randomness,
+                    body.use_view_time,
+                    body.view_time_weight,
+                    body.strategy_weights,
                 )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
-                ON CONFLICT (user_id) DO UPDATE
-                SET diversity_tolerance = EXCLUDED.diversity_tolerance,
-                    randomness = EXCLUDED.randomness,
-                    preferred_topics = EXCLUDED.preferred_topics,
-                    blacklisted_topics = EXCLUDED.blacklisted_topics,
-                    use_view_time = EXCLUDED.use_view_time,
-                    view_time_weight = EXCLUDED.view_time_weight,
-                    strategy_weights = EXCLUDED.strategy_weights
-                RETURNING *;
-            """,
-            user_id,
-            body.diversity_tolerance,
-            body.randomness,
-            body.preferred_topics,
-            body.blacklisted_topics,
-            body.use_view_time,
-            body.view_time_weight,
-            json.dumps(body.strategy_weights),
-            )
+                await self._sync_topic_prefs(conn, user_id, body.topic_preferences)
+                topic_preferences = await self._fetch_topic_prefs(conn, user_id)
 
-        return self._build_user_profile(rows)
+        return self._build_user_profile(row, topic_preferences)
 
     async def put_prefs(self, user_id: int, body) -> UserProfile:
         return await self.save_prefs(user_id, body)

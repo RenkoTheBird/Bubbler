@@ -9,6 +9,9 @@ Frontend should return something like:
   },
   "randomness": 0.3,
   "diversity_tolerance": 40,
-  "preferred_topics": ["tech", "startups"],
-  "blacklisted_topics": ["politics"]
+  "topic_preferences": [
+    {"topic": "tech", "preference_type": "preferred"},
+    {"topic": "startups", "preference_type": "preferred"},
+    {"topic": "politics", "preference_type": "blacklisted"}
+  ]
 }

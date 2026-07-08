@@ -16,9 +16,9 @@ class PostService:
 
     async def post_user_posts(self, user_id, post):
         embedded = self.EmbeddingService.embed_text(post)
-        row = await self.repo.post_user_posts(user_id, post, embedded)
-        await self.edge_builder_repo.build_edges_for_post(row.id, embedded)
-        return row
+        return await self.repo.post_user_posts(
+            user_id, post, embedded, edge_builder=self.edge_builder_repo,
+        )
 
     async def delete_post(self, user_id, post_id):
         result = await self.repo.delete_post(user_id, post_id)

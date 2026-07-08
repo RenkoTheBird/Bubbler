@@ -17,6 +17,7 @@ sys.path.insert(0, str(ROOT))
 load_dotenv(BACKEND_ROOT / ".env")
 
 from backend.config import my_env_vars
+from backend.app.db.topics import DEFAULT_TOPIC
 from backend.app.repositories.edge_builder_repo import EdgeBuilderRepo
 from backend.app.ml.embeddings.generate import embed
 from backend.app.db.vector import to_pgvector
@@ -45,7 +46,7 @@ async def main():
             """
         )
 
-        for name in SAMPLE_TOPICS:
+        for name in [*SAMPLE_TOPICS, DEFAULT_TOPIC]:
             await conn.execute(
                 """
                 INSERT INTO topics (name)

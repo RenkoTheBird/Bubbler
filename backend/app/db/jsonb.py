@@ -1,6 +1,10 @@
 import json
 
 
+def to_jsonb(value) -> str:
+    return json.dumps(value)
+
+
 def normalize_strategy_weights(raw_value, *, defaults: dict[str, float]) -> dict[str, float]:
     normalized = dict(defaults)
 

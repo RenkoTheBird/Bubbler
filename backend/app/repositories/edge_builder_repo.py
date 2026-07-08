@@ -8,15 +8,16 @@ _EDGE_INSERT = """
 
 _SIMILAR_LIMIT = 5
 
+# NOTE: named as similar_posts instead of similar as similar is a reserved word in PostgreSQL
 _EDGES_QUERY = """
-    WITH similar AS (
+    WITH similar_posts AS (
         SELECT id, 1 - (embedding <=> $1::vector) AS similarity, 'similar' AS edge_type
         FROM posts
         WHERE id != $2 AND embedding IS NOT NULL
         ORDER BY embedding <=> $1::vector
         LIMIT $3
     ),
-    opposite AS (
+    opposite_posts AS (
         SELECT id, 1 - (embedding <=> $1::vector) AS similarity, 'opposite' AS edge_type
         FROM posts
         WHERE id != $2 AND embedding IS NOT NULL
@@ -31,9 +32,9 @@ _EDGES_QUERY = """
         WHERE pt_self.post_id = $2 AND p.id != $2
         LIMIT $3
     )
-    SELECT id, similarity, edge_type FROM similar
+    SELECT id, similarity, edge_type FROM similar_posts
     UNION ALL
-    SELECT id, similarity, edge_type FROM opposite
+    SELECT id, similarity, edge_type FROM opposite_posts
     UNION ALL
     SELECT id, similarity, edge_type FROM topic_neighbors
 """

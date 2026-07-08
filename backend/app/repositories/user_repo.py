@@ -1,4 +1,4 @@
-from app.db.jsonb import normalize_strategy_weights
+from app.db.jsonb import normalize_strategy_weights, to_jsonb
 from app.schemas.user import (
     DEFAULT_STRATEGY_WEIGHTS,
     TopicPreference,
@@ -165,7 +165,7 @@ class UserRepository:
                     body.randomness,
                     body.use_view_time,
                     body.view_time_weight,
-                    body.strategy_weights,
+                    to_jsonb(body.strategy_weights),
                 )
                 await self._sync_topic_prefs(conn, user_id, body.topic_preferences)
                 topic_preferences = await self._fetch_topic_prefs(conn, user_id)

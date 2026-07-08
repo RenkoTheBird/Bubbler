@@ -108,6 +108,10 @@ final class AuthSession: ObservableObject {
         successMessage = nil
     }
 
+    func showSuccessMessage(_ message: String) {
+        successMessage = message
+    }
+
     private func performAuthAction(_ action: () async throws -> AuthResponse) async -> Bool {
         authError = nil
         successMessage = nil

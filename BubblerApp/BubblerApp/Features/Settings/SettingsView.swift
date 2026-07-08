@@ -85,6 +85,12 @@ struct SettingsView: View {
                             settingsRow(icon: "rectangle.stack.fill", title: "Classic Feed")
                         }
                         .buttonStyle(.plain)
+                        NavigationLink {
+                            CreatePostView()
+                        } label: {
+                            settingsRow(icon: "square.and.pencil", title: "Create Post")
+                        }
+                        .buttonStyle(.plain)
                     }
                     
                     // app

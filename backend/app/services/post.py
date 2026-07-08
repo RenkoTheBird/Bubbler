@@ -14,10 +14,10 @@ class PostService:
     async def get_user_posts(self, user_id):
         return await self.repo.get_user_posts(user_id)
 
-    async def post_user_posts(self, user_id, post):
+    async def post_user_posts(self, user_id, post, topic=None):
         embedded = self.EmbeddingService.embed_text(post)
         return await self.repo.post_user_posts(
-            user_id, post, embedded, edge_builder=self.edge_builder_repo,
+            user_id, post, embedded, edge_builder=self.edge_builder_repo, topic=topic,
         )
 
     async def edit_post(self, user_id, post_id, post):

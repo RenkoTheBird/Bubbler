@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from app.services.user import UserService
 from app.services.interaction import InteractionService
 from app.services.post import PostService
 from app.schemas.post import InteractionCreate
 from app.schemas.user import PrefsUpdate
+from app.db.topics import KNOWN_TOPICS
 
 
 def create_user_router(user_service: UserService, interaction_service: InteractionService, post_service: PostService, get_current_user_id):
@@ -30,8 +31,18 @@ def create_user_router(user_service: UserService, interaction_service: Interacti
         return await post_service.edit_post(user_id, post_id, post)
 
     @router.post("/me/posts")
-    async def post_user_posts(post: str, user_id: int = Depends(get_current_user_id)):
-        return await post_service.post_user_posts(user_id, post)
+    async def post_user_posts(
+        post: str,
+        topic: str | None = None,
+        user_id: int = Depends(get_current_user_id),
+    ):
+        normalized_topic = None
+        if topic is not None:
+            normalized = topic.strip().lower()
+            if normalized not in KNOWN_TOPICS:
+                raise HTTPException(status_code=422, detail=f"Unknown topic: {topic}")
+            normalized_topic = normalized
+        return await post_service.post_user_posts(user_id, post, topic=normalized_topic)
     
     @router.post("/me/interactions")
     async def record_interaction(body: InteractionCreate, user_id: int = Depends(get_current_user_id)):

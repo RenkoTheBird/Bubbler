@@ -124,6 +124,31 @@ enum APIClient {
         return try apiJSONDecoder.decode([Post].self, from: data)
     }
 
+    static func createPost(content: String, topic: String) async throws -> Post {
+        var components = URLComponents(
+            url: APIConfig.baseURL.appending(path: "user/me/posts"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [
+            URLQueryItem(name: "post", value: content),
+            URLQueryItem(name: "topic", value: topic),
+        ]
+
+        guard let url = components.url else {
+            throw APIClientError.invalidResponse
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        guard let token = KeychainStore.loadAccessToken() else {
+            throw APIClientError.unauthorized
+        }
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let data = try await performData(request)
+        return try apiJSONDecoder.decode(Post.self, from: data)
+    }
+
     static func recordInteraction(_ payload: GraphInteractionPayload) async throws {
         let body = try JSONEncoder().encode(payload)
         _ = try await authorizedRequest(

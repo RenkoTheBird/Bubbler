@@ -32,6 +32,7 @@ class PostRepository:
         post: str,
         embeddedPost: List[float],
         edge_builder=None,
+        topic: str | None = None,
     ):
         vec = to_pgvector(embeddedPost)
 
@@ -47,17 +48,20 @@ class PostRepository:
                 )
                 post_id = result["id"]
 
-                topic_name = await conn.fetchval(
-                    """
-                    SELECT pt.topic_name
-                    FROM posts p
-                    JOIN post_topics pt ON pt.post_id = p.id
-                    WHERE p.id != $1 AND p.embedding IS NOT NULL
-                    ORDER BY p.embedding <=> $2::vector
-                    LIMIT 1
-                    """,
-                    post_id, vec,
-                ) or DEFAULT_TOPIC
+                if topic is not None:
+                    topic_name = topic
+                else:
+                    topic_name = await conn.fetchval(
+                        """
+                        SELECT pt.topic_name
+                        FROM posts p
+                        JOIN post_topics pt ON pt.post_id = p.id
+                        WHERE p.id != $1 AND p.embedding IS NOT NULL
+                        ORDER BY p.embedding <=> $2::vector
+                        LIMIT 1
+                        """,
+                        post_id, vec,
+                    ) or DEFAULT_TOPIC
 
                 await conn.execute(
                     """

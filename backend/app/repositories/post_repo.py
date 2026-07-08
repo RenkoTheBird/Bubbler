@@ -92,6 +92,15 @@ class PostRepository:
 
         return self._map_row(row)
 
+    async def edit_post(self, user_id: int, post_id: str, post: str, embedded: List[float]):
+        vec = to_pgvector(embedded)
+        async with self.pool.acquire() as conn:
+            result = await conn.execute(
+                "UPDATE posts SET content = $1, embedding = $2 WHERE id = $3 AND user_id = $4",
+                post, vec, post_id, user_id,
+            )
+        return result == "UPDATE 1"
+
     async def delete_post(self, user_id: int, post_id: str) -> bool:
         async with self.pool.acquire() as conn:
             result = await conn.execute(

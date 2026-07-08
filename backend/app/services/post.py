@@ -20,6 +20,13 @@ class PostService:
             user_id, post, embedded, edge_builder=self.edge_builder_repo,
         )
 
+    async def edit_post(self, user_id, post_id, post):
+        embedded = self.EmbeddingService.embed_text(post)
+        result = await self.repo.edit_post(user_id, post_id, post, embedded)
+        if not result:
+            raise HTTPException(status_code=404, detail="Post not found")
+        return result
+
     async def delete_post(self, user_id, post_id):
         result = await self.repo.delete_post(user_id, post_id)
         if not result:

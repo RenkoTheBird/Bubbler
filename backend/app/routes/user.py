@@ -26,8 +26,8 @@ def create_user_router(user_service: UserService, interaction_service: Interacti
         return await post_service.get_user_posts(user_id)
 
     @router.put("/me/posts/{post_id}")
-    async def update_post(post_id: str, post: str, user_id: int = Depends(get_current_user_id)):
-        return await post_service.update_post(user_id, post_id, post)
+    async def edit_post(post_id: str, post: str, user_id: int = Depends(get_current_user_id)):
+        return await post_service.edit_post(user_id, post_id, post)
 
     @router.post("/me/posts")
     async def post_user_posts(post: str, user_id: int = Depends(get_current_user_id)):

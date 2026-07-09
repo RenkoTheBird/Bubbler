@@ -6,9 +6,14 @@
 //
 
 import SwiftUI
+import Combine
 
 struct SettingsView: View {
     @EnvironmentObject private var authSession: AuthSession
+    
+    @State private var pushNotifications = true
+    @State private var bubbleActivityAlerts = true
+    @State private var trendingContentAlerts = false
     
     var body: some View {
         
@@ -58,9 +63,23 @@ struct SettingsView: View {
                     
                     // notifications
                     settingsSection(title: "Notifications") {
-                        settingsToggle(title: "Push Notifications")
-                        settingsToggle(title: "Bubble Activity Alerts")
-                        settingsToggle(title: "Trending Content Alerts")
+                        settingsToggle(
+                            icon: "bell.fill",
+                            title: "Push Notifications",
+                            isOn: $pushNotifications
+                        )
+                        
+                        settingsToggle(
+                            icon: "bubble.left.and.bubble.right.fill",
+                            title: "Bubble Activity Alerts",
+                            isOn: $bubbleActivityAlerts
+                        )
+                        
+                        settingsToggle(
+                            icon: "flame.fill",
+                            title: "Trending Content Alerts",
+                            isOn: $trendingContentAlerts
+                        )
                     }
                     
                     // privacy
@@ -95,7 +114,6 @@ struct SettingsView: View {
                     
                     // app
                     settingsSection(title: "App") {
-                        settingsRow(icon: "paintbrush.fill", title: "Appearance")
                         settingsRow(icon: "trash.fill", title: "Clear Cache")
                         settingsRow(icon: "info.circle.fill", title: "About Bubbler")
                     }
@@ -153,11 +171,15 @@ struct SettingsView: View {
     }
     
     // toggle row
-    private func settingsToggle(title: String) -> some View {
+    private func settingsToggle(
+        icon: String,
+        title: String,
+        isOn: Binding<Bool>
+    ) -> some View {
         
         HStack {
             
-            Image(systemName: "switch.2")
+            Image(systemName: icon)
                 .foregroundColor(.white.opacity(0.8))
                 .frame(width: 22)
             
@@ -167,8 +189,9 @@ struct SettingsView: View {
             
             Spacer()
             
-            Image(systemName: "circle")
-                .foregroundColor(.white.opacity(0.4))
+            Toggle("", isOn: isOn)
+                .labelsHidden()
+                .tint(.blue)
         }
     }
 }

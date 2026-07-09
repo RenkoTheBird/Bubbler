@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import Combine
 
 @MainActor
 final class PreferencesSettingsViewModel: ObservableObject {

@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 struct GraphFeedNode: Identifiable {
     let post: Post

@@ -10,7 +10,7 @@ enum TopicPreferenceList {
         var seen = Set<String>()
 
         return topics
-            .map(normalizedTopic(from:))
+            .map { normalizedTopic(from: $0) }
             .filter { !$0.isEmpty }
             .filter { topic in
                 seen.insert(topic.lowercased()).inserted

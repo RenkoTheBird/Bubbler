@@ -48,24 +48,8 @@ struct FeedView: View {
                 
                 VStack(spacing: 28) {
                     
-                    // Top buttons
+                    // Create Post button
                     HStack {
-
-                        // Profile button
-                        NavigationLink {
-                            ProfileView()
-                        } label: {
-                            Image(systemName: "person.fill")
-                                .font(.system(size: 20, weight: .semibold))
-                                .foregroundColor(.white)
-                                .padding(10)
-                                .background(Color.white.opacity(0.15))
-                                .clipShape(Circle())
-                                .overlay(
-                                    Circle()
-                                        .stroke(Color.white.opacity(0.25), lineWidth: 1)
-                                )
-                        }
 
                         Spacer()
 
@@ -83,25 +67,10 @@ struct FeedView: View {
                                         .stroke(Color.white.opacity(0.25), lineWidth: 1)
                                 )
                         }
-
-                        NavigationLink {
-                            SearchView() // WORKING ON STILL
-                        } label: {
-                            Image(systemName: "magnifyingglass")
-                                .font(.system(size: 20, weight: .semibold))
-                                .foregroundColor(.white)
-                                .padding(10)
-                                .background(Color.white.opacity(0.15))
-                                .clipShape(Circle())
-                                .overlay(
-                                    Circle()
-                                        .stroke(Color.white.opacity(0.25), lineWidth: 1)
-                                )
-                        }
                     }
-                    .padding(.horizontal, 60)
+                    .padding(.horizontal, 24)
                     .padding(.top, -20)
-                    
+
                     Spacer().frame(height: 1)
                     
                     // header

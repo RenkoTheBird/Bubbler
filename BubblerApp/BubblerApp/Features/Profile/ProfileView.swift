@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct ProfileView: View {
     
@@ -30,45 +31,8 @@ struct ProfileView: View {
                 
                 VStack(spacing: 28) {
                     
-                    HStack {
-                        
-                        // home button
-                            NavigationLink {
-                                ContentView() // send to main screen
-                            } label: {
-                                Image(systemName: "house.fill")
-                                    .font(.system(size: 20, weight: .semibold))
-                                    .foregroundColor(.white)
-                                    .padding(10)
-                                    .background(Color.white.opacity(0.15))
-                                    .clipShape(Circle())
-                                    .overlay(
-                                        Circle()
-                                            .stroke(Color.white.opacity(0.25), lineWidth: 1)
-                                    )
-                            }
-                        
-                        Spacer()
-                        
-                        NavigationLink {
-                            SettingsView()
-                        } label: {
-                            Image(systemName: "gearshape.fill")
-                                .font(.system(size: 20, weight: .semibold))
-                                .foregroundColor(.white)
-                                .padding(10)
-                                .background(Color.white.opacity(0.15))
-                                .clipShape(Circle())
-                                .overlay(
-                                    Circle()
-                                        .stroke(Color.white.opacity(0.25), lineWidth: 1)
-                                )
-                        }
-                    }
-                    .padding(.horizontal, 60)
-                    .padding(.top, -20)
-                    
-                    Spacer().frame(height: 1)
+                    Spacer()
+                        .frame(height: 20)
                     
                     //PLACEHOLDER
                     Text("🫧 Active Bubble: Tech")

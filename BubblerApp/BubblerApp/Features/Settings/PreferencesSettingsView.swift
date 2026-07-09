@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct PreferencesSettingsView: View {
     @EnvironmentObject private var authSession: AuthSession

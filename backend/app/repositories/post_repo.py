@@ -4,11 +4,38 @@ from app.db.feed_sql import POSTS_BASE_FROM, POSTS_WITH_TOPIC_COLUMNS
 from app.db.topics import DEFAULT_TOPIC
 from app.schemas.post import Post
 from app.db.vector import to_pgvector
+from app.services.topic_detection import AI_TOPIC_HIDDEN_WEIGHT
 
 
 class PostRepository:
     def __init__(self, pool):
         self.pool = pool
+
+    async def ensure_topics(self, topic_embeddings: dict[str, list[float]], *, conn=None) -> None:
+        records = [
+            (topic_name, to_pgvector(embedding))
+            for topic_name, embedding in topic_embeddings.items()
+        ]
+        if not records:
+            return
+
+        async def _run(connection):
+            await connection.executemany(
+                """
+                INSERT INTO topics (name, embedding)
+                VALUES ($1, $2::vector)
+                ON CONFLICT (name) DO UPDATE
+                SET embedding = COALESCE(topics.embedding, EXCLUDED.embedding)
+                """,
+                records,
+            )
+
+        if conn is not None:
+            await _run(conn)
+            return
+
+        async with self.pool.acquire() as connection:
+            await _run(connection)
 
     # Posts for the graph are retrieved in feed_service.py
     # id here is user id
@@ -33,6 +60,7 @@ class PostRepository:
         embeddedPost: List[float],
         edge_builder=None,
         topic: str | None = None,
+        ai_topics: list[dict[str, float | str]] | None = None,
     ):
         vec = to_pgvector(embeddedPost)
 
@@ -73,12 +101,32 @@ class PostRepository:
                 )
                 await conn.execute(
                     """
-                    INSERT INTO post_topics (post_id, topic_name, source, confidence)
-                    VALUES ($1, $2, 'user', 1.0)
+                    INSERT INTO post_topics (post_id, topic_name, source, confidence, weight)
+                    VALUES ($1, $2, 'user', 1.0, 1.0)
                     ON CONFLICT DO NOTHING
                     """,
                     post_id, topic_name,
                 )
+                if ai_topics:
+                    ai_topic_records = [
+                        (
+                            post_id,
+                            topic["topic_name"],
+                            float(topic["confidence"]),
+                            AI_TOPIC_HIDDEN_WEIGHT,
+                        )
+                        for topic in ai_topics
+                        if topic["topic_name"] != topic_name
+                    ]
+                    if ai_topic_records:
+                        await conn.executemany(
+                            """
+                            INSERT INTO post_topics (post_id, topic_name, source, confidence, weight)
+                            VALUES ($1, $2, 'ai', $3, $4)
+                            ON CONFLICT DO NOTHING
+                            """,
+                            ai_topic_records,
+                        )
 
                 if edge_builder is not None:
                     await edge_builder.build_edges_for_post(

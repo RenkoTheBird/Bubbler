@@ -22,7 +22,8 @@ CREATE UNIQUE INDEX users_username_lower_idx ON users (username_lower);
 CREATE TABLE topics (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL UNIQUE,
-    parent_topic_id UUID REFERENCES topics(id) ON DELETE SET NULL
+    parent_topic_id UUID REFERENCES topics(id) ON DELETE SET NULL,
+    embedding vector(384)
 );
 
 -- POSTS

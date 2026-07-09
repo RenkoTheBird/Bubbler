@@ -21,6 +21,7 @@ from app.services.graph import GraphService
 from app.services.interaction import InteractionService
 from app.services.post import EmbeddingService
 from app.services.post import PostService
+from app.services.topic_detection import TopicDetectionService
 from app.services.user import UserService
 
 # Repositories
@@ -68,10 +69,12 @@ async def lifespan(fastapi: FastAPI):
     auth_service = AuthService(pool, my_env_vars.secret_key, my_env_vars.algorithm, my_env_vars.timeoffset)
     graph_service = GraphService(feed_repo)
     interaction_service = InteractionService(interaction_repo)
-    post_service = PostService(post_repo, edge_builder_repo, EmbeddingService())
+    embedding_service = EmbeddingService()
+    topic_detection_service = TopicDetectionService(post_repo, embedding_service)
+    post_service = PostService(post_repo, edge_builder_repo, embedding_service, topic_detection_service)
     user_service = UserService(user_repo)
     strategy_service = StrategyService(feed_repo, graph_service)
-    feed_service = FeedService(feed_repo, graph_service, RankingService(), EmbeddingService(), strategy_service,
+    feed_service = FeedService(feed_repo, graph_service, RankingService(), embedding_service, strategy_service,
                                PreferenceService(), user_repo, interaction_repo)
 
     # start routers

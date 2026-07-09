@@ -214,22 +214,28 @@ async def seed_checkpoint_posts(pool: asyncpg.Pool, user_id: int) -> int:
 
     async with pool.acquire() as conn:
         for name in SAMPLE_TOPICS:
+            topic_vector = to_pgvector(embed(name))
             await conn.execute(
                 """
-                INSERT INTO topics (name)
-                VALUES ($1)
-                ON CONFLICT (name) DO NOTHING
+                INSERT INTO topics (name, embedding)
+                VALUES ($1, $2::vector)
+                ON CONFLICT (name) DO UPDATE
+                SET embedding = COALESCE(topics.embedding, EXCLUDED.embedding)
                 """,
                 name,
+                topic_vector,
             )
 
+        default_topic_vector = to_pgvector(embed(DEFAULT_TOPIC))
         await conn.execute(
             """
-            INSERT INTO topics (name)
-            VALUES ($1)
-            ON CONFLICT (name) DO NOTHING
+            INSERT INTO topics (name, embedding)
+            VALUES ($1, $2::vector)
+            ON CONFLICT (name) DO UPDATE
+            SET embedding = COALESCE(topics.embedding, EXCLUDED.embedding)
             """,
             DEFAULT_TOPIC,
+            default_topic_vector,
         )
 
         for content, topic_name in SAMPLE_POSTS:

@@ -47,13 +47,16 @@ async def main():
         )
 
         for name in [*SAMPLE_TOPICS, DEFAULT_TOPIC]:
+            topic_vector = to_pgvector(embed(name))
             await conn.execute(
                 """
-                INSERT INTO topics (name)
-                VALUES ($1)
-                ON CONFLICT (name) DO NOTHING
+                INSERT INTO topics (name, embedding)
+                VALUES ($1, $2::vector)
+                ON CONFLICT (name) DO UPDATE
+                SET embedding = COALESCE(topics.embedding, EXCLUDED.embedding)
                 """,
                 name,
+                topic_vector,
             )
 
         for content, topic_name in SAMPLE_POSTS:

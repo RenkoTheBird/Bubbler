@@ -81,7 +81,11 @@ load_dotenv(BACKEND_ROOT / ".env")
 try:
     from seed_db import SAMPLE_POSTS as SEEDED_SAMPLE_POSTS  # noqa: E402
     from seed_db import SAMPLE_TOPICS as SEEDED_SAMPLE_TOPICS  # noqa: E402
+    from seed_db import ensure_schema  # noqa: E402
 except Exception:  # pragma: no cover - fallback keeps checkpoints runnable
+    async def ensure_schema(pool):  # type: ignore[misc]
+        return None
+
     SEEDED_SAMPLE_TOPICS = ["technology", "health", "business"]
     SEEDED_SAMPLE_POSTS = [
         ("I love building side projects.", "technology"),
@@ -91,7 +95,7 @@ except Exception:  # pragma: no cover - fallback keeps checkpoints runnable
     ]
 
 from config import my_env_vars  # noqa: E402
-from app.db.topics import DEFAULT_TOPIC  # noqa: E402
+from app.db.topics import DEFAULT_TOPIC, KNOWN_TOPICS  # noqa: E402
 from app.repositories.edge_builder_repo import EdgeBuilderRepo  # noqa: E402
 from app.services.feed import RankingService  # noqa: E402
 from app.services.post import EmbeddingService  # noqa: E402
@@ -210,6 +214,22 @@ def ios_swift_sources() -> list[tuple[str, str]]:
     ]
 
 
+async def seed_topic_embeddings(conn: asyncpg.Connection, topic_names: set[str]) -> None:
+    """Upsert topic rows with embeddings for the curated topic list."""
+    for name in sorted(topic_names):
+        topic_vector = to_pgvector(embed(name))
+        await conn.execute(
+            """
+            INSERT INTO topics (name, embedding)
+            VALUES ($1, $2::vector)
+            ON CONFLICT (name) DO UPDATE
+            SET embedding = COALESCE(topics.embedding, EXCLUDED.embedding)
+            """,
+            name,
+            topic_vector,
+        )
+
+
 async def reset_checkpoint_data(pool: asyncpg.Pool) -> None:
     """Remove prior checkpoint users; ON DELETE CASCADE cleans related rows."""
     async with pool.acquire() as conn:
@@ -224,29 +244,9 @@ async def seed_checkpoint_posts(pool: asyncpg.Pool, user_id: int) -> int:
     inserted = 0
 
     async with pool.acquire() as conn:
-        for name in SAMPLE_TOPICS:
-            topic_vector = to_pgvector(embed(name))
-            await conn.execute(
-                """
-                INSERT INTO topics (name, embedding)
-                VALUES ($1, $2::vector)
-                ON CONFLICT (name) DO UPDATE
-                SET embedding = COALESCE(topics.embedding, EXCLUDED.embedding)
-                """,
-                name,
-                topic_vector,
-            )
-
-        default_topic_vector = to_pgvector(embed(DEFAULT_TOPIC))
-        await conn.execute(
-            """
-            INSERT INTO topics (name, embedding)
-            VALUES ($1, $2::vector)
-            ON CONFLICT (name) DO UPDATE
-            SET embedding = COALESCE(topics.embedding, EXCLUDED.embedding)
-            """,
-            DEFAULT_TOPIC,
-            default_topic_vector,
+        await seed_topic_embeddings(
+            conn,
+            {*SAMPLE_TOPICS, DEFAULT_TOPIC, *KNOWN_TOPICS},
         )
 
         for content, topic_name in SAMPLE_POSTS:
@@ -263,8 +263,8 @@ async def seed_checkpoint_posts(pool: asyncpg.Pool, user_id: int) -> int:
             )
             await conn.execute(
                 """
-                INSERT INTO post_topics (post_id, topic_name, source, confidence)
-                VALUES ($1, $2, 'user', 1.0)
+                INSERT INTO post_topics (post_id, topic_name, source, confidence, weight)
+                VALUES ($1, $2, 'user', 1.0, 1.0)
                 ON CONFLICT DO NOTHING
                 """,
                 post_id,
@@ -1306,6 +1306,10 @@ async def main() -> int:
     ctx = Context(api=ApiClient(API_BASE_URL), pool=pool)
 
     try:
+        print("\n--- Schema ---")
+        await ensure_schema(pool)
+        print("  PASS  Database schema aligned with reference")
+
         print("\n--- Reset ---")
         await reset_checkpoint_data(pool)
         print("  PASS  Cleared prior checkpoint test data")

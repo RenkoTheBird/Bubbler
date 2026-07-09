@@ -35,6 +35,13 @@ Phase 6 maps to docs/roadmap.md “User-Controlled Algorithm”:
   2    Blacklisting a topic removes it from the feed
   3    iOS settings UI exposes randomness + blacklisted topics
 
+Phase 7 maps to post/topic features on the new schema (post_topics, topic_training_events):
+  1    Create post with an explicit topic
+  2    Edit post content
+  3    Add and remove secondary topics on a post
+  4    Topic training events logged for user corrections
+  5    iOS create-post flow sends topic with new posts
+
 How to run
 Terminal 1 — start the API (if not already running):
 
@@ -75,12 +82,12 @@ try:
     from seed_db import SAMPLE_POSTS as SEEDED_SAMPLE_POSTS  # noqa: E402
     from seed_db import SAMPLE_TOPICS as SEEDED_SAMPLE_TOPICS  # noqa: E402
 except Exception:  # pragma: no cover - fallback keeps checkpoints runnable
-    SEEDED_SAMPLE_TOPICS = ["tech", "health", "startups"]
+    SEEDED_SAMPLE_TOPICS = ["technology", "health", "business"]
     SEEDED_SAMPLE_POSTS = [
-        ("I love building side projects.", "tech"),
+        ("I love building side projects.", "technology"),
         ("Morning runs clear my head.", "health"),
-        ("This startup idea needs validation.", "startups"),
-        ("Hot take: tabs over spaces.", "tech"),
+        ("This startup idea needs validation.", "business"),
+        ("Hot take: tabs over spaces.", "technology"),
     ]
 
 from config import my_env_vars  # noqa: E402
@@ -112,6 +119,10 @@ REQUIRED_OPENAPI_PATHS = [
     "/feed/me/session",
     "/user/me",
     "/user/me/posts",
+    "/user/me/posts/{post_id}",
+    "/user/me/posts/{post_id}/topics",
+    "/user/me/posts/{post_id}/topics/{topic_name}",
+    "/user/me/preferences",
     "/graph/posts/{post_id}/next",
 ]
 
@@ -285,6 +296,41 @@ async def fetch_posts_by_id(pool: asyncpg.Pool, post_ids: list[str]) -> dict[str
         )
 
     return {str(row["id"]): dict(row) for row in rows}
+
+
+async def fetch_post_topic_names(pool: asyncpg.Pool, post_id: str) -> list[str]:
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT topic_name
+            FROM post_topics
+            WHERE post_id = $1::uuid
+            ORDER BY topic_name
+            """,
+            post_id,
+        )
+    return [str(row["topic_name"]) for row in rows]
+
+
+async def count_topic_training_events(
+    pool: asyncpg.Pool,
+    post_id: str,
+    *,
+    action: str | None = None,
+    topic_name: str | None = None,
+) -> int:
+    clauses = ["post_id = $1::uuid"]
+    params: list[Any] = [post_id]
+    if action is not None:
+        params.append(action)
+        clauses.append(f"action = ${len(params)}")
+    if topic_name is not None:
+        params.append(topic_name)
+        clauses.append(f"topic_name = ${len(params)}")
+
+    query = f"SELECT COUNT(*) FROM topic_training_events WHERE {' AND '.join(clauses)}"
+    async with pool.acquire() as conn:
+        return await conn.fetchval(query, *params) or 0
 
 
 async def fetch_user_posts(pool: asyncpg.Pool, user_id: int) -> list[dict[str, Any]]:
@@ -873,10 +919,10 @@ async def run_phase_6(ctx: Context) -> None:
     """Phase 6 — randomness + blacklisted topics runtime and settings checks."""
     ranking_service = RankingService()
     ranking_posts = [
-        {"id": "alpha", "topic": "tech", "similarity": 0.5},
+        {"id": "alpha", "topic": "technology", "similarity": 0.5},
         {"id": "beta", "topic": "health", "similarity": 0.5},
-        {"id": "gamma", "topic": "startups", "similarity": 0.5},
-        {"id": "delta", "topic": "music", "similarity": 0.5},
+        {"id": "gamma", "topic": "business", "similarity": 0.5},
+        {"id": "delta", "topic": "entertainment", "similarity": 0.5},
     ]
 
     deterministic_order = post_ids(
@@ -1032,6 +1078,210 @@ async def run_phase_6(ctx: Context) -> None:
     )
 
 
+async def run_phase_7(ctx: Context) -> None:
+    """Phase 7 — post editing, topic mutations, and training events on the new schema."""
+    if not ctx.token:
+        ok(ctx, "7.1 Auth token available", False, "missing token from earlier phase")
+        return
+
+    if ctx.pool is None or ctx.user_id is None:
+        ok(ctx, "7.1 Database pool and user_id available", False)
+        return
+
+    # --- Create post with explicit topic ---
+    create_topic = "health"
+    create_content = "Checkpoint post with an explicit health topic"
+    status, created_body, raw = ctx.api.request(
+        "POST",
+        f"/user/me/posts?{urlencode({'post': create_content, 'topic': create_topic})}",
+        token=ctx.token,
+    )
+    ok(ctx, "7.1 POST /user/me/posts with topic → 200", status == 200, raw[:200])
+
+    created_post_id = ""
+    if isinstance(created_body, dict):
+        created_post_id = str(created_body.get("id", "")).strip()
+        ok(
+            ctx,
+            "7.1 Created post response includes topic",
+            str(created_body.get("topic", "")).strip().lower() == create_topic,
+            str(created_body.get("topic")),
+        )
+
+    status, bad_topic_body, raw = ctx.api.request(
+        "POST",
+        f"/user/me/posts?{urlencode({'post': 'invalid topic test', 'topic': 'not-a-real-topic'})}",
+        token=ctx.token,
+    )
+    ok(
+        ctx,
+        "7.1 Unknown topic on create → 422",
+        status == 422,
+        f"status={status}, body={raw[:120]}",
+    )
+
+    # --- Edit post content ---
+    target_post_id = created_post_id
+    if not target_post_id:
+        user_posts = await fetch_user_posts(ctx.pool, ctx.user_id)
+        if user_posts:
+            target_post_id = str(user_posts[0].get("id", "")).strip()
+
+    ok(ctx, "7.2 Post available for edit test", bool(target_post_id), target_post_id)
+    if target_post_id:
+        edited_content = "Checkpoint edited post content about wellness"
+        status, _, raw = ctx.api.request(
+            "PUT",
+            f"/user/me/posts/{target_post_id}?{urlencode({'post': edited_content})}",
+            token=ctx.token,
+        )
+        ok(ctx, "7.2 PUT /user/me/posts/{post_id} → 200", status == 200, raw[:200])
+
+        db_posts = await fetch_posts_by_id(ctx.pool, [target_post_id])
+        ok(
+            ctx,
+            "7.2 Edited content persisted in database",
+            db_posts.get(target_post_id, {}).get("content") == edited_content,
+            db_posts.get(target_post_id, {}).get("content", ""),
+        )
+
+    # --- Add secondary topic ---
+    topic_post_id = target_post_id
+    secondary_topic = "science"
+    if topic_post_id:
+        before_topics = await fetch_post_topic_names(ctx.pool, topic_post_id)
+        status, add_body, raw = ctx.api.request(
+            "POST",
+            f"/user/me/posts/{topic_post_id}/topics",
+            json_body={"topic": secondary_topic},
+            token=ctx.token,
+        )
+        ok(ctx, "7.3 POST /user/me/posts/{post_id}/topics → 200", status == 200, raw[:200])
+
+        after_add_topics = await fetch_post_topic_names(ctx.pool, topic_post_id)
+        ok(
+            ctx,
+            "7.3 Secondary topic added to post_topics",
+            secondary_topic in after_add_topics and len(after_add_topics) >= len(before_topics) + 1,
+            str(after_add_topics),
+        )
+        ok(
+            ctx,
+            "7.3 Topic training event logged for add",
+            await count_topic_training_events(
+                ctx.pool,
+                topic_post_id,
+                action="add",
+                topic_name=secondary_topic,
+            )
+            >= 1,
+            secondary_topic,
+        )
+
+        # --- Remove secondary topic ---
+        status, _, raw = ctx.api.request(
+            "DELETE",
+            f"/user/me/posts/{topic_post_id}/topics/{secondary_topic}",
+            token=ctx.token,
+        )
+        ok(
+            ctx,
+            f"7.4 DELETE /user/me/posts/{{post_id}}/topics/{secondary_topic} → 200",
+            status == 200,
+            raw[:200],
+        )
+        after_remove_topics = await fetch_post_topic_names(ctx.pool, topic_post_id)
+        ok(
+            ctx,
+            "7.4 Secondary topic removed from post_topics",
+            secondary_topic not in after_remove_topics,
+            str(after_remove_topics),
+        )
+        ok(
+            ctx,
+            "7.4 Topic training event logged for remove",
+            await count_topic_training_events(
+                ctx.pool,
+                topic_post_id,
+                action="remove",
+                topic_name=secondary_topic,
+            )
+            >= 1,
+            secondary_topic,
+        )
+
+        primary_topic = after_remove_topics[0] if after_remove_topics else ""
+        if primary_topic:
+            status, _, raw = ctx.api.request(
+                "DELETE",
+                f"/user/me/posts/{topic_post_id}/topics/{primary_topic}",
+                token=ctx.token,
+            )
+            ok(
+                ctx,
+                "7.4 Cannot remove the last topic from a post → 422",
+                status == 422,
+                f"status={status}, body={raw[:120]}",
+            )
+
+    # --- User posts list returns topic field ---
+    status, user_posts_body, raw = ctx.api.request("GET", "/user/me/posts", token=ctx.token)
+    ok(ctx, "7.5 GET /user/me/posts → 200", status == 200, raw[:200])
+    user_posts_api = user_posts_body if isinstance(user_posts_body, list) else []
+    posts_with_topics = [
+        post
+        for post in user_posts_api
+        if isinstance(post, dict) and str(post.get("topic", "")).strip()
+    ]
+    ok(
+        ctx,
+        "7.5 User posts include primary topic from post_topics",
+        len(posts_with_topics) > 0,
+        f"with_topic={len(posts_with_topics)}",
+    )
+
+    # --- Delete post ---
+    if created_post_id:
+        status, _, raw = ctx.api.request(
+            "DELETE",
+            f"/user/me/posts/{created_post_id}",
+            token=ctx.token,
+        )
+        ok(ctx, "7.6 DELETE /user/me/posts/{post_id} → 204", status == 204, raw[:120])
+        db_posts = await fetch_posts_by_id(ctx.pool, [created_post_id])
+        ok(
+            ctx,
+            "7.6 Deleted post removed from database",
+            created_post_id not in db_posts,
+            created_post_id,
+        )
+
+    # --- iOS create-post + topic picker wiring ---
+    create_post_vm = read_ios_file("Features/Post/CreatePostViewModel.swift")
+    ok(ctx, "7.7 CreatePostViewModel.swift exists", bool(create_post_vm))
+    ok(
+        ctx,
+        "7.7 CreatePostViewModel submits topic with APIClient.createPost",
+        "APIClient.createPost" in create_post_vm and "topic: selectedTopic" in create_post_vm,
+    )
+
+    create_post_view = read_ios_file("Features/Post/CreatePostView.swift")
+    ok(ctx, "7.8 CreatePostView.swift exists", bool(create_post_view))
+    ok(
+        ctx,
+        "7.8 CreatePostView uses TopicPicker for topic selection",
+        "TopicPicker" in create_post_view,
+    )
+
+    known_topics = read_ios_file("Models/KnownTopics.swift")
+    ok(ctx, "7.9 KnownTopics.swift exists", bool(known_topics))
+    ok(
+        ctx,
+        "7.9 KnownTopics mirrors backend curated list",
+        '"technology"' in known_topics and '"health"' in known_topics,
+    )
+
+
 PhaseFn = Callable[[Context], Any]
 
 PHASES: list[tuple[str, str, PhaseFn]] = [
@@ -1042,6 +1292,7 @@ PHASES: list[tuple[str, str, PhaseFn]] = [
     ("4", "Connect iOS to Real Feed Data", run_phase_4),
     ("5", "Graph Path (Core Product)", run_phase_5),
     ("6", "User-Controlled Algorithm", run_phase_6),
+    ("7", "Posts, Topics & Training Events", run_phase_7),
 ]
 
 

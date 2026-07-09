@@ -9,6 +9,10 @@ class PostTopic(BaseModel):
     weight: float
 
 
+class PostTopicMutation(BaseModel):
+    topic: str = Field(min_length=1)
+
+
 class Post(BaseModel):
     id: str
     user_id: int

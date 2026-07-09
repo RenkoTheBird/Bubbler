@@ -53,6 +53,20 @@ CREATE TABLE post_topics (
 
 CREATE INDEX post_topics_topic_name_idx ON post_topics (topic_name);
 
+-- TOPIC TRAINING EVENTS (user corrections for future model training)
+CREATE TABLE topic_training_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    topic_name TEXT NOT NULL REFERENCES topics(name) ON UPDATE CASCADE ON DELETE RESTRICT,
+    action TEXT NOT NULL CHECK (action IN ('add', 'remove')),
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX topic_training_events_post_id_idx ON topic_training_events (post_id);
+CREATE INDEX topic_training_events_user_id_idx ON topic_training_events (user_id);
+CREATE INDEX topic_training_events_topic_name_idx ON topic_training_events (topic_name);
+
 -- Denormalized post row with highest-weight topic (see feed_sql.py)
 CREATE VIEW posts_with_topic AS
 SELECT

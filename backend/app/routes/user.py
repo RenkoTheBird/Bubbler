@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.services.user import UserService
 from app.services.interaction import InteractionService
 from app.services.post import PostService
-from app.schemas.post import InteractionCreate
+from app.schemas.post import InteractionCreate, PostTopicMutation
 from app.schemas.user import PrefsUpdate
 from app.db.topics import KNOWN_TOPICS
 
@@ -29,6 +29,28 @@ def create_user_router(user_service: UserService, interaction_service: Interacti
     @router.put("/me/posts/{post_id}")
     async def edit_post(post_id: str, post: str, user_id: int = Depends(get_current_user_id)):
         return await post_service.edit_post(user_id, post_id, post)
+
+    @router.post("/me/posts/{post_id}/topics")
+    async def add_post_topic(
+        post_id: str,
+        body: PostTopicMutation,
+        user_id: int = Depends(get_current_user_id),
+    ):
+        normalized = body.topic.strip().lower()
+        if normalized not in KNOWN_TOPICS:
+            raise HTTPException(status_code=422, detail=f"Unknown topic: {body.topic}")
+        return await post_service.add_post_topic(user_id, post_id, normalized)
+
+    @router.delete("/me/posts/{post_id}/topics/{topic_name}")
+    async def remove_post_topic(
+        post_id: str,
+        topic_name: str,
+        user_id: int = Depends(get_current_user_id),
+    ):
+        normalized = topic_name.strip().lower()
+        if normalized not in KNOWN_TOPICS:
+            raise HTTPException(status_code=422, detail=f"Unknown topic: {topic_name}")
+        return await post_service.remove_post_topic(user_id, post_id, normalized)
 
     @router.post("/me/posts")
     async def post_user_posts(

@@ -49,3 +49,18 @@ class PostService:
         if not result:
             raise HTTPException(status_code=404, detail="Post not found")
         return result
+
+    async def add_post_topic(self, user_id, post_id, topic):
+        result = await self.repo.add_post_topic(user_id, post_id, topic)
+        if not result:
+            raise HTTPException(status_code=404, detail="Post not found")
+        return result
+
+    async def remove_post_topic(self, user_id, post_id, topic):
+        try:
+            result = await self.repo.remove_post_topic(user_id, post_id, topic)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        if not result:
+            raise HTTPException(status_code=404, detail="Post or topic not found")
+        return result

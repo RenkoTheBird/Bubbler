@@ -11,6 +11,37 @@ class PostRepository:
     def __init__(self, pool):
         self.pool = pool
 
+    async def _log_topic_training_event(
+        self,
+        conn,
+        *,
+        post_id,
+        user_id: int,
+        topic_name: str,
+        action: str,
+    ) -> None:
+        await conn.execute(
+            """
+            INSERT INTO topic_training_events (post_id, user_id, topic_name, action)
+            VALUES ($1, $2, $3, $4)
+            """,
+            post_id,
+            user_id,
+            topic_name,
+            action,
+        )
+
+    async def _get_owned_post_id(self, conn, user_id: int, post_id: str):
+        return await conn.fetchval(
+            """
+            SELECT id
+            FROM posts
+            WHERE id = $1 AND user_id = $2
+            """,
+            post_id,
+            user_id,
+        )
+
     async def ensure_topics(self, topic_embeddings: dict[str, list[float]], *, conn=None) -> None:
         records = [
             (topic_name, to_pgvector(embedding))
@@ -107,6 +138,14 @@ class PostRepository:
                     """,
                     post_id, topic_name,
                 )
+                if topic is not None:
+                    await self._log_topic_training_event(
+                        conn,
+                        post_id=post_id,
+                        user_id=id,
+                        topic_name=topic_name,
+                        action="add",
+                    )
                 if ai_topics:
                     ai_topic_records = [
                         (
@@ -132,6 +171,121 @@ class PostRepository:
                     await edge_builder.build_edges_for_post(
                         post_id, embeddedPost, conn=conn,
                     )
+
+                row = await conn.fetchrow(
+                    f"""
+                    SELECT {POSTS_WITH_TOPIC_COLUMNS}
+                    {POSTS_BASE_FROM}
+                    WHERE pwt.id = $1
+                    """,
+                    post_id,
+                )
+
+        return self._map_row(row)
+
+    async def add_post_topic(self, user_id: int, post_id: str, topic_name: str) -> Post | None:
+        async with self.pool.acquire() as conn:
+            async with conn.transaction():
+                owned_post_id = await self._get_owned_post_id(conn, user_id, post_id)
+                if owned_post_id is None:
+                    return None
+
+                existing = await conn.fetchrow(
+                    """
+                    SELECT source
+                    FROM post_topics
+                    WHERE post_id = $1 AND topic_name = $2
+                    """,
+                    post_id,
+                    topic_name,
+                )
+
+                await conn.execute(
+                    """
+                    INSERT INTO topics (name)
+                    VALUES ($1)
+                    ON CONFLICT (name) DO NOTHING
+                    """,
+                    topic_name,
+                )
+                await conn.execute(
+                    """
+                    INSERT INTO post_topics (post_id, topic_name, source, confidence, weight)
+                    VALUES ($1, $2, 'user', 1.0, 1.0)
+                    ON CONFLICT (post_id, topic_name) DO UPDATE
+                    SET source = 'user',
+                        confidence = 1.0,
+                        weight = 1.0
+                    """,
+                    post_id,
+                    topic_name,
+                )
+
+                if existing is None or existing["source"] != "user":
+                    await self._log_topic_training_event(
+                        conn,
+                        post_id=post_id,
+                        user_id=user_id,
+                        topic_name=topic_name,
+                        action="add",
+                    )
+
+                row = await conn.fetchrow(
+                    f"""
+                    SELECT {POSTS_WITH_TOPIC_COLUMNS}
+                    {POSTS_BASE_FROM}
+                    WHERE pwt.id = $1
+                    """,
+                    post_id,
+                )
+
+        return self._map_row(row)
+
+    async def remove_post_topic(self, user_id: int, post_id: str, topic_name: str) -> Post | None:
+        async with self.pool.acquire() as conn:
+            async with conn.transaction():
+                owned_post_id = await self._get_owned_post_id(conn, user_id, post_id)
+                if owned_post_id is None:
+                    return None
+
+                existing = await conn.fetchrow(
+                    """
+                    SELECT source
+                    FROM post_topics
+                    WHERE post_id = $1 AND topic_name = $2
+                    """,
+                    post_id,
+                    topic_name,
+                )
+                if existing is None:
+                    return None
+
+                topic_count = await conn.fetchval(
+                    """
+                    SELECT COUNT(*)
+                    FROM post_topics
+                    WHERE post_id = $1
+                    """,
+                    post_id,
+                )
+                if topic_count <= 1:
+                    raise ValueError("Cannot remove the last topic from a post")
+
+                await conn.execute(
+                    """
+                    DELETE FROM post_topics
+                    WHERE post_id = $1 AND topic_name = $2
+                    """,
+                    post_id,
+                    topic_name,
+                )
+                await self._log_topic_training_event(
+                    conn,
+                    post_id=post_id,
+                    user_id=user_id,
+                    topic_name=topic_name,
+                    action="remove",
+                )
 
                 row = await conn.fetchrow(
                     f"""

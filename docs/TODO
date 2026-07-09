@@ -3,3 +3,6 @@ add media support
 
 -- IMPORTANT CHECKS
 routing efficiency/gotchas
+
+-- FUTURE
+add proper topic system (e.g. AI/ML based topic determination)

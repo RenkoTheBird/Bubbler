@@ -27,6 +27,7 @@ struct UserPreferences: Codable, Equatable {
     var topicPreferences: [TopicPreference]
     var useViewTime: Bool
     var viewTimeWeight: Double
+    var aiTopicDetection: Bool
     var strategyWeights: FeedStrategyWeights
 
     enum CodingKeys: String, CodingKey {
@@ -36,6 +37,7 @@ struct UserPreferences: Codable, Equatable {
         case topicPreferences = "topic_preferences"
         case useViewTime = "use_view_time"
         case viewTimeWeight = "view_time_weight"
+        case aiTopicDetection = "ai_topic_detection"
         case strategyWeights = "strategy_weights"
     }
 
@@ -46,6 +48,7 @@ struct UserPreferences: Codable, Equatable {
         topicPreferences: [],
         useViewTime: false,
         viewTimeWeight: 0.1,
+        aiTopicDetection: false,
         strategyWeights: .default
     )
 
@@ -68,6 +71,7 @@ struct UserPreferences: Codable, Equatable {
             topicPreferences: topicPreferences,
             useViewTime: useViewTime,
             viewTimeWeight: viewTimeWeight,
+            aiTopicDetection: aiTopicDetection,
             strategyWeights: strategyWeights
         )
     }
@@ -105,6 +109,7 @@ struct UserPreferences: Codable, Equatable {
             ),
             useViewTime: useViewTime,
             viewTimeWeight: viewTimeWeight.clamped(to: 0 ... 1),
+            aiTopicDetection: aiTopicDetection,
             strategyWeights: strategyWeights.normalized()
         )
     }
@@ -136,6 +141,7 @@ struct PreferencesUpdatePayload: Codable {
     var topicPreferences: [TopicPreference]
     var useViewTime: Bool
     var viewTimeWeight: Double
+    var aiTopicDetection: Bool
     var strategyWeights: FeedStrategyWeights
 
     enum CodingKeys: String, CodingKey {
@@ -144,6 +150,7 @@ struct PreferencesUpdatePayload: Codable {
         case topicPreferences = "topic_preferences"
         case useViewTime = "use_view_time"
         case viewTimeWeight = "view_time_weight"
+        case aiTopicDetection = "ai_topic_detection"
         case strategyWeights = "strategy_weights"
     }
 }

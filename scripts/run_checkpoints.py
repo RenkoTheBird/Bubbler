@@ -246,8 +246,8 @@ async def seed_checkpoint_posts(pool: asyncpg.Pool, user_id: int) -> int:
             )
             await conn.execute(
                 """
-                INSERT INTO post_topics (post_id, topic_name)
-                VALUES ($1, $2)
+                INSERT INTO post_topics (post_id, topic_name, source, confidence)
+                VALUES ($1, $2, 'user', 1.0)
                 ON CONFLICT DO NOTHING
                 """,
                 post_id,
@@ -351,6 +351,7 @@ def preferences_payload(body: Any, **overrides: Any) -> dict[str, Any]:
         "topic_preferences": list(data.get("topic_preferences", [])),
         "use_view_time": bool(data.get("use_view_time", False)),
         "view_time_weight": float(data.get("view_time_weight", 0.1)),
+        "ai_topic_detection": bool(data.get("ai_topic_detection", False)),
         "strategy_weights": dict(
             data.get(
                 "strategy_weights",

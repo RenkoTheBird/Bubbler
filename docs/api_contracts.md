@@ -13,5 +13,6 @@ Frontend should return something like:
     {"topic": "tech", "preference_type": "preferred"},
     {"topic": "startups", "preference_type": "preferred"},
     {"topic": "politics", "preference_type": "blacklisted"}
-  ]
+  ],
+  "ai_topic_detection": false
 }

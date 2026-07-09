@@ -44,6 +44,8 @@ USING hnsw (embedding vector_cosine_ops);
 CREATE TABLE post_topics (
     post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
     topic_name TEXT NOT NULL REFERENCES topics(name) ON UPDATE CASCADE ON DELETE RESTRICT,
+    source TEXT NOT NULL CHECK (source IN ('user', 'ai')),
+    confidence FLOAT NOT NULL CHECK (confidence BETWEEN 0 AND 1), --only necessary for ai sources
     weight FLOAT NOT NULL DEFAULT 1.0,
     PRIMARY KEY (post_id, topic_name)
 );
@@ -100,6 +102,7 @@ CREATE TABLE user_profiles (
     randomness FLOAT,
     use_view_time BOOLEAN NOT NULL DEFAULT FALSE,
     view_time_weight FLOAT DEFAULT 0.1,
+    ai_topic_detection BOOLEAN NOT NULL DEFAULT FALSE,
     strategy_weights JSONB NOT NULL DEFAULT
         '{"similar":0.7,"graph":0.2,"opposite":0.0,"random":0.1}'
 );

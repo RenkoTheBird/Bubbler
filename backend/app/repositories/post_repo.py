@@ -73,8 +73,8 @@ class PostRepository:
                 )
                 await conn.execute(
                     """
-                    INSERT INTO post_topics (post_id, topic_name)
-                    VALUES ($1, $2)
+                    INSERT INTO post_topics (post_id, topic_name, source, confidence)
+                    VALUES ($1, $2, 'user', 1.0)
                     ON CONFLICT DO NOTHING
                     """,
                     post_id, topic_name,

@@ -48,6 +48,7 @@ struct PreferencesSettingsView: View {
                         tuningSection
                         strategySection
                         topicSections
+                        aiTopicSection
                         behaviorSection
                         saveSection
                     }
@@ -182,6 +183,20 @@ struct PreferencesSettingsView: View {
                     set: { viewModel.preferences.updatePreferredTopics($0) }
                 )
             )
+        }
+    }
+
+    private var aiTopicSection: some View {
+        PreferenceSectionCard(
+            title: "AI Topic Detection",
+            subtitle: "When enabled, your topic classifications can help train smarter topic suggestions. AI suggestions are not active yet."
+        ) {
+            Toggle(isOn: $viewModel.preferences.aiTopicDetection) {
+                Text("Contribute Topic Classifications")
+                    .foregroundColor(.white.opacity(0.9))
+                    .font(.subheadline.weight(.semibold))
+            }
+            .toggleStyle(SwitchToggleStyle(tint: .mint))
         }
     }
 

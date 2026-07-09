@@ -50,6 +50,7 @@ class UserProfile(BaseModel):
     topic_preferences: list[TopicPreference]
     use_view_time: bool = False
     view_time_weight: float = 0.1
+    ai_topic_detection: bool = False
 
     # feed composition, e.g. {"similar": 0.6, "opposite": 0.2, "random": 0.2}
     strategy_weights: dict[str, float]
@@ -62,6 +63,7 @@ class PrefsUpdate(BaseModel):
     topic_preferences: list[TopicPreference]
     use_view_time: bool
     view_time_weight: float
+    ai_topic_detection: bool
 
     # feed composition, e.g. {"similar": 0.6, "opposite": 0.2, "random": 0.2}
     strategy_weights: dict[str, float]

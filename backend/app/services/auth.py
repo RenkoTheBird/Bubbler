@@ -1,4 +1,3 @@
-from app.repositories.auth_repo import AuthRepository
 import bcrypt
 import jwt
 from asyncpg.exceptions import UniqueViolationError
@@ -15,8 +14,8 @@ def check_password(entry_password: str, stored_password: str) -> bool:
 
 
 class AuthService:
-    def __init__(self, db_pool, secret_key, algorithm, expiration_offset):
-        self.auth_repo = AuthRepository(db_pool)
+    def __init__(self, auth_repo, secret_key, algorithm, expiration_offset):
+        self.auth_repo = auth_repo
         self.secret_key = secret_key
         self.algorithm = algorithm
         self.expiration_offset = expiration_offset  # Used as hours

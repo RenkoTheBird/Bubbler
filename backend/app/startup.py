@@ -66,7 +66,7 @@ async def lifespan(fastapi: FastAPI):
     edge_builder_repo = EdgeBuilderRepo(pool)
 
     # Start services
-    auth_service = AuthService(pool, my_env_vars.secret_key, my_env_vars.algorithm, my_env_vars.timeoffset)
+    auth_service = AuthService(auth_repo, my_env_vars.secret_key, my_env_vars.algorithm, my_env_vars.timeoffset)
     graph_service = GraphService(feed_repo)
     interaction_service = InteractionService(interaction_repo)
     embedding_service = EmbeddingService()

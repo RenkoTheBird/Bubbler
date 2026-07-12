@@ -40,6 +40,7 @@ Environment overrides:
   BUBBLER_API_HOST       Uvicorn bind host (default: 127.0.0.1)
   BUBBLER_API_PORT       Uvicorn bind port (default: 8000)
   BUBBLER_REBUILD_DB     Set to 1/true to rebuild the database (same as --rebuild-db)
+  BUBBLER_PYTHON         Python 3.12 interpreter (auto-detected if unset)
 
 Examples:
   ./scripts/start_backend.sh
@@ -86,6 +87,37 @@ fail() {
 
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || fail "Missing required command: $1"
+}
+
+# Pipfile requires Python 3.12. Prefer an explicit 3.12 binary so macOS Homebrew
+# defaults (often newer than 3.12) do not break torch / sentence-transformers.
+resolve_python() {
+  local candidate
+  local -a candidates=(
+    "${BUBBLER_PYTHON:-}"
+    python3.12
+    /opt/homebrew/bin/python3.12
+    /usr/local/bin/python3.12
+  )
+
+  for candidate in "${candidates[@]}"; do
+    [[ -n "$candidate" ]] || continue
+    if command -v "$candidate" >/dev/null 2>&1; then
+      candidate="$(command -v "$candidate")"
+    elif [[ ! -x "$candidate" ]]; then
+      continue
+    fi
+    if "$candidate" -c 'import sys; raise SystemExit(0 if sys.version_info[:2] == (3, 12) else 1)' 2>/dev/null; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  fail "Python 3.12 is required (see backend/Pipfile). Install it (e.g. brew install python@3.12) or set BUBBLER_PYTHON to a 3.12 interpreter."
+}
+
+is_macos() {
+  [[ "$(uname -s)" == "Darwin" ]]
 }
 
 load_env_file() {
@@ -204,8 +236,28 @@ verify_local_postgres() {
 
 install_python_deps() {
   require_cmd pipenv
+
+  local python_bin
+  python_bin="$(resolve_python)"
+  export PIPENV_PYTHON="$python_bin"
+  log "Using Python: $python_bin"
+
+  # Pipfile.lock was historically resolved on Linux and can list NVIDIA CUDA
+  # wheels. Those entries are marked Linux-only; on macOS pipenv still needs a
+  # clean resolve of torch (CPU/MPS). Prefer a locked install, and if that
+  # fails on Darwin (stale lock / missing markers), fall back to --skip-lock.
   log "Installing Python dependencies (pipenv install)"
-  (cd "$BACKEND" && pipenv install)
+  if (cd "$BACKEND" && pipenv install); then
+    return 0
+  fi
+
+  if is_macos; then
+    log "Locked install failed on macOS; retrying without Pipfile.lock (CPU/MPS torch)"
+    (cd "$BACKEND" && pipenv install --skip-lock) || fail "pipenv install failed on macOS"
+    return 0
+  fi
+
+  fail "pipenv install failed"
 }
 
 seed_database() {
@@ -236,6 +288,10 @@ main() {
   : "${DATABASE_PASSWORD:?DATABASE_PASSWORD is required in backend/.env}"
   : "${HOST:?HOST is required in backend/.env}"
   : "${PORT:?PORT is required in backend/.env}"
+
+  # Resolve early so macOS users get a clear error before Docker/schema work.
+  export PIPENV_PYTHON
+  PIPENV_PYTHON="$(resolve_python)"
 
   if $USE_DOCKER; then
     start_docker_database

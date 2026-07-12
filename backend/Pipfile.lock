@@ -217,7 +217,7 @@
             "hashes": [
                 "sha256:0228c023f95d1480f143ef5c8922d27a2ab052087a942e81dc289c9eb8f91689"
             ],
-            "markers": "python_version >= '3.10'",
+            "markers": "platform_system == 'Linux' and (python_version >= '3.10')",
             "version": "==1.5.5"
         },
         "cuda-toolkit": {
@@ -573,6 +573,7 @@
                 "sha256:683f58d301548deeefcb8f6fac1b8d907691b9d8b18eccab417f51e362102f00",
                 "sha256:796bd679890ee55fb14a94629b698b6db54bcfd833d391d5e94017dd9d7d3151"
             ],
+            "markers": "platform_system == 'Linux'",
             "version": "==13.0.85"
         },
         "nvidia-cuda-nvrtc": {
@@ -581,6 +582,7 @@
                 "sha256:ad9b6d2ead2435f11cbb6868809d2adeeee302e9bb94bcf0539c7a40d80e8575",
                 "sha256:d27f20a0ca67a4bb34268a5e951033496c5b74870b868bacd046b1b8e0c3267b"
             ],
+            "markers": "platform_system == 'Linux'",
             "version": "==13.0.88"
         },
         "nvidia-cuda-runtime": {
@@ -589,6 +591,7 @@
                 "sha256:ef9bcbe90493a2b9d810e43d249adb3d02e98dd30200d86607d8d02687c43f55",
                 "sha256:f79298c8a098cec150a597c8eba58ecdab96e3bdc4b9bc4f9983635031740492"
             ],
+            "markers": "platform_system == 'Linux'",
             "version": "==13.0.96"
         },
         "nvidia-cudnn-cu13": {
@@ -606,6 +609,7 @@
                 "sha256:2abce5b39d2f5ae12730fb7e5db6696533e36c26e2d3e8fd1750bdd2853364eb",
                 "sha256:6c44f692dce8fd5ffd3e3df134b6cdb9c2f72d99cf40b62c32dde45eea9ddad3"
             ],
+            "markers": "platform_system == 'Linux'",
             "version": "==12.0.0.61"
         },
         "nvidia-cufile": {
@@ -613,6 +617,7 @@
                 "sha256:08a3ecefae5a01c7f5117351c64f17c7c62efa5fffdbe24fc7d298da19cd0b44",
                 "sha256:bdc0deedc61f548bddf7733bdc216456c2fdb101d020e1ab4b88d232d5e2f6d1"
             ],
+            "markers": "platform_system == 'Linux'",
             "version": "==1.15.1.6"
         },
         "nvidia-curand": {
@@ -621,6 +626,7 @@
                 "sha256:1aee33a5da6e1db083fe2b90082def8915f30f3248d5896bcec36a579d941bfc",
                 "sha256:65b1710aa6961d326b411e314b374290904c5ddf41dc3f766ebc3f1d7d4ca69f"
             ],
+            "markers": "platform_system == 'Linux'",
             "version": "==10.4.0.35"
         },
         "nvidia-cusolver": {
@@ -629,6 +635,7 @@
                 "sha256:0a759da5dea5c0ea10fd307de75cdeb59e7ea4fcb8add0924859b944babf1112",
                 "sha256:16515bd33a8e76bb54d024cfa068fa68d30e80fc34b9e1090813ea9362e0cb65"
             ],
+            "markers": "platform_system == 'Linux'",
             "version": "==12.0.4.66"
         },
         "nvidia-cusparse": {
@@ -637,6 +644,7 @@
                 "sha256:80bcc4662f23f1054ee334a15c72b8940402975e0eab63178fc7e670aa59472c",
                 "sha256:cbcf42feb737bd7ec15b4c0a63e62351886bd3f975027b8815d7f720a2b5ea79"
             ],
+            "markers": "platform_system == 'Linux'",
             "version": "==12.6.3.3"
         },
         "nvidia-cusparselt-cu13": {
@@ -662,6 +670,7 @@
                 "sha256:634e96e3da9ef845ae744097a1f289238ecf946ce0b82e93cdce14b9782e682f",
                 "sha256:e931536ccc7d467a98ba1d8b89ff7fa7f1fa3b13f2b0069118cd7f47bff07d0c"
             ],
+            "markers": "platform_system == 'Linux'",
             "version": "==13.0.88"
         },
         "nvidia-nvshmem-cu13": {
@@ -678,6 +687,7 @@
                 "sha256:cb7780edb6b14107373c835bf8b72e7a178bac7367e23da7acb108f973f157a6",
                 "sha256:d66ea44254dd3c6eacc300047af6e1288d2269dd072b417e0adffbf479e18519"
             ],
+            "markers": "platform_system == 'Linux'",
             "version": "==13.0.85"
         },
         "packaging": {

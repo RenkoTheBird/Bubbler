@@ -4,7 +4,14 @@ from app.services.interaction import InteractionService
 from app.services.post import PostService
 from app.schemas.post import InteractionCreate, PostCreate, PostTopicMutation, PostUpdate
 from app.schemas.user import EmailUpdate, PrefsUpdate
-from app.db.topics import KNOWN_TOPICS
+from app.db.topics import normalize_known_topic
+
+
+def _require_known_topic(topic: str) -> str:
+    normalized = normalize_known_topic(topic)
+    if normalized is None:
+        raise HTTPException(status_code=422, detail=f"Unknown topic: {topic}")
+    return normalized
 
 
 def create_user_router(user_service: UserService, interaction_service: InteractionService, post_service: PostService, get_current_user_id):
@@ -36,10 +43,9 @@ def create_user_router(user_service: UserService, interaction_service: Interacti
         body: PostTopicMutation,
         user_id: int = Depends(get_current_user_id),
     ):
-        normalized = body.topic.strip().lower()
-        if normalized not in KNOWN_TOPICS:
-            raise HTTPException(status_code=422, detail=f"Unknown topic: {body.topic}")
-        return await post_service.add_post_topic(user_id, post_id, normalized)
+        return await post_service.add_post_topic(
+            user_id, post_id, _require_known_topic(body.topic)
+        )
 
     @router.delete("/me/posts/{post_id}/topics/{topic_name}")
     async def remove_post_topic(
@@ -47,22 +53,18 @@ def create_user_router(user_service: UserService, interaction_service: Interacti
         topic_name: str,
         user_id: int = Depends(get_current_user_id),
     ):
-        normalized = topic_name.strip().lower()
-        if normalized not in KNOWN_TOPICS:
-            raise HTTPException(status_code=422, detail=f"Unknown topic: {topic_name}")
-        return await post_service.remove_post_topic(user_id, post_id, normalized)
+        return await post_service.remove_post_topic(
+            user_id, post_id, _require_known_topic(topic_name)
+        )
 
     @router.post("/me/posts")
     async def post_user_posts(
         body: PostCreate,
         user_id: int = Depends(get_current_user_id),
     ):
-        normalized_topic = None
-        if body.topic is not None:
-            normalized = body.topic.strip().lower()
-            if normalized not in KNOWN_TOPICS:
-                raise HTTPException(status_code=422, detail=f"Unknown topic: {body.topic}")
-            normalized_topic = normalized
+        normalized_topic = (
+            _require_known_topic(body.topic) if body.topic is not None else None
+        )
         return await post_service.post_user_posts(user_id, body.post, topic=normalized_topic)
     
     @router.post("/me/interactions")

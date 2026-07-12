@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 from typing import Any, List
 
+from app.db.conn import acquire_conn
 from app.db.feed_sql import (
     POSTS_BASE_FROM,
     POSTS_TABLESAMPLE_FROM,
@@ -133,18 +134,13 @@ class FeedRepository:
             WHERE rn <= $2
         """
 
-        async def _run(connection):
+        async with acquire_conn(self.pool, conn) as connection:
             rows = await connection.fetch(query, ids, limit)
             result: dict[str, list[Edge]] = {}
             for row in rows:
                 edge = self._map_edge(row)
                 result.setdefault(edge.from_post_id, []).append(edge)
             return result
-
-        if conn is not None:
-            return await _run(conn)
-        async with self.pool.acquire() as conn:
-            return await _run(conn)
 
     async def get_neighbors(self, id: str, limit: int = 4, *, conn=None) -> list[Edge]:
         batch = await self.get_neighbors_batch([id], limit=limit, conn=conn)
@@ -154,28 +150,18 @@ class FeedRepository:
     async def get_similar_posts(
         self, embedded_post: List[float], limit: int = 4, *, conn=None
     ) -> list[dict[str, Any]]:
-        async def _run(connection):
+        async with acquire_conn(self.pool, conn) as connection:
             return await self._fetch_posts_by_embedding(
                 connection, embedded_post, limit, ascending=True
             )
 
-        if conn is not None:
-            return await _run(conn)
-        async with self.pool.acquire() as conn:
-            return await _run(conn)
-
     async def get_opposite_posts(
         self, embedding: List[float], limit: int = 10, *, conn=None
     ) -> list[dict[str, Any]]:
-        async def _run(connection):
+        async with acquire_conn(self.pool, conn) as connection:
             return await self._fetch_posts_by_embedding(
                 connection, embedding, limit, ascending=False
             )
-
-        if conn is not None:
-            return await _run(conn)
-        async with self.pool.acquire() as conn:
-            return await _run(conn)
 
     async def get_new_session_posts(
         self,
@@ -217,19 +203,12 @@ class FeedRepository:
             WHERE pwt.id = ANY($1::uuid[])
         """
 
-        async def _run(connection):
+        async with acquire_conn(self.pool, conn) as connection:
             rows = await connection.fetch(query, ids)
             rows_by_id = {str(row["id"]): self._map_post_row(row) for row in rows}
             normalized = [str(post_id) for post_id in ids]
             return [rows_by_id[post_id] for post_id in normalized if post_id in rows_by_id]
 
-        if conn is not None:
-            return await _run(conn)
-        async with self.pool.acquire() as conn:
-            return await _run(conn)
-
     async def get_random_posts(self, limit: int = 10, *, conn=None) -> list[dict[str, Any]]:
-        if conn is not None:
-            return await self._fetch_random_posts(conn, limit)
-        async with self.pool.acquire() as conn:
-            return await self._fetch_random_posts(conn, limit)
+        async with acquire_conn(self.pool, conn) as connection:
+            return await self._fetch_random_posts(connection, limit)

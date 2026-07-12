@@ -64,7 +64,7 @@ class UserRepository:
         for pref in topic_preferences:
             if not isinstance(pref.topic, str):
                 continue
-            normalized = pref.topic.strip().lower()
+            normalized = pref.topic.strip().casefold()
             if not normalized:
                 continue
             key = (normalized, pref.preference_type)

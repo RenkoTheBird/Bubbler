@@ -1,8 +1,14 @@
 class GraphService:
     def __init__(self, repo):
-        self.repo = repo  # feed repo
+        self.repo = repo  # FeedRepository
 
-    async def expand_posts(self, seedPosts: list, depth: int = 1, *, conn=None):
+    async def expand_posts(self, seed_posts: list, depth: int = 1, *, conn=None):
+        """Expand seed posts through graph neighbors.
+
+        ``depth`` is the max depth inclusive from 0. Expansion starts at
+        ``current_depth=0``, so the default ``depth=1`` runs two rounds
+        (neighbors of seeds, then neighbors of those neighbors).
+        """
         visited: set[str] = set()
         results: list[str] = []
 
@@ -29,6 +35,6 @@ class GraphService:
 
             await expand_level(next_ids, current_depth + 1)
 
-        seed_ids = [str(p["id"]) for p in seedPosts]
+        seed_ids = [str(p["id"]) for p in seed_posts]
         await expand_level(seed_ids, 0)
         return results

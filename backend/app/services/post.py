@@ -12,19 +12,19 @@ class PostService:
         self,
         repo,
         edge_builder_repo,
-        EmbeddingService: EmbeddingService,
+        embedding_service: EmbeddingService,
         topic_detection_service=None,
     ):
-        self.repo = repo # post repo
+        self.repo = repo  # PostRepository
         self.edge_builder_repo = edge_builder_repo
-        self.EmbeddingService = EmbeddingService
+        self.embedding_service = embedding_service
         self.topic_detection_service = topic_detection_service
 
     async def get_user_posts(self, user_id):
         return await self.repo.get_user_posts(user_id)
 
     async def post_user_posts(self, user_id, post, topic=None):
-        embedded = self.EmbeddingService.embed_text(post)
+        embedded = self.embedding_service.embed_text(post)
         ai_topics = []
         if self.topic_detection_service is not None:
             ai_topics = await self.topic_detection_service.detect_topics(embedded)
@@ -38,7 +38,7 @@ class PostService:
         )
 
     async def edit_post(self, user_id, post_id, post):
-        embedded = self.EmbeddingService.embed_text(post)
+        embedded = self.embedding_service.embed_text(post)
         result = await self.repo.edit_post(
             user_id,
             post_id,

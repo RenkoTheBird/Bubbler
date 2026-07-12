@@ -44,11 +44,8 @@ class EmailUpdate(BaseModel):
     email: EmailStr = Field(max_length=80)
 
 
-# To load a user profile 
-class UserProfile(BaseModel):
-    user_id: int
-    
-    # preferences
+# Shared preference fields — used for both profile load and preference updates
+class PrefsUpdate(BaseModel):
     diversity_tolerance: float
     randomness: float
     topic_preferences: list[TopicPreference]
@@ -60,16 +57,6 @@ class UserProfile(BaseModel):
     # feed composition, e.g. {"similar": 0.6, "opposite": 0.2, "random": 0.2}
     strategy_weights: dict[str, float]
 
-# Update user preferences
-class PrefsUpdate(BaseModel):
-    # preferences (defaults removed)
-    diversity_tolerance: float
-    randomness: float
-    topic_preferences: list[TopicPreference]
-    use_view_time: bool
-    view_time_weight: float
-    use_recency: bool
-    ai_topic_detection: bool
 
-    # feed composition, e.g. {"similar": 0.6, "opposite": 0.2, "random": 0.2}
-    strategy_weights: dict[str, float]
+class UserProfile(PrefsUpdate):
+    user_id: int

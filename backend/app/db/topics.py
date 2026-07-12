@@ -19,3 +19,9 @@ KNOWN_TOPICS: frozenset[str] = frozenset({
     "education",
     "environment",
 })
+
+
+def normalize_known_topic(topic: str) -> str | None:
+    """Return the normalized topic if it is in KNOWN_TOPICS, else None."""
+    normalized = topic.strip().casefold()
+    return normalized if normalized in KNOWN_TOPICS else None

@@ -99,36 +99,30 @@ class RankingService:
 
 
 class StrategyService:
-    def __init__(self, repo, service):
-        self.repo = repo # feed repo
-        self.service = service # graph service
+    def __init__(self, repo):
+        self.repo = repo  # FeedRepository
 
     async def get_candidates(self, embedding, prefs):
         strategies = []
         weights = prefs.strategy_weights
 
         async with self.repo.acquire() as conn:
-            similar_posts = None
+            # Similar fetch also seeds graph when similar weight is 0.
+            # Expansion happens once in FeedService.get_feed — not here.
             if weights.get("similar", 0) > 0 or weights.get("graph", 0) > 0:
                 similar_posts = await self.repo.get_similar_posts(
                     embedding, limit=10, conn=conn
                 )
                 if weights.get("similar", 0) > 0:
                     strategies.append(("similar", similar_posts))
+                elif weights.get("graph", 0) > 0:
+                    strategies.append(("graph", similar_posts[:5]))
 
             if weights.get("opposite", 0) > 0:
                 opposite = await self.repo.get_opposite_posts(
                     embedding, limit=10, conn=conn
                 )
                 strategies.append(("opposite", opposite))
-
-            if weights.get("graph", 0) > 0:
-                base = (similar_posts or await self.repo.get_similar_posts(
-                    embedding, limit=5, conn=conn
-                ))[:5]
-                expanded_ids = await self.service.expand_posts(base, conn=conn)
-                graph_posts = await self.repo.get_posts_by_ids(expanded_ids, conn=conn)
-                strategies.append(("graph", graph_posts))
 
             if weights.get("random", 0) > 0:
                 random_posts = await self.repo.get_random_posts(limit=10, conn=conn)
@@ -138,24 +132,25 @@ class StrategyService:
 
 
 class FeedService:
-    def __init__(self,
-                 repo,
-                 GraphService,
-                 RankingService: RankingService,
-                 EmbeddingService,
-                 StrategyService: StrategyService,
-                 PreferenceService: PreferenceService,
-                 PrefRepo,
-                 InteractionRepo
-                 ):
-        self.repo = repo
-        self.GraphService = GraphService
-        self.RankingService = RankingService
-        self.EmbeddingService = EmbeddingService
-        self.StrategyService = StrategyService
-        self.PreferenceService = PreferenceService
-        self.PrefRepo = PrefRepo
-        self.InteractionRepo = InteractionRepo
+    def __init__(
+        self,
+        repo,
+        graph_service,
+        ranking_service: RankingService,
+        embedding_service,
+        strategy_service: StrategyService,
+        preference_service: PreferenceService,
+        user_repo,
+        interaction_repo,
+    ):
+        self.repo = repo  # FeedRepository
+        self.graph_service = graph_service
+        self.ranking_service = ranking_service
+        self.embedding_service = embedding_service
+        self.strategy_service = strategy_service
+        self.preference_service = preference_service
+        self.user_repo = user_repo  # UserRepository (prefs)
+        self.interaction_repo = interaction_repo
         # Per-user seed for session diversity: (utc_date, embedding, topic).
         # Refreshed when the UTC calendar day changes.
         self._yesterday_liked: dict[
@@ -177,78 +172,78 @@ class FeedService:
             if entry[0] == today
         }
 
-        embedding, topic = await self.InteractionRepo.get_yesterday_liked_post(user_id)
+        embedding, topic = await self.interaction_repo.get_yesterday_liked_post(user_id)
         self._yesterday_liked[user_id] = (today, embedding, topic)
         return embedding, topic
 
-    async def get_feed(self, userId: int, userInput: str):
-        prefs = await self.PrefRepo.get_prefs(userId)
-        interactions = await self.InteractionRepo.get_recent_interactions(userId)
+    async def get_feed(self, user_id: int, user_input: str):
+        prefs = await self.user_repo.get_prefs(user_id)
+        interactions = await self.interaction_repo.get_recent_interactions(user_id)
         original_topics = {
             (pref.topic.strip().casefold(), pref.preference_type)
             for pref in prefs.topic_preferences
             if isinstance(pref.topic, str) and pref.topic.strip()
         }
-        prefs = self.PreferenceService.update_from_interactions(prefs, interactions)
+        prefs = self.preference_service.update_from_interactions(prefs, interactions)
         updated_topics = {
             (pref.topic.strip().casefold(), pref.preference_type)
             for pref in prefs.topic_preferences
             if isinstance(pref.topic, str) and pref.topic.strip()
         }
         if updated_topics != original_topics:
-            prefs = await self.PrefRepo.save_prefs(userId, prefs)
+            prefs = await self.user_repo.save_prefs(user_id, prefs)
 
         # Prefer an explicit query; otherwise embed preferred topics as user context.
-        query_text = userInput.strip() if isinstance(userInput, str) else ""
+        query_text = user_input.strip() if isinstance(user_input, str) else ""
         if not query_text:
             preferred, _ = _topic_sets(prefs.topic_preferences)
             query_text = " ".join(sorted(preferred))
-        embedding = self.EmbeddingService.embed_text(query_text)
+        embedding = self.embedding_service.embed_text(query_text)
 
-        strategyResults = await self.StrategyService.get_candidates(embedding, prefs)
+        strategy_results = await self.strategy_service.get_candidates(embedding, prefs)
 
         seeds = []
-        for strategyName, posts in strategyResults:
+        for strategy_name, posts in strategy_results:
             for p in posts:
-                p["_strategy"] = strategyName
+                p["_strategy"] = strategy_name
                 seeds.append(p)
 
-        seedPosts = seeds[:10]
+        seed_posts = seeds[:10]
         async with self.repo.acquire() as conn:
-            expandedIds = await self.GraphService.expand_posts(seedPosts, conn=conn)
-            allIds = set(p["id"] for p in seedPosts) | set(expandedIds)
-            expandedPosts = await self.repo.get_posts_by_ids(list(allIds), conn=conn)
+            expanded_ids = await self.graph_service.expand_posts(seed_posts, conn=conn)
+            all_ids = set(p["id"] for p in seed_posts) | set(expanded_ids)
+            expanded_posts = await self.repo.get_posts_by_ids(list(all_ids), conn=conn)
 
-        seedMap = {p["id"]: p for p in seeds}
+        seed_map = {p["id"]: p for p in seeds}
 
-        for post in expandedPosts:
-            if post["id"] in seedMap:
-                post["similarity"] = seedMap[post["id"]].get("similarity", 0)
-                post["_strategy"] = seedMap[post["id"]].get("_strategy", "graph")
+        for post in expanded_posts:
+            if post["id"] in seed_map:
+                post["similarity"] = seed_map[post["id"]].get("similarity", 0)
+                post["_strategy"] = seed_map[post["id"]].get("_strategy", "graph")
             else:
                 post["similarity"] = 0.3
                 post["_strategy"] = "graph"
 
         weighted = []
-        for post in expandedPosts:
+        for post in expanded_posts:
             strategy = post.get("_strategy", "graph")
             weight = prefs.strategy_weights.get(strategy, 0.1)
             post["score"] = post["similarity"] * weight
             weighted.append(post)
 
-        ranked = self.RankingService.apply_preferences(prefs, weighted)
+        ranked = self.ranking_service.apply_preferences(prefs, weighted)
 
         return ranked[:20]
 
-    async def get_new_session_posts(self, userId: int):
-        prefs = await self.PrefRepo.get_prefs(userId)
-        yesterday_post, liked_topic = await self._yesterday_liked_signal(userId)
+    async def get_new_session_posts(self, user_id: int):
+        prefs = await self.user_repo.get_prefs(user_id)
+        yesterday_post, liked_topic = await self._yesterday_liked_signal(user_id)
         return await self.repo.get_new_session_posts(
             prefs.diversity_tolerance, yesterday_post, liked_topic
         )
 
     async def get_next_posts(self, user_id: int, post_id: str):
-        prefs = await self.PrefRepo.get_prefs(user_id)
+        prefs = await self.user_repo.get_prefs(user_id)
         # Over-fetch neighbors so blacklist / preference filtering still leaves choices.
         async with self.repo.acquire() as conn:
             neighbors = await self.repo.get_neighbors(post_id, limit=20, conn=conn)
@@ -262,5 +257,5 @@ class FeedService:
         for post in posts:
             post["similarity"] = weight_by_id.get(post["id"], 0.0)
 
-        ranked = self.RankingService.apply_preferences(prefs, posts)
+        ranked = self.ranking_service.apply_preferences(prefs, posts)
         return ranked[:4]

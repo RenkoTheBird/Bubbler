@@ -73,7 +73,7 @@ async def lifespan(fastapi: FastAPI):
     topic_detection_service = TopicDetectionService(post_repo, embedding_service)
     post_service = PostService(post_repo, edge_builder_repo, embedding_service, topic_detection_service)
     user_service = UserService(user_repo)
-    strategy_service = StrategyService(feed_repo, graph_service)
+    strategy_service = StrategyService(feed_repo)
     feed_service = FeedService(feed_repo, graph_service, RankingService(), embedding_service, strategy_service,
                                PreferenceService(), user_repo, interaction_repo)
 

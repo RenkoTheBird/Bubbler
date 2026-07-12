@@ -1,3 +1,4 @@
+from app.db.conn import acquire_conn
 from app.db.vector import to_pgvector
 from app.schemas.edge import Edge
 
@@ -58,7 +59,7 @@ class EdgeBuilderRepo:
     async def build_edges_for_post(self, post_id, embedding, *, conn=None) -> list[Edge]:
         vec = to_pgvector(embedding)
 
-        async def _run(connection) -> list[Edge]:
+        async with acquire_conn(self.pool, conn) as connection:
             # Drop outbound edges first so edits replace stale neighbors
             # instead of accumulating via ON CONFLICT DO NOTHING.
             await connection.execute(
@@ -85,9 +86,3 @@ class EdgeBuilderRepo:
                 post_id,
             )
             return [self._map_edge(row) for row in edge_rows]
-
-        if conn is not None:
-            return await _run(conn)
-
-        async with self.pool.acquire() as conn:
-            return await _run(conn)

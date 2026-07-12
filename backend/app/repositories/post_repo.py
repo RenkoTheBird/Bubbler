@@ -1,5 +1,6 @@
 from typing import List
 
+from app.db.conn import acquire_conn
 from app.db.feed_sql import POSTS_BASE_FROM, POSTS_WITH_TOPIC_COLUMNS
 from app.db.topics import DEFAULT_TOPIC
 from app.schemas.post import Post, PostTopic, Topic
@@ -87,7 +88,7 @@ class PostRepository:
 
         topic_names = list(topic_embeddings.keys())
 
-        async def _run(connection) -> list[Topic]:
+        async with acquire_conn(self.pool, conn) as connection:
             await connection.executemany(
                 """
                 INSERT INTO topics (name, embedding)
@@ -107,12 +108,6 @@ class PostRepository:
                 topic_names,
             )
             return [self._map_topic(row) for row in rows]
-
-        if conn is not None:
-            return await _run(conn)
-
-        async with self.pool.acquire() as connection:
-            return await _run(connection)
 
     # Posts for the graph are retrieved in feed_service.py
     # id here is user id
@@ -134,12 +129,12 @@ class PostRepository:
         self,
         id: int,
         post: str,
-        embeddedPost: List[float],
+        embedded_post: List[float],
         edge_builder=None,
         topic: str | None = None,
         ai_topics: list[dict[str, float | str]] | None = None,
     ):
-        vec = to_pgvector(embeddedPost)
+        vec = to_pgvector(embedded_post)
 
         async with self.pool.acquire() as conn:
             async with conn.transaction():
@@ -215,7 +210,7 @@ class PostRepository:
 
                 if edge_builder is not None:
                     await edge_builder.build_edges_for_post(
-                        post_id, embeddedPost, conn=conn,
+                        post_id, embedded_post, conn=conn,
                     )
 
                 row = await conn.fetchrow(

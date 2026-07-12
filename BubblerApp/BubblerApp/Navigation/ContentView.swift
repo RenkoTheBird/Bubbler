@@ -12,11 +12,13 @@ struct ContentView: View {
     @StateObject private var backendConnection = BackendConnection()
 
     var body: some View {
-        NavigationStack {
+        Group {
             if authSession.isSignedIn {
-                GraphFeedView()
+                MainTabView()
             } else {
-                LoginView()
+                NavigationStack {
+                    LoginView()
+                }
             }
         }
         .id(authSession.isSignedIn)

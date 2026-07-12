@@ -9,7 +9,7 @@ struct MainTabView: View {
         TabView {
             
             NavigationStack {
-                FeedView()
+                GraphFeedView()
             }
             .tabItem {
                 Label("Feed", systemImage: "house.fill")

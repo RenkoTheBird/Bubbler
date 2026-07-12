@@ -98,18 +98,6 @@ struct SettingsView: View {
                             settingsRow(icon: "slider.horizontal.3", title: "Bubble Sensitivity")
                         }
                         .buttonStyle(.plain)
-                        NavigationLink {
-                            FeedView()
-                        } label: {
-                            settingsRow(icon: "rectangle.stack.fill", title: "Classic Feed")
-                        }
-                        .buttonStyle(.plain)
-                        NavigationLink {
-                            CreatePostView()
-                        } label: {
-                            settingsRow(icon: "square.and.pencil", title: "Create Post")
-                        }
-                        .buttonStyle(.plain)
                     }
                     
                     // app

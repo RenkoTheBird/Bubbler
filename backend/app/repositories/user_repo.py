@@ -140,7 +140,7 @@ class UserRepository:
 
         return self._build_user_profile(row, topic_preferences)
 
-    async def save_prefs(self, user_id: int, body) -> UserProfile:
+    async def _upsert_prefs(self, user_id: int, body) -> UserProfile:
         async with self.pool.acquire() as conn:
             async with conn.transaction():
                 row = await conn.fetchrow(
@@ -181,7 +181,12 @@ class UserRepository:
         return self._build_user_profile(row, topic_preferences)
 
     async def put_prefs(self, user_id: int, body) -> UserProfile:
-        return await self.save_prefs(user_id, body)
+        """Persist preferences from an explicit user settings update (PUT /me/preferences)."""
+        return await self._upsert_prefs(user_id, body)
+
+    async def save_prefs(self, user_id: int, body) -> UserProfile:
+        """Persist preferences after system-driven updates (e.g. interaction-derived topics)."""
+        return await self._upsert_prefs(user_id, body)
 
     async def delete_user(self, user_id: int) -> bool:
         async with self.pool.acquire() as conn:

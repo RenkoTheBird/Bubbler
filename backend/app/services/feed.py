@@ -21,27 +21,35 @@ def _topic_sets(topic_preferences: list[TopicPreference]) -> tuple[set[str], set
 
 class PreferenceService:
     def update_from_interactions(self, prefs, interactions):
-        topicScores = {}
+        topic_scores: dict[str, float] = {}
 
         for i in interactions:
+            if not isinstance(i.topic, str) or not i.topic.strip():
+                continue
+            topic = i.topic.strip().casefold()
+
             if i.liked:
-                topicScores[i.topic] = topicScores.get(i.topic, 0) + 1
+                topic_scores[topic] = topic_scores.get(topic, 0) + 1
 
             if prefs.use_view_time:
-                topicScores[i.topic] = topicScores.get(i.topic, 0) + (i.view_time * prefs.view_time_weight)
+                topic_scores[topic] = topic_scores.get(topic, 0) + (
+                    i.view_time * prefs.view_time_weight
+                )
 
-        sortedTopics = sorted(topicScores.items(), key=lambda x: x[1], reverse=True)
+        sorted_topics = sorted(topic_scores.items(), key=lambda x: x[1], reverse=True)
+        preferred, blacklisted = _topic_sets(prefs.topic_preferences)
 
-        blacklisted = [
-            pref for pref in prefs.topic_preferences
-            if pref.preference_type == "blacklisted"
+        for name, _ in sorted_topics[:5]:
+            if name not in blacklisted:
+                preferred.add(name)
+
+        prefs.topic_preferences = [
+            TopicPreference(topic=topic, preference_type="preferred")
+            for topic in sorted(preferred)
+        ] + [
+            TopicPreference(topic=topic, preference_type="blacklisted")
+            for topic in sorted(blacklisted)
         ]
-        preferred = [
-            TopicPreference(topic=name, preference_type="preferred")
-            for name, _ in sortedTopics[:5]
-            if isinstance(name, str) and name.strip()
-        ]
-        prefs.topic_preferences = blacklisted + preferred
 
         return prefs
 
@@ -152,7 +160,19 @@ class FeedService:
     async def get_feed(self, userId: int, userInput: str):
         prefs = await self.PrefRepo.get_prefs(userId)
         interactions = await self.InteractionRepo.get_recent_interactions(userId)
+        original_topics = {
+            (pref.topic.strip().casefold(), pref.preference_type)
+            for pref in prefs.topic_preferences
+            if isinstance(pref.topic, str) and pref.topic.strip()
+        }
         prefs = self.PreferenceService.update_from_interactions(prefs, interactions)
+        updated_topics = {
+            (pref.topic.strip().casefold(), pref.preference_type)
+            for pref in prefs.topic_preferences
+            if isinstance(pref.topic, str) and pref.topic.strip()
+        }
+        if updated_topics != original_topics:
+            prefs = await self.PrefRepo.save_prefs(userId, prefs)
 
         embedding = self.EmbeddingService.embed_text(userInput)
 

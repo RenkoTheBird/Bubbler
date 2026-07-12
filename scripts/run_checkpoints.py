@@ -522,7 +522,8 @@ async def run_phase_2(ctx: Context) -> None:
     post_text = "Checkpoint automation post about tabs vs spaces"
     status, _, raw = ctx.api.request(
         "POST",
-        f"/user/me/posts?{urlencode({'post': post_text})}",
+        "/user/me/posts",
+        json_body={"post": post_text},
         token=ctx.token,
     )
 
@@ -1094,7 +1095,8 @@ async def run_phase_7(ctx: Context) -> None:
     create_content = "Checkpoint post with an explicit health topic"
     status, created_body, raw = ctx.api.request(
         "POST",
-        f"/user/me/posts?{urlencode({'post': create_content, 'topic': create_topic})}",
+        "/user/me/posts",
+        json_body={"post": create_content, "topic": create_topic},
         token=ctx.token,
     )
     ok(ctx, "7.1 POST /user/me/posts with topic → 200", status == 200, raw[:200])
@@ -1111,7 +1113,8 @@ async def run_phase_7(ctx: Context) -> None:
 
     status, bad_topic_body, raw = ctx.api.request(
         "POST",
-        f"/user/me/posts?{urlencode({'post': 'invalid topic test', 'topic': 'not-a-real-topic'})}",
+        "/user/me/posts",
+        json_body={"post": "invalid topic test", "topic": "not-a-real-topic"},
         token=ctx.token,
     )
     ok(
@@ -1133,7 +1136,8 @@ async def run_phase_7(ctx: Context) -> None:
         edited_content = "Checkpoint edited post content about wellness"
         status, _, raw = ctx.api.request(
             "PUT",
-            f"/user/me/posts/{target_post_id}?{urlencode({'post': edited_content})}",
+            f"/user/me/posts/{target_post_id}",
+            json_body={"post": edited_content},
             token=ctx.token,
         )
         ok(ctx, "7.2 PUT /user/me/posts/{post_id} → 200", status == 200, raw[:200])

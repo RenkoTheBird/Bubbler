@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.services.user import UserService
 from app.services.interaction import InteractionService
 from app.services.post import PostService
-from app.schemas.post import InteractionCreate, PostTopicMutation
-from app.schemas.user import PrefsUpdate
+from app.schemas.post import InteractionCreate, PostCreate, PostTopicMutation, PostUpdate
+from app.schemas.user import EmailUpdate, PrefsUpdate
 from app.db.topics import KNOWN_TOPICS
 
 
@@ -15,8 +15,8 @@ def create_user_router(user_service: UserService, interaction_service: Interacti
         return await user_service.get_profile_info(user_id)
 
     @router.put("/me/profile/email")
-    async def put_email(email: str, user_id: int = Depends(get_current_user_id)):
-        return await user_service.put_email(email, user_id)
+    async def put_email(body: EmailUpdate, user_id: int = Depends(get_current_user_id)):
+        return await user_service.put_email(body.email, user_id)
 
     @router.get("/me")
     async def get_user_interactions(user_id: int = Depends(get_current_user_id)):
@@ -27,8 +27,8 @@ def create_user_router(user_service: UserService, interaction_service: Interacti
         return await post_service.get_user_posts(user_id)
 
     @router.put("/me/posts/{post_id}")
-    async def edit_post(post_id: str, post: str, user_id: int = Depends(get_current_user_id)):
-        return await post_service.edit_post(user_id, post_id, post)
+    async def edit_post(post_id: str, body: PostUpdate, user_id: int = Depends(get_current_user_id)):
+        return await post_service.edit_post(user_id, post_id, body.post)
 
     @router.post("/me/posts/{post_id}/topics")
     async def add_post_topic(
@@ -54,17 +54,16 @@ def create_user_router(user_service: UserService, interaction_service: Interacti
 
     @router.post("/me/posts")
     async def post_user_posts(
-        post: str,
-        topic: str | None = None,
+        body: PostCreate,
         user_id: int = Depends(get_current_user_id),
     ):
         normalized_topic = None
-        if topic is not None:
-            normalized = topic.strip().lower()
+        if body.topic is not None:
+            normalized = body.topic.strip().lower()
             if normalized not in KNOWN_TOPICS:
-                raise HTTPException(status_code=422, detail=f"Unknown topic: {topic}")
+                raise HTTPException(status_code=422, detail=f"Unknown topic: {body.topic}")
             normalized_topic = normalized
-        return await post_service.post_user_posts(user_id, post, topic=normalized_topic)
+        return await post_service.post_user_posts(user_id, body.post, topic=normalized_topic)
     
     @router.post("/me/interactions")
     async def record_interaction(body: InteractionCreate, user_id: int = Depends(get_current_user_id)):

@@ -27,6 +27,11 @@ private struct RegisterBody: Encodable {
     let password: String
 }
 
+private struct CreatePostBody: Encodable {
+    let post: String
+    let topic: String
+}
+
 private struct APIErrorBody: Decodable {
     let detail: String
 }
@@ -125,27 +130,13 @@ enum APIClient {
     }
 
     static func createPost(content: String, topic: String) async throws -> Post {
-        var components = URLComponents(
-            url: APIConfig.baseURL.appending(path: "user/me/posts"),
-            resolvingAgainstBaseURL: false
-        )!
-        components.queryItems = [
-            URLQueryItem(name: "post", value: content),
-            URLQueryItem(name: "topic", value: topic),
-        ]
-
-        guard let url = components.url else {
-            throw APIClientError.invalidResponse
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        guard let token = KeychainStore.loadAccessToken() else {
-            throw APIClientError.unauthorized
-        }
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-
-        let data = try await performData(request)
+        let body = try JSONEncoder().encode(CreatePostBody(post: content, topic: topic))
+        let data = try await authorizedRequest(
+            path: "user/me/posts",
+            method: "POST",
+            body: body,
+            contentType: "application/json"
+        )
         return try apiJSONDecoder.decode(Post.self, from: data)
     }
 

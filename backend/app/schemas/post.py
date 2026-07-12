@@ -15,6 +15,15 @@ class PostTopicMutation(BaseModel):
     topic: str = Field(min_length=1)
 
 
+class PostCreate(BaseModel):
+    post: str = Field(min_length=1)
+    topic: Optional[str] = None
+
+
+class PostUpdate(BaseModel):
+    post: str = Field(min_length=1)
+
+
 class Post(BaseModel):
     id: str
     user_id: int

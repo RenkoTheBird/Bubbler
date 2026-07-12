@@ -40,6 +40,10 @@ class CreateUser(BaseModel):
     password: str = Field(min_length=5, max_length=40) ## logical limit at api side truly capped at 60 for hash at db 
 
 
+class EmailUpdate(BaseModel):
+    email: EmailStr = Field(max_length=80)
+
+
 # To load a user profile 
 class UserProfile(BaseModel):
     user_id: int

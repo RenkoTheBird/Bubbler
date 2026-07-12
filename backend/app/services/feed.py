@@ -198,7 +198,12 @@ class FeedService:
         if updated_topics != original_topics:
             prefs = await self.PrefRepo.save_prefs(userId, prefs)
 
-        embedding = self.EmbeddingService.embed_text(userInput)
+        # Prefer an explicit query; otherwise embed preferred topics as user context.
+        query_text = userInput.strip() if isinstance(userInput, str) else ""
+        if not query_text:
+            preferred, _ = _topic_sets(prefs.topic_preferences)
+            query_text = " ".join(sorted(preferred))
+        embedding = self.EmbeddingService.embed_text(query_text)
 
         strategyResults = await self.StrategyService.get_candidates(embedding, prefs)
 

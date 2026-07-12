@@ -1,7 +1,11 @@
+from typing import Optional
+
 from pydantic import BaseModel
+
 
 class Edge(BaseModel):
     id: str
     from_post_id: str
     to_post_id: str
-    type: str # similarity, opposite, etc...
+    type: str  # similar, opposite, topic
+    weight: Optional[float] = None

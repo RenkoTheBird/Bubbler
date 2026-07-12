@@ -218,5 +218,5 @@ class FeedService:
     async def get_next_posts(self, post_id):
         async with self.repo.acquire() as conn:
             neighbors = await self.repo.get_neighbors(post_id, limit=4, conn=conn)
-            ids = [n["to_post_id"] for n in neighbors]
+            ids = [n.to_post_id for n in neighbors]
             return await self.repo.get_posts_by_ids(ids, conn=conn)

@@ -7,6 +7,7 @@ from app.db.feed_sql import (
     POSTS_WITH_TOPIC_COLUMNS,
 )
 from app.db.vector import to_pgvector
+from app.schemas.edge import Edge
 
 # TABLESAMPLE percentage — tunable; avoids full-table ORDER BY RANDOM()
 _RANDOM_SAMPLE_PERCENT = 25
@@ -37,6 +38,16 @@ class FeedRepository:
             "topic": row["topic"],
             "similarity": float(row["similarity"]),
         }
+
+    @staticmethod
+    def _map_edge(row: Any) -> Edge:
+        return Edge(
+            id=str(row["id"]),
+            from_post_id=str(row["from_post_id"]),
+            to_post_id=str(row["to_post_id"]),
+            type=row["edge_type"],
+            weight=float(row["weight"]) if row["weight"] is not None else None,
+        )
 
     async def _fetch_posts_by_embedding(
         self,
@@ -90,36 +101,44 @@ class FeedRepository:
         limit: int = 4,
         *,
         conn=None,
-    ) -> dict[str, list[dict[str, Any]]]:
+    ) -> dict[str, list[Edge]]:
         if not ids:
             return {}
 
         query = """
-            SELECT from_post_id::text, to_post_id::text AS to_post_id, weight
+            SELECT id, from_post_id, to_post_id, edge_type, weight
             FROM (
                 SELECT
+                    id,
                     from_post_id,
                     to_post_id,
-                    MAX(weight) AS weight,
+                    edge_type,
+                    weight,
                     ROW_NUMBER() OVER (
                         PARTITION BY from_post_id
-                        ORDER BY MAX(weight) DESC
+                        ORDER BY weight DESC NULLS LAST
                     ) AS rn
-                FROM edges
-                WHERE from_post_id = ANY($1::uuid[])
-                GROUP BY from_post_id, to_post_id
+                FROM (
+                    SELECT DISTINCT ON (from_post_id, to_post_id)
+                        id,
+                        from_post_id,
+                        to_post_id,
+                        edge_type,
+                        weight
+                    FROM edges
+                    WHERE from_post_id = ANY($1::uuid[])
+                    ORDER BY from_post_id, to_post_id, weight DESC NULLS LAST
+                ) best_per_pair
             ) ranked
             WHERE rn <= $2
         """
 
         async def _run(connection):
             rows = await connection.fetch(query, ids, limit)
-            result: dict[str, list[dict[str, Any]]] = {}
+            result: dict[str, list[Edge]] = {}
             for row in rows:
-                key = row["from_post_id"]
-                result.setdefault(key, []).append(
-                    {"to_post_id": row["to_post_id"], "weight": row["weight"]}
-                )
+                edge = self._map_edge(row)
+                result.setdefault(edge.from_post_id, []).append(edge)
             return result
 
         if conn is not None:
@@ -127,7 +146,7 @@ class FeedRepository:
         async with self.pool.acquire() as conn:
             return await _run(conn)
 
-    async def get_neighbors(self, id: str, limit: int = 4, *, conn=None) -> list[dict[str, Any]]:
+    async def get_neighbors(self, id: str, limit: int = 4, *, conn=None) -> list[Edge]:
         batch = await self.get_neighbors_batch([id], limit=limit, conn=conn)
         return batch.get(str(id), [])
 

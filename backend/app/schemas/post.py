@@ -5,8 +5,10 @@ import datetime
 
 class PostTopic(BaseModel):
     post_id: str
-    topic_id: str
+    topic_name: str
     weight: float
+    source: Literal["user", "ai"] = "user"
+    confidence: float = Field(default=1.0, ge=0, le=1)
 
 
 class PostTopicMutation(BaseModel):
@@ -41,4 +43,4 @@ class InteractionCreate(BaseModel):
 class Topic(BaseModel):
     id: str
     name: str
-    parent_topic_id: int
+    parent_topic_id: Optional[str] = None

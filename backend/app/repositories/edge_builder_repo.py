@@ -1,4 +1,5 @@
 from app.db.vector import to_pgvector
+from app.schemas.edge import Edge
 
 _EDGE_INSERT = """
     INSERT INTO edges (from_post_id, to_post_id, edge_type, weight)
@@ -44,10 +45,20 @@ class EdgeBuilderRepo:
     def __init__(self, pool):
         self.pool = pool
 
-    async def build_edges_for_post(self, post_id, embedding, *, conn=None):
+    @staticmethod
+    def _map_edge(row) -> Edge:
+        return Edge(
+            id=str(row["id"]),
+            from_post_id=str(row["from_post_id"]),
+            to_post_id=str(row["to_post_id"]),
+            type=row["edge_type"],
+            weight=float(row["weight"]) if row["weight"] is not None else None,
+        )
+
+    async def build_edges_for_post(self, post_id, embedding, *, conn=None) -> list[Edge]:
         vec = to_pgvector(embedding)
 
-        async def _run(connection):
+        async def _run(connection) -> list[Edge]:
             rows = await connection.fetch(
                 _EDGES_QUERY,
                 vec, post_id, _SIMILAR_LIMIT,
@@ -59,9 +70,18 @@ class EdgeBuilderRepo:
             if records:
                 await connection.executemany(_EDGE_INSERT, records)
 
+            edge_rows = await connection.fetch(
+                """
+                SELECT id, from_post_id, to_post_id, edge_type, weight
+                FROM edges
+                WHERE from_post_id = $1
+                """,
+                post_id,
+            )
+            return [self._map_edge(row) for row in edge_rows]
+
         if conn is not None:
-            await _run(conn)
-            return
+            return await _run(conn)
 
         async with self.pool.acquire() as conn:
-            await _run(conn)
+            return await _run(conn)

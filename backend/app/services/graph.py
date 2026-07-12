@@ -22,7 +22,7 @@ class GraphService:
 
             for pid in unvisited:
                 for neighbor in batch.get(str(pid), []):
-                    nid = neighbor["to_post_id"]
+                    nid = neighbor.to_post_id
                     results.append(nid)
                     if nid not in visited:
                         next_ids.append(nid)

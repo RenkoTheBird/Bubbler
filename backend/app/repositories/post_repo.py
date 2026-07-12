@@ -2,7 +2,7 @@ from typing import List
 
 from app.db.feed_sql import POSTS_BASE_FROM, POSTS_WITH_TOPIC_COLUMNS
 from app.db.topics import DEFAULT_TOPIC
-from app.schemas.post import Post
+from app.schemas.post import Post, PostTopic, Topic
 from app.db.vector import to_pgvector
 from app.services.topic_detection import AI_TOPIC_HIDDEN_WEIGHT
 
@@ -10,6 +10,25 @@ from app.services.topic_detection import AI_TOPIC_HIDDEN_WEIGHT
 class PostRepository:
     def __init__(self, pool):
         self.pool = pool
+
+    @staticmethod
+    def _map_topic(row) -> Topic:
+        parent = row["parent_topic_id"]
+        return Topic(
+            id=str(row["id"]),
+            name=row["name"],
+            parent_topic_id=str(parent) if parent is not None else None,
+        )
+
+    @staticmethod
+    def _map_post_topic(row) -> PostTopic:
+        return PostTopic(
+            post_id=str(row["post_id"]),
+            topic_name=row["topic_name"],
+            weight=float(row["weight"]),
+            source=row["source"],
+            confidence=float(row["confidence"]),
+        )
 
     async def _log_topic_training_event(
         self,
@@ -42,15 +61,33 @@ class PostRepository:
             user_id,
         )
 
-    async def ensure_topics(self, topic_embeddings: dict[str, list[float]], *, conn=None) -> None:
+    async def _get_post_topic(
+        self, conn, post_id: str, topic_name: str
+    ) -> PostTopic | None:
+        row = await conn.fetchrow(
+            """
+            SELECT post_id, topic_name, source, confidence, weight
+            FROM post_topics
+            WHERE post_id = $1 AND topic_name = $2
+            """,
+            post_id,
+            topic_name,
+        )
+        return self._map_post_topic(row) if row else None
+
+    async def ensure_topics(
+        self, topic_embeddings: dict[str, list[float]], *, conn=None
+    ) -> list[Topic]:
         records = [
             (topic_name, to_pgvector(embedding))
             for topic_name, embedding in topic_embeddings.items()
         ]
         if not records:
-            return
+            return []
 
-        async def _run(connection):
+        topic_names = list(topic_embeddings.keys())
+
+        async def _run(connection) -> list[Topic]:
             await connection.executemany(
                 """
                 INSERT INTO topics (name, embedding)
@@ -60,13 +97,22 @@ class PostRepository:
                 """,
                 records,
             )
+            rows = await connection.fetch(
+                """
+                SELECT id, name, parent_topic_id
+                FROM topics
+                WHERE name = ANY($1::text[])
+                ORDER BY name
+                """,
+                topic_names,
+            )
+            return [self._map_topic(row) for row in rows]
 
         if conn is not None:
-            await _run(conn)
-            return
+            return await _run(conn)
 
         async with self.pool.acquire() as connection:
-            await _run(connection)
+            return await _run(connection)
 
     # Posts for the graph are retrieved in feed_service.py
     # id here is user id
@@ -190,15 +236,7 @@ class PostRepository:
                 if owned_post_id is None:
                     return None
 
-                existing = await conn.fetchrow(
-                    """
-                    SELECT source
-                    FROM post_topics
-                    WHERE post_id = $1 AND topic_name = $2
-                    """,
-                    post_id,
-                    topic_name,
-                )
+                existing = await self._get_post_topic(conn, post_id, topic_name)
 
                 await conn.execute(
                     """
@@ -221,7 +259,7 @@ class PostRepository:
                     topic_name,
                 )
 
-                if existing is None or existing["source"] != "user":
+                if existing is None or existing.source != "user":
                     await self._log_topic_training_event(
                         conn,
                         post_id=post_id,
@@ -248,15 +286,7 @@ class PostRepository:
                 if owned_post_id is None:
                     return None
 
-                existing = await conn.fetchrow(
-                    """
-                    SELECT source
-                    FROM post_topics
-                    WHERE post_id = $1 AND topic_name = $2
-                    """,
-                    post_id,
-                    topic_name,
-                )
+                existing = await self._get_post_topic(conn, post_id, topic_name)
                 if existing is None:
                     return None
 

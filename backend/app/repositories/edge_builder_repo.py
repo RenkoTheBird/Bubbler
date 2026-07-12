@@ -59,6 +59,12 @@ class EdgeBuilderRepo:
         vec = to_pgvector(embedding)
 
         async def _run(connection) -> list[Edge]:
+            # Drop outbound edges first so edits replace stale neighbors
+            # instead of accumulating via ON CONFLICT DO NOTHING.
+            await connection.execute(
+                "DELETE FROM edges WHERE from_post_id = $1",
+                post_id,
+            )
             rows = await connection.fetch(
                 _EDGES_QUERY,
                 vec, post_id, _SIMILAR_LIMIT,

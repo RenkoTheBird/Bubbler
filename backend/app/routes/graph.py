@@ -6,6 +6,6 @@ def create_graph_router(feed_service: FeedService, get_current_user_id):
 
     @router.get("/posts/{post_id}/next")
     async def get_next_posts(post_id: str, user_id: int = Depends(get_current_user_id)):
-        return await feed_service.get_next_posts(post_id) 
+        return await feed_service.get_next_posts(user_id, post_id)
 
     return router

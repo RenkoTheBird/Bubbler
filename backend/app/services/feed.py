@@ -247,8 +247,20 @@ class FeedService:
             prefs.diversity_tolerance, yesterday_post, liked_topic
         )
 
-    async def get_next_posts(self, post_id):
+    async def get_next_posts(self, user_id: int, post_id: str):
+        prefs = await self.PrefRepo.get_prefs(user_id)
+        # Over-fetch neighbors so blacklist / preference filtering still leaves choices.
         async with self.repo.acquire() as conn:
-            neighbors = await self.repo.get_neighbors(post_id, limit=4, conn=conn)
+            neighbors = await self.repo.get_neighbors(post_id, limit=20, conn=conn)
             ids = [n.to_post_id for n in neighbors]
-            return await self.repo.get_posts_by_ids(ids, conn=conn)
+            posts = await self.repo.get_posts_by_ids(ids, conn=conn)
+
+        weight_by_id = {
+            n.to_post_id: float(n.weight) if n.weight is not None else 0.0
+            for n in neighbors
+        }
+        for post in posts:
+            post["similarity"] = weight_by_id.get(post["id"], 0.0)
+
+        ranked = self.RankingService.apply_preferences(prefs, posts)
+        return ranked[:4]

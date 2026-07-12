@@ -1,5 +1,6 @@
 import datetime
 
+from app.db.datetime_utils import ensure_utc
 from app.db.feed_sql import POSTS_WITH_TOPIC_VIEW
 from app.db.vector import from_pgvector
 from app.schemas.post import Interaction
@@ -85,7 +86,7 @@ class InteractionRepository:
             user_id=str(row["user_id"]),
             post_id=str(row["post_id"]),
             type=row["type"],
-            created_at=row["created_at"],
+            created_at=ensure_utc(row["created_at"]),
             topic=row["topic"] or "",
             view_time=row["view_time"] or 0.0,
             liked=row["type"] == "like",

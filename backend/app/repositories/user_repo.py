@@ -1,4 +1,5 @@
 from app.db.jsonb import normalize_strategy_weights, to_jsonb
+from app.db.datetime_utils import ensure_utc
 from app.schemas.user import (
     DEFAULT_STRATEGY_WEIGHTS,
     TopicPreference,
@@ -33,7 +34,7 @@ class UserRepository:
             id=row["id"],
             username=row["username"],
             email=row["email"],
-            created_at=row["created_at"],
+            created_at=ensure_utc(row["created_at"]),
         )
 
     async def _fetch_topic_prefs(self, conn, user_id: int) -> list[TopicPreference]:

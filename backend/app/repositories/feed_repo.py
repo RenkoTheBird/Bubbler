@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from typing import Any, List
 
 from app.db.conn import acquire_conn
+from app.db.datetime_utils import ensure_utc
 from app.db.feed_sql import (
     POSTS_BASE_FROM,
     POSTS_TABLESAMPLE_FROM,
@@ -28,7 +29,7 @@ class FeedRepository:
             "id": str(row["id"]),
             "content": row["content"],
             "topic": row["topic"],
-            "created_at": row["created_at"],
+            "created_at": ensure_utc(row["created_at"]),
             "user_id": row["user_id"],
         }
 

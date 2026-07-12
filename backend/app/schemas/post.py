@@ -1,6 +1,8 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 from typing import Optional, Literal
 import datetime
+
+from app.db.datetime_utils import ensure_utc, utc_iso_z
 
 
 class PostTopic(BaseModel):
@@ -32,6 +34,13 @@ class Post(BaseModel):
     created_at: datetime.datetime
     topic: Optional[str] = None
 
+    def model_post_init(self, __context) -> None:
+        object.__setattr__(self, "created_at", ensure_utc(self.created_at))
+
+    @field_serializer("created_at")
+    def serialize_created_at(self, value: datetime.datetime) -> str:
+        return utc_iso_z(value)
+
 
 class Interaction(BaseModel):
     id: str
@@ -43,6 +52,13 @@ class Interaction(BaseModel):
     
     view_time: float
     liked: bool
+
+    def model_post_init(self, __context) -> None:
+        object.__setattr__(self, "created_at", ensure_utc(self.created_at))
+
+    @field_serializer("created_at")
+    def serialize_created_at(self, value: datetime.datetime) -> str:
+        return utc_iso_z(value)
 
 class InteractionCreate(BaseModel):
     post_id: str 

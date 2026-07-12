@@ -1,6 +1,7 @@
 from typing import List
 
 from app.db.conn import acquire_conn
+from app.db.datetime_utils import ensure_utc
 from app.db.feed_sql import POSTS_BASE_FROM, POSTS_WITH_TOPIC_COLUMNS
 from app.db.topics import DEFAULT_TOPIC
 from app.schemas.post import Post, PostTopic, Topic
@@ -359,6 +360,6 @@ class PostRepository:
             user_id=row["user_id"],
             content=row["content"],
             embedding=None,
-            created_at=row["created_at"],
+            created_at=ensure_utc(row["created_at"]),
             topic=row.get("topic") or "",
         )

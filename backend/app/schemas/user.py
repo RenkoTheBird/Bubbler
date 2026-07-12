@@ -1,7 +1,9 @@
 import datetime
 from typing import Literal
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_serializer
+
+from app.db.datetime_utils import ensure_utc, utc_iso_z
 
 DEFAULT_STRATEGY_WEIGHTS: dict[str, float] = {
     "similar": 0.7,
@@ -31,6 +33,13 @@ class UserInfo(BaseModel):
     username: str
     email: EmailStr
     created_at: datetime.datetime
+
+    def model_post_init(self, __context) -> None:
+        object.__setattr__(self, "created_at", ensure_utc(self.created_at))
+
+    @field_serializer("created_at")
+    def serialize_created_at(self, value: datetime.datetime) -> str:
+        return utc_iso_z(value)
 
 
 # Doesnt need ID or Register Time autofilled by DB 

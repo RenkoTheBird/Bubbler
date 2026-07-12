@@ -2,6 +2,7 @@ import random
 import datetime
 from typing import List
 
+from app.db.datetime_utils import with_utc_created_at
 from app.schemas.user import TopicPreference
 
 
@@ -233,14 +234,15 @@ class FeedService:
 
         ranked = self.ranking_service.apply_preferences(prefs, weighted)
 
-        return ranked[:20]
+        return [with_utc_created_at(post) for post in ranked[:20]]
 
     async def get_new_session_posts(self, user_id: int):
         prefs = await self.user_repo.get_prefs(user_id)
         yesterday_post, liked_topic = await self._yesterday_liked_signal(user_id)
-        return await self.repo.get_new_session_posts(
+        posts = await self.repo.get_new_session_posts(
             prefs.diversity_tolerance, yesterday_post, liked_topic
         )
+        return [with_utc_created_at(post) for post in posts]
 
     async def get_next_posts(self, user_id: int, post_id: str):
         prefs = await self.user_repo.get_prefs(user_id)
@@ -258,4 +260,4 @@ class FeedService:
             post["similarity"] = weight_by_id.get(post["id"], 0.0)
 
         ranked = self.ranking_service.apply_preferences(prefs, posts)
-        return ranked[:4]
+        return [with_utc_created_at(post) for post in ranked[:4]]

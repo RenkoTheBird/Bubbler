@@ -156,6 +156,30 @@ class FeedService:
         self.PreferenceService = PreferenceService
         self.PrefRepo = PrefRepo
         self.InteractionRepo = InteractionRepo
+        # Per-user seed for session diversity: (utc_date, embedding, topic).
+        # Refreshed when the UTC calendar day changes.
+        self._yesterday_liked: dict[
+            int, tuple[datetime.date, list[float] | None, str | None]
+        ] = {}
+
+    async def _yesterday_liked_signal(
+        self, user_id: int
+    ) -> tuple[list[float] | None, str | None]:
+        today = datetime.datetime.now(datetime.timezone.utc).date()
+        cached = self._yesterday_liked.get(user_id)
+        if cached is not None and cached[0] == today:
+            return cached[1], cached[2]
+
+        # Drop stale day entries so the cache resets each day.
+        self._yesterday_liked = {
+            uid: entry
+            for uid, entry in self._yesterday_liked.items()
+            if entry[0] == today
+        }
+
+        embedding, topic = await self.InteractionRepo.get_yesterday_liked_post(user_id)
+        self._yesterday_liked[user_id] = (today, embedding, topic)
+        return embedding, topic
 
     async def get_feed(self, userId: int, userInput: str):
         prefs = await self.PrefRepo.get_prefs(userId)
@@ -213,8 +237,11 @@ class FeedService:
 
     async def get_new_session_posts(self, userId: int):
         prefs = await self.PrefRepo.get_prefs(userId)
-        return await self.repo.get_new_session_posts(prefs.diversity_tolerance, None, None)
-    
+        yesterday_post, liked_topic = await self._yesterday_liked_signal(userId)
+        return await self.repo.get_new_session_posts(
+            prefs.diversity_tolerance, yesterday_post, liked_topic
+        )
+
     async def get_next_posts(self, post_id):
         async with self.repo.acquire() as conn:
             neighbors = await self.repo.get_neighbors(post_id, limit=4, conn=conn)

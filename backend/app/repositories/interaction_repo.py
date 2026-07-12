@@ -1,4 +1,7 @@
+import datetime
+
 from app.db.feed_sql import POSTS_WITH_TOPIC_VIEW
+from app.db.vector import from_pgvector
 from app.schemas.post import Interaction
 
 
@@ -37,6 +40,43 @@ class InteractionRepository:
                 user_id, limit,
             )
         return [self._row_to_interaction(row) for row in rows]
+
+    async def get_yesterday_liked_post(
+        self, user_id: int
+    ) -> tuple[list[float] | None, str | None]:
+        """Most recent like from yesterday's UTC calendar day (embedding + topic)."""
+        now = datetime.datetime.now(datetime.timezone.utc)
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+        yesterday_start = today_start - datetime.timedelta(days=1)
+
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                f"""
+                SELECT pwt.embedding, pwt.topic
+                FROM interactions i
+                JOIN {POSTS_WITH_TOPIC_VIEW} pwt ON pwt.id = i.post_id
+                WHERE i.user_id = $1
+                  AND i.type = 'like'
+                  AND i.created_at >= $2
+                  AND i.created_at < $3
+                  AND pwt.embedding IS NOT NULL
+                  AND pwt.topic IS NOT NULL
+                ORDER BY i.created_at DESC
+                LIMIT 1
+                """,
+                user_id,
+                yesterday_start,
+                today_start,
+            )
+
+        if row is None:
+            return None, None
+
+        embedding = from_pgvector(row["embedding"])
+        topic = row["topic"]
+        if not embedding or not isinstance(topic, str) or not topic.strip():
+            return None, None
+        return embedding, topic.strip()
 
     @staticmethod
     def _row_to_interaction(row) -> Interaction:

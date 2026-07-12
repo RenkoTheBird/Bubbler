@@ -162,6 +162,14 @@ async def ensure_schema(pool: asyncpg.Pool) -> None:
                 """
             )
 
+        if not await _column_exists(conn, "user_profiles", "use_recency"):
+            await conn.execute(
+                """
+                ALTER TABLE user_profiles
+                ADD COLUMN use_recency BOOLEAN NOT NULL DEFAULT TRUE
+                """
+            )
+
 
 async def main():
     pool = await asyncpg.create_pool(my_env_vars.db_url)

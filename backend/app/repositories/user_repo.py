@@ -20,6 +20,7 @@ class UserRepository:
             topic_preferences=topic_preferences,
             use_view_time=row["use_view_time"],
             view_time_weight=row["view_time_weight"],
+            use_recency=row["use_recency"],
             ai_topic_detection=row["ai_topic_detection"],
             strategy_weights=normalize_strategy_weights(
                 row["strategy_weights"],
@@ -150,15 +151,17 @@ class UserRepository:
                         randomness,
                         use_view_time,
                         view_time_weight,
+                        use_recency,
                         ai_topic_detection,
                         strategy_weights
                     )
-                    VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
                     ON CONFLICT (user_id) DO UPDATE
                     SET diversity_tolerance = EXCLUDED.diversity_tolerance,
                         randomness = EXCLUDED.randomness,
                         use_view_time = EXCLUDED.use_view_time,
                         view_time_weight = EXCLUDED.view_time_weight,
+                        use_recency = EXCLUDED.use_recency,
                         ai_topic_detection = EXCLUDED.ai_topic_detection,
                         strategy_weights = EXCLUDED.strategy_weights
                     RETURNING *;
@@ -168,6 +171,7 @@ class UserRepository:
                     body.randomness,
                     body.use_view_time,
                     body.view_time_weight,
+                    body.use_recency,
                     body.ai_topic_detection,
                     to_jsonb(body.strategy_weights),
                 )

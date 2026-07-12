@@ -403,6 +403,7 @@ def preferences_payload(body: Any, **overrides: Any) -> dict[str, Any]:
         "topic_preferences": list(data.get("topic_preferences", [])),
         "use_view_time": bool(data.get("use_view_time", False)),
         "view_time_weight": float(data.get("view_time_weight", 0.1)),
+        "use_recency": bool(data.get("use_recency", True)),
         "ai_topic_detection": bool(data.get("ai_topic_detection", False)),
         "strategy_weights": dict(
             data.get(

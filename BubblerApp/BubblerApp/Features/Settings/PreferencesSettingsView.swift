@@ -110,6 +110,13 @@ struct PreferencesSettingsView: View {
                 value: $viewModel.preferences.randomness,
                 tint: .purple
             )
+
+            Toggle(isOn: $viewModel.preferences.useRecency) {
+                Text("Boost Recent Posts")
+                    .foregroundColor(.white.opacity(0.9))
+                    .font(.subheadline.weight(.semibold))
+            }
+            .toggleStyle(SwitchToggleStyle(tint: .orange))
         }
     }
 

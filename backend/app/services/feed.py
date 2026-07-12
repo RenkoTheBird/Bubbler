@@ -47,13 +47,23 @@ class PreferenceService:
 
 
 class RankingService:
-    def score(self, post, similarity: float):
-        recencyBoost = 1 / (1 + (datetime.datetime.now() - post["created_at"]))
-        return similarity * 0.7 + recencyBoost * 0.3
+    def score(self, post, similarity: float) -> float:
+        created_at = post.get("created_at")
+        if created_at is None:
+            return similarity
+
+        now = datetime.datetime.now(datetime.timezone.utc)
+        if getattr(created_at, "tzinfo", None) is None:
+            created_at = created_at.replace(tzinfo=datetime.timezone.utc)
+
+        age_days = max((now - created_at).total_seconds() / 86400.0, 0.0)
+        recency_boost = 1 / (1 + age_days)
+        return similarity * 0.7 + recency_boost * 0.3
 
     def apply_preferences(self, prefs, posts: List[str]):
         filtered = []
         preferred_topics, blacklisted_topics = _topic_sets(prefs.topic_preferences)
+        use_recency = getattr(prefs, "use_recency", True)
 
         for post in posts:
             post_topic = post.get("topic")
@@ -66,7 +76,8 @@ class RankingService:
             if normalized_topic and normalized_topic in blacklisted_topics:
                 continue
 
-            score = post.get("similarity", 0)
+            similarity = post.get("similarity", 0)
+            score = self.score(post, similarity) if use_recency else similarity
 
             if normalized_topic and normalized_topic in preferred_topics:
                 score += 0.3

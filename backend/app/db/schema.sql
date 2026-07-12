@@ -117,6 +117,7 @@ CREATE TABLE user_profiles (
     randomness FLOAT,
     use_view_time BOOLEAN NOT NULL DEFAULT FALSE,
     view_time_weight FLOAT DEFAULT 0.1,
+    use_recency BOOLEAN NOT NULL DEFAULT TRUE,
     ai_topic_detection BOOLEAN NOT NULL DEFAULT FALSE,
     strategy_weights JSONB NOT NULL DEFAULT
         '{"similar":0.7,"graph":0.2,"opposite":0.0,"random":0.1}'

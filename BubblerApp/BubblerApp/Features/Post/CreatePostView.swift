@@ -35,9 +35,7 @@ struct CreatePostView: View {
                     headerSection
                     contentSection
 
-                    if !viewModel.isEditing {
-                        TopicPicker(selectedTopic: $viewModel.selectedTopic)
-                    }
+                    TopicPicker(selectedTopic: $viewModel.selectedTopic)
 
                     if let errorMessage = viewModel.errorMessage {
                         messageCard(errorMessage, tint: .red.opacity(0.8))
@@ -61,7 +59,7 @@ struct CreatePostView: View {
 
             Text(
                 viewModel.isEditing
-                    ? "Update your post content."
+                    ? "Update your post content or topic."
                     : "Write your post and pick a topic for the feed."
             )
                 .font(.subheadline)

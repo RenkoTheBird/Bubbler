@@ -36,6 +36,10 @@ private struct UpdatePostBody: Encodable {
     let post: String
 }
 
+private struct PostTopicMutationBody: Encodable {
+    let topic: String
+}
+
 private struct EmailUpdateBody: Encodable {
     let email: String
 }
@@ -187,6 +191,25 @@ enum APIClient {
 
     static func deletePost(id: String) async throws {
         _ = try await authorizedRequest(path: "user/me/posts/\(id)", method: "DELETE")
+    }
+
+    static func addPostTopic(postId: String, topic: String) async throws -> Post {
+        let body = try JSONEncoder().encode(PostTopicMutationBody(topic: topic))
+        let data = try await authorizedRequest(
+            path: "user/me/posts/\(postId)/topics",
+            method: "POST",
+            body: body,
+            contentType: "application/json"
+        )
+        return try apiJSONDecoder.decode(Post.self, from: data)
+    }
+
+    static func removePostTopic(postId: String, topic: String) async throws -> Post {
+        let data = try await authorizedRequest(
+            path: "user/me/posts/\(postId)/topics/\(topic)",
+            method: "DELETE"
+        )
+        return try apiJSONDecoder.decode(Post.self, from: data)
     }
 
     static func recordInteraction(_ payload: GraphInteractionPayload) async throws {

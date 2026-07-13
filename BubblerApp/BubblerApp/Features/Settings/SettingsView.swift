@@ -71,6 +71,17 @@ struct SettingsView: View {
                         } label: {
                             settingsRow(icon: "rectangle.portrait.and.arrow.right", title: "Log Out")
                         }
+
+                        NavigationLink {
+                            DeleteAccountView()
+                        } label: {
+                            settingsRow(
+                                icon: "trash.fill",
+                                title: "Delete Account",
+                                tint: .red.opacity(0.9)
+                            )
+                        }
+                        .buttonStyle(.plain)
                     }
                     
                     // notifications
@@ -151,16 +162,20 @@ struct SettingsView: View {
     }
     
     // row
-    private func settingsRow(icon: String, title: String) -> some View {
+    private func settingsRow(
+        icon: String,
+        title: String,
+        tint: Color = .white.opacity(0.9)
+    ) -> some View {
         
         HStack {
             
             Image(systemName: icon)
-                .foregroundColor(.white.opacity(0.8))
+                .foregroundColor(tint.opacity(0.9))
                 .frame(width: 22)
             
             Text(title)
-                .foregroundColor(.white.opacity(0.9))
+                .foregroundColor(tint)
                 .font(.subheadline)
             
             Spacer()

@@ -170,6 +170,10 @@ enum APIClient {
         )
     }
 
+    static func deleteAccount() async throws {
+        _ = try await authorizedRequest(path: "user/me", method: "DELETE")
+    }
+
     private static let apiJSONDecoder: JSONDecoder = {
         let decoder = JSONDecoder()
         let formatter = ISO8601DateFormatter()

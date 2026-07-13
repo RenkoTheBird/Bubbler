@@ -99,13 +99,25 @@ enum APIClient {
         path: String,
         method: String = "GET",
         body: Data? = nil,
-        contentType: String? = nil
+        contentType: String? = nil,
+        queryItems: [URLQueryItem]? = nil
     ) async throws -> Data {
         guard let token = KeychainStore.loadAccessToken() else {
             throw APIClientError.unauthorized
         }
 
-        var request = URLRequest(url: APIConfig.baseURL.appending(path: path))
+        var components = URLComponents(
+            url: APIConfig.baseURL.appending(path: path),
+            resolvingAgainstBaseURL: false
+        )
+        if let queryItems, !queryItems.isEmpty {
+            components?.queryItems = queryItems
+        }
+        guard let url = components?.url else {
+            throw APIClientError.invalidResponse
+        }
+
+        var request = URLRequest(url: url)
         request.httpMethod = method
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         if let contentType {
@@ -145,6 +157,16 @@ enum APIClient {
             contentType: "application/json"
         )
         return try apiJSONDecoder.decode(UserPreferences.self, from: data)
+    }
+
+    /// Ranked feed. Optional `query` maps to `q` and seeds similar/opposite candidates.
+    static func getFeed(query: String? = nil) async throws -> [Post] {
+        let trimmed = query?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let queryItems: [URLQueryItem]? = trimmed.isEmpty
+            ? nil
+            : [URLQueryItem(name: "q", value: trimmed)]
+        let data = try await authorizedRequest(path: "feed/me", queryItems: queryItems)
+        return try apiJSONDecoder.decode([Post].self, from: data)
     }
 
     static func getSessionFeed() async throws -> [Post] {

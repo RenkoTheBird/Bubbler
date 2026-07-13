@@ -12,8 +12,8 @@ final class FeedViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var isLoading = false
 
-    func loadFeed(using authSession: AuthSession) async {
-        guard let token = authSession.accessToken else {
+    func loadFeed(using authSession: AuthSession, query: String? = nil) async {
+        guard authSession.accessToken != nil else {
             posts = []
             errorMessage = nil
             return
@@ -24,7 +24,7 @@ final class FeedViewModel: ObservableObject {
         defer { isLoading = false }
 
         do {
-            posts = try await APIClient.get("feed/me", token: token)
+            posts = try await APIClient.getFeed(query: query)
         } catch APIClientError.unauthorized {
             posts = []
             errorMessage = APIClientError.unauthorized.localizedDescription

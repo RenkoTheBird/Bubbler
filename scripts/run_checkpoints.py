@@ -753,12 +753,20 @@ async def run_phase_4(ctx: Context) -> None:
             f"matched={len(matching_posts)}/{len(visible_posts)}",
         )
 
+    api_client = read_ios_file("Core/APIClient.swift")
+    ok(ctx, "4.2 APIClient.getFeed exists", "func getFeed" in api_client)
+    ok(
+        ctx,
+        "4.2 APIClient.getFeed hits feed/me",
+        'authorizedRequest(path: "feed/me"' in api_client,
+    )
+
     feed_view_model = read_ios_file("Features/Feed/FeedViewModel.swift")
     ok(ctx, "4.2 FeedViewModel.swift exists", bool(feed_view_model))
     ok(
         ctx,
         "4.2 FeedViewModel fetches GET /feed/me",
-        'APIClient.get("feed/me", token: token)' in feed_view_model,
+        "APIClient.getFeed" in feed_view_model,
     )
 
     feed_view = read_ios_file("Features/Feed/FeedView.swift")

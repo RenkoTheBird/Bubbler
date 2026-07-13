@@ -36,8 +36,7 @@ struct ProfileView: View {
                     Spacer()
                         .frame(height: 20)
                     
-                    //PLACEHOLDER
-                    Text("🫧 Active Bubble: Tech")
+                    Text(viewModel.activeBubbleLabel)
                         .font(.subheadline.bold())
                         .foregroundColor(.white.opacity(0.9))
                         .padding(.horizontal, 14)
@@ -92,15 +91,15 @@ struct ProfileView: View {
                         }
                     }
                     
-                    // stats (PLACEHOLDER NUMBERS)
+                    // stats (Connections / Clicks still placeholders)
                     HStack(spacing: 14) {
-                        statCard(number: "24", label: "Bubbles")
-                        statCard(number: "483", label: "Connections")
-                        statCard(number: "96", label: "Clicks")
+                        statCard(number: "\(viewModel.postedTopics.count)", label: "Bubbles")
+                        statCard(number: "—", label: "Connections")
+                        statCard(number: "—", label: "Clicks")
                     }
                     .padding(.horizontal, 20)
                     
-                    // active bubbles
+                    // active bubbles from topics you've posted about
                     VStack(alignment: .leading, spacing: 14) {
                         
                         Text("Active Bubbles")
@@ -108,17 +107,33 @@ struct ProfileView: View {
                             .foregroundColor(.white)
                             .padding(.horizontal, 35)
                         
-                        // PLACEHOLDER BUBBLES
-                        HStack(spacing: 14) {
-                            bubble("Tech", "desktopcomputer", .blue, 0.95)
-                            bubble("Sports", "basketball.fill", .green, 0.95)
-                            bubble("Space", "globe.americas.fill", .purple, 0.95)
-                            bubble("AI", "brain.head.profile", .pink, 0.95)
+                        if viewModel.postedTopics.isEmpty {
+                            Text(
+                                viewModel.isLoading
+                                    ? "Loading your bubbles…"
+                                    : "Post about a topic to grow your bubbles."
+                            )
+                            .font(.subheadline)
+                            .foregroundColor(.white.opacity(0.75))
+                            .padding(.horizontal, 35)
+                        } else {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 14) {
+                                    ForEach(viewModel.postedTopics, id: \.self) { topic in
+                                        bubble(
+                                            KnownTopics.displayName(for: topic),
+                                            TopicStyle.icon(for: topic),
+                                            TopicStyle.color(for: topic),
+                                            0.95
+                                        )
+                                    }
+                                }
+                                .padding(.horizontal, 15)
+                            }
                         }
-                        .padding(.horizontal, 15)
                     }
                     
-                    // bubble trail
+                    // bubble trail (GET /user/me, max 20)
                     VStack(alignment: .leading, spacing: 14) {
                         
                         Text("Your Bubble Trail")
@@ -126,10 +141,17 @@ struct ProfileView: View {
                             .foregroundColor(.white)
                             .padding(.horizontal, 35)
                         
-                        // PLACEHOLDER DATA
-                        feedSnippet("Your bubble trail will appear here once you start interacting with real posts.")
-                        feedSnippet("Likes, skips, and views will shape the topics shown in your profile.")
-                        feedSnippet("Seeded posts can be added later to start building your activity trail.")
+                        if viewModel.trailInteractions.isEmpty {
+                            feedSnippet(
+                                viewModel.isLoading
+                                    ? "Loading your bubble trail…"
+                                    : "Your bubble trail will appear here once you start interacting with posts."
+                            )
+                        } else {
+                            ForEach(viewModel.trailInteractions) { interaction in
+                                feedSnippet(interaction.trailSummary)
+                            }
+                        }
                     }
                     
                     Spacer().frame(height: 40)

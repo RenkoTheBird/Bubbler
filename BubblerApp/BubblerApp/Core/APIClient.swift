@@ -153,6 +153,17 @@ enum APIClient {
         return try apiJSONDecoder.decode([Post].self, from: data)
     }
 
+    static func getMyPosts() async throws -> [Post] {
+        let data = try await authorizedRequest(path: "user/me/posts")
+        return try apiJSONDecoder.decode([Post].self, from: data)
+    }
+
+    /// Recent interactions for the profile Bubble Trail (server caps at 20).
+    static func getMyInteractions() async throws -> [Interaction] {
+        let data = try await authorizedRequest(path: "user/me")
+        return try apiJSONDecoder.decode([Interaction].self, from: data)
+    }
+
     static func createPost(content: String, topic: String) async throws -> Post {
         let body = try JSONEncoder().encode(CreatePostBody(post: content, topic: topic))
         let data = try await authorizedRequest(

@@ -194,6 +194,15 @@ async def _constraint_exists(conn: asyncpg.Connection, name: str) -> bool:
     )
 
 
+async def _index_exists(conn: asyncpg.Connection, name: str) -> bool:
+    return bool(
+        await conn.fetchval(
+            "SELECT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = $1)",
+            name,
+        )
+    )
+
+
 async def ensure_schema(pool: asyncpg.Pool) -> None:
     """Align a local dev database with backend/app/db/schema.sql before seeding."""
     async with pool.acquire() as conn:
@@ -285,6 +294,21 @@ async def ensure_schema(pool: asyncpg.Pool) -> None:
                 """
                 ALTER TABLE user_profiles
                 ADD COLUMN use_recency BOOLEAN NOT NULL DEFAULT TRUE
+                """
+            )
+
+        # explore/skip may repeat; only likes stay unique per user+post.
+        if await _constraint_exists(conn, "interactions_user_id_post_id_key"):
+            await conn.execute(
+                "ALTER TABLE interactions DROP CONSTRAINT interactions_user_id_post_id_key"
+            )
+
+        if not await _index_exists(conn, "interactions_user_id_post_id_like_uidx"):
+            await conn.execute(
+                """
+                CREATE UNIQUE INDEX interactions_user_id_post_id_like_uidx
+                ON interactions (user_id, post_id)
+                WHERE type = 'like'
                 """
             )
 

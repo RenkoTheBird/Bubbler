@@ -12,16 +12,33 @@ class InteractionRepository:
 
     async def record(self, user_id: int, post_id: str, type: str, view_time: float = 0):
         async with self.pool.acquire() as conn:
-            await conn.execute(
-                """
-                INSERT INTO interactions (user_id, post_id, type, view_time)
-                VALUES ($1, $2, $3, $4)
-                ON CONFLICT (user_id, post_id) DO UPDATE
-                SET type = EXCLUDED.type,
-                    view_time = EXCLUDED.view_time
-                """,
-                user_id, post_id, type, view_time,
-            )
+            if type == "like":
+                # Likes are unique per user+post; re-like refreshes the row.
+                await conn.execute(
+                    """
+                    INSERT INTO interactions (user_id, post_id, type, view_time)
+                    VALUES ($1, $2, 'like', $3)
+                    ON CONFLICT (user_id, post_id) WHERE (type = 'like')
+                    DO UPDATE SET
+                        view_time = EXCLUDED.view_time,
+                        created_at = NOW()
+                    """,
+                    user_id,
+                    post_id,
+                    view_time,
+                )
+            else:
+                # explore/skip may be recorded many times for the same post.
+                await conn.execute(
+                    """
+                    INSERT INTO interactions (user_id, post_id, type, view_time)
+                    VALUES ($1, $2, $3, $4)
+                    """,
+                    user_id,
+                    post_id,
+                    type,
+                    view_time,
+                )
 
     async def get_recent_interactions(self, user_id: int, limit: int = 50) -> list[Interaction]:
         async with self.pool.acquire() as conn:

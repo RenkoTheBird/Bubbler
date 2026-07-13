@@ -32,6 +32,10 @@ private struct CreatePostBody: Encodable {
     let topic: String
 }
 
+private struct EmailUpdateBody: Encodable {
+    let email: String
+}
+
 private struct APIErrorBody: Decodable {
     let detail: String
 }
@@ -101,6 +105,22 @@ enum APIClient {
         }
         request.httpBody = body
         return try await performData(request)
+    }
+
+    static func getProfile() async throws -> User {
+        let data = try await authorizedRequest(path: "user/me/profile")
+        return try apiJSONDecoder.decode(User.self, from: data)
+    }
+
+    static func updateEmail(_ email: String) async throws -> User {
+        let body = try JSONEncoder().encode(EmailUpdateBody(email: email))
+        let data = try await authorizedRequest(
+            path: "user/me/profile/email",
+            method: "PUT",
+            body: body,
+            contentType: "application/json"
+        )
+        return try apiJSONDecoder.decode(User.self, from: data)
     }
 
     static func getPreferences() async throws -> UserPreferences {

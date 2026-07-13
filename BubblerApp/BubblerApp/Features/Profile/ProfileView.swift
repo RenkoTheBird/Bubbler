@@ -9,7 +9,9 @@ import SwiftUI
 import Combine
 
 struct ProfileView: View {
-    
+    @EnvironmentObject private var authSession: AuthSession
+    @StateObject private var viewModel = ProfileViewModel()
+
     var body: some View {
         
         ZStack {
@@ -73,13 +75,21 @@ struct ProfileView: View {
                     }
                     
                     VStack(spacing: 6) {
-                        Text("@bubblerUser") //PLACEHOLDER
+                        Text(viewModel.displayUsername)
                             .font(.system(size: 24, weight: .black, design: .rounded))
                             .foregroundColor(.white)
                         
                         Text("Your bubble profile 🫧")
                             .font(.subheadline)
                             .foregroundColor(.white.opacity(0.85))
+
+                        if let errorMessage = viewModel.errorMessage {
+                            Text(errorMessage)
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.75))
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 24)
+                        }
                     }
                     
                     // stats (PLACEHOLDER NUMBERS)
@@ -125,6 +135,9 @@ struct ProfileView: View {
                     Spacer().frame(height: 40)
                 }
             }
+        }
+        .task {
+            await viewModel.loadProfile(using: authSession)
         }
     }
     
@@ -212,4 +225,5 @@ struct ProfileView: View {
 
 #Preview {
     ProfileView()
+        .environmentObject(AuthSession())
 }

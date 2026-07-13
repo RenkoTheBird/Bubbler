@@ -51,8 +51,20 @@ struct SettingsView: View {
                     
                     // account
                     settingsSection(title: "Account") {
-                        settingsRow(icon: "person.fill", title: "Profile Information")
-                        settingsRow(icon: "envelope.fill", title: "Email Settings")
+                        NavigationLink {
+                            ProfileInformationView()
+                        } label: {
+                            settingsRow(icon: "person.fill", title: "Profile Information")
+                        }
+                        .buttonStyle(.plain)
+
+                        NavigationLink {
+                            EmailSettingsView()
+                        } label: {
+                            settingsRow(icon: "envelope.fill", title: "Email Settings")
+                        }
+                        .buttonStyle(.plain)
+
                         settingsRow(icon: "lock.fill", title: "Password & Security")
                         Button {
                             authSession.signOut()

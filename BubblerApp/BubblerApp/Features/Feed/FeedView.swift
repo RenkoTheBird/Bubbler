@@ -133,7 +133,15 @@ struct FeedView: View {
                             )
                         } else {
                             ForEach(viewModel.posts) { post in
-                                PostCardView(post: post)
+                                PostCardView(
+                                    post: post,
+                                    onDeleted: {
+                                        viewModel.removePost(id: post.id)
+                                    },
+                                    onEdited: { content in
+                                        viewModel.updatePostContent(id: post.id, content: content)
+                                    }
+                                )
                             }
                         }
                     }
@@ -247,6 +255,8 @@ struct FeedView: View {
 }
 
 #Preview {
-    FeedView()
-        .environmentObject(AuthSession())
+    NavigationStack {
+        FeedView()
+            .environmentObject(AuthSession())
+    }
 }

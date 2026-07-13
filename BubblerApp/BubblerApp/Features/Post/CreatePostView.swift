@@ -4,10 +4,17 @@ import Combine
 struct CreatePostView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var authSession: AuthSession
-    @StateObject private var viewModel = CreatePostViewModel()
+    @StateObject private var viewModel: CreatePostViewModel
+
+    private let onSuccess: ((String) -> Void)?
 
     private var accentColor: Color {
         TopicStyle.color(for: viewModel.selectedTopic)
+    }
+
+    init(post: Post? = nil, onSuccess: ((String) -> Void)? = nil) {
+        _viewModel = StateObject(wrappedValue: CreatePostViewModel(post: post))
+        self.onSuccess = onSuccess
     }
 
     var body: some View {
@@ -27,7 +34,10 @@ struct CreatePostView: View {
                 VStack(spacing: 24) {
                     headerSection
                     contentSection
-                    TopicPicker(selectedTopic: $viewModel.selectedTopic)
+
+                    if !viewModel.isEditing {
+                        TopicPicker(selectedTopic: $viewModel.selectedTopic)
+                    }
 
                     if let errorMessage = viewModel.errorMessage {
                         messageCard(errorMessage, tint: .red.opacity(0.8))
@@ -39,17 +49,21 @@ struct CreatePostView: View {
                 .padding(.bottom, 30)
             }
         }
-        .navigationTitle("New Post")
+        .navigationTitle(viewModel.isEditing ? "Edit Post" : "New Post")
         .navigationBarTitleDisplayMode(.inline)
     }
 
     private var headerSection: some View {
         VStack(spacing: 8) {
-            Text("Share a Bubble")
+            Text(viewModel.isEditing ? "Edit Bubble" : "Share a Bubble")
                 .font(.system(size: 28, weight: .black, design: .rounded))
                 .foregroundColor(.white)
 
-            Text("Write your post and pick a topic for the feed.")
+            Text(
+                viewModel.isEditing
+                    ? "Update your post content."
+                    : "Write your post and pick a topic for the feed."
+            )
                 .font(.subheadline)
                 .foregroundColor(.white.opacity(0.75))
                 .multilineTextAlignment(.center)
@@ -80,7 +94,8 @@ struct CreatePostView: View {
     private var postButton: some View {
         Button {
             Task {
-                if await viewModel.submit(using: authSession) != nil {
+                if let content = await viewModel.submit(using: authSession) {
+                    onSuccess?(content)
                     dismiss()
                 }
             }
@@ -91,7 +106,7 @@ struct CreatePostView: View {
                         .tint(.white)
                 }
 
-                Text(viewModel.isSubmitting ? "Posting..." : "Post to Bubbler")
+                Text(submitButtonTitle)
                     .font(.headline)
             }
             .foregroundColor(.white)
@@ -108,6 +123,13 @@ struct CreatePostView: View {
         }
         .disabled(!viewModel.canSubmit)
         .buttonStyle(.plain)
+    }
+
+    private var submitButtonTitle: String {
+        if viewModel.isSubmitting {
+            return viewModel.isEditing ? "Saving..." : "Posting..."
+        }
+        return viewModel.isEditing ? "Save Changes" : "Post to Bubbler"
     }
 
     private func messageCard(_ text: String, tint: Color) -> some View {

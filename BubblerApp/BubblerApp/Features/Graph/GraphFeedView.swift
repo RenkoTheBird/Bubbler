@@ -3,9 +3,18 @@ import SwiftUI
 struct GraphFeedView: View {
     @EnvironmentObject private var authSession: AuthSession
     @StateObject private var viewModel = GraphFeedViewModel()
+    @State private var showDeleteConfirmation = false
 
     private var accentColor: Color {
         topicColor(for: viewModel.currentTopicName)
+    }
+
+    private var ownsCurrentPost: Bool {
+        guard let userId = authSession.userId,
+              let currentNode = viewModel.currentNode else {
+            return false
+        }
+        return userId == currentNode.userId
     }
 
     var body: some View {
@@ -70,6 +79,20 @@ struct GraphFeedView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task(id: authSession.accessToken) {
             await viewModel.load(using: authSession)
+        }
+        .confirmationDialog(
+            "Delete this post?",
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete Post", role: .destructive) {
+                Task {
+                    await viewModel.deleteCurrentPost(using: authSession)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This permanently removes your post.")
         }
     }
 
@@ -136,6 +159,10 @@ struct GraphFeedView: View {
                 )
             } else if let node = viewModel.currentNode {
                 postCard(node, isInteractive: false)
+
+                if ownsCurrentPost {
+                    ownerActions(for: node)
+                }
 
                 TimelineView(.periodic(from: .now, by: 1)) { context in
                     HStack {
@@ -232,6 +259,42 @@ struct GraphFeedView: View {
             .font(.caption.bold())
             .foregroundColor(.white.opacity(0.64))
             .tracking(1)
+    }
+
+    private func ownerActions(for node: GraphFeedNode) -> some View {
+        HStack(spacing: 10) {
+            NavigationLink {
+                CreatePostView(post: node.post) { content in
+                    viewModel.updateCurrentPostContent(content)
+                }
+            } label: {
+                Label("Edit", systemImage: "pencil")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color.white.opacity(0.14))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+            .buttonStyle(.plain)
+            .disabled(viewModel.isSubmitting)
+
+            Button {
+                showDeleteConfirmation = true
+            } label: {
+                Label("Delete", systemImage: "trash")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color.red.opacity(0.55))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+            .buttonStyle(.plain)
+            .disabled(viewModel.isSubmitting)
+
+            Spacer()
+        }
     }
 
     private func postCard(_ node: GraphFeedNode, isInteractive: Bool) -> some View {

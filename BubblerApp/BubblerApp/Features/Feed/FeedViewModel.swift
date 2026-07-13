@@ -34,4 +34,21 @@ final class FeedViewModel: ObservableObject {
             errorMessage = error.localizedDescription
         }
     }
+
+    func removePost(id: String) {
+        posts.removeAll { $0.id == id }
+    }
+
+    func updatePostContent(id: String, content: String) {
+        guard let index = posts.firstIndex(where: { $0.id == id }) else { return }
+        let existing = posts[index]
+        posts[index] = Post(
+            id: existing.id,
+            userId: existing.userId,
+            content: content,
+            createdAt: existing.createdAt,
+            topic: existing.topic,
+            embedding: existing.embedding
+        )
+    }
 }

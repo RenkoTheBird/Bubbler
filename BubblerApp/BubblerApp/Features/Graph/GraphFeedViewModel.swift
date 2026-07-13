@@ -62,6 +62,52 @@ final class GraphFeedViewModel: ObservableObject {
         )
     }
 
+    func updateCurrentPostContent(_ content: String) {
+        guard let currentNode else { return }
+        let existing = currentNode.post
+        let updatedPost = Post(
+            id: existing.id,
+            userId: existing.userId,
+            content: content,
+            createdAt: existing.createdAt,
+            topic: existing.topic,
+            embedding: existing.embedding
+        )
+        self.currentNode = GraphFeedNode(
+            post: updatedPost,
+            isPreferredTopic: currentNode.isPreferredTopic,
+            isBlacklistedTopic: currentNode.isBlacklistedTopic
+        )
+    }
+
+    func deleteCurrentPost(using authSession: AuthSession) async {
+        guard let currentNode else { return }
+
+        isSubmitting = true
+        errorMessage = nil
+
+        do {
+            try await APIClient.deletePost(id: currentNode.id)
+            authSession.showSuccessMessage("Post deleted.")
+
+            nextChoices.removeAll { $0.id == currentNode.id }
+            sessionQueue.removeAll { $0.id == currentNode.id }
+
+            if let nextNode = nextAutomaticNode(excluding: currentNode.id) {
+                await setCurrentNode(nextNode, using: authSession)
+                if errorMessage == nil {
+                    statusMessage = "Deleted your post and moved ahead."
+                }
+            } else {
+                await loadSession(using: authSession, message: "Deleted your post. Loading a fresh session.")
+            }
+        } catch {
+            handle(error, using: authSession, fallbackMessage: "We couldn't delete that post.")
+        }
+
+        isSubmitting = false
+    }
+
     func viewTimeText(at date: Date) -> String {
         let elapsedSeconds = Int(viewTime(at: date).rounded(.down))
         return "\(elapsedSeconds)s tracked"

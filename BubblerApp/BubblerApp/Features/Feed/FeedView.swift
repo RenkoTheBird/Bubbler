@@ -11,26 +11,12 @@ struct FeedView: View {
     @EnvironmentObject private var authSession: AuthSession
     @StateObject private var viewModel = FeedViewModel()
 
-    private var activeTopics: [String] {
-        var seen = Set<String>()
+    private let feedTopics: [String?] = [nil] + KnownTopics.all.map { Optional($0) }
 
-        return viewModel.posts
-            .compactMap { post in
-                guard let topic = post.topic?.trimmingCharacters(in: .whitespacesAndNewlines),
-                      !topic.isEmpty else {
-                    return nil
-                }
-                return topic
-            }
-            .filter { topic in
-                seen.insert(topic.lowercased()).inserted
-            }
-    }
-    
     var body: some View {
-        
+
         ZStack {
-            
+
             // background
             LinearGradient(
                 colors: [
@@ -43,48 +29,41 @@ struct FeedView: View {
                 endPoint: .bottomTrailing
             )
             .ignoresSafeArea()
-            
+
             ScrollView {
-                
+
                 VStack(spacing: 28) {
                     // header
                     VStack(spacing: 8) {
-                        
+
                         // logo
                         BubblerLogoView()
                             .frame(width: 55, height: 55)
                             .opacity(0.95)
                             .shadow(color: .blue.opacity(0.2), radius: 8)
                             .padding(.bottom, 65)
-                        
+
                         // title
                         Text("BUBBLER")
                             .font(.system(size: 34, weight: .black, design: .rounded))
                             .foregroundColor(.white)
                             .tracking(2)
-                        
+
                         // subtitle
                         Text("your interest field is active")
                             .font(.subheadline)
                             .foregroundColor(.white.opacity(0.75))
                     }
                     .frame(maxWidth: .infinity)
-                    
-                    // bubble strip
-                    if !activeTopics.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 14) {
-                                ForEach(Array(activeTopics.enumerated()), id: \.offset) { item in
-                                    bubbleChip(
-                                        item.element,
-                                        topicIcon(for: item.element),
-                                        topicColor(for: item.element),
-                                        item.offset == 0
-                                    )
-                                }
+
+                    // topic strip — All (mixed) plus curated KnownTopics
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 14) {
+                            ForEach(Array(feedTopics.enumerated()), id: \.offset) { _, topic in
+                                topicChip(topic)
                             }
-                            .padding(.horizontal)
                         }
+                        .padding(.horizontal)
                     }
 
                     // feed stream
@@ -103,7 +82,9 @@ struct FeedView: View {
                         } else if viewModel.posts.isEmpty {
                             stateCard(
                                 title: "No posts yet",
-                                message: "Posts from the database will show up here after the feed has data."
+                                message: viewModel.selectedTopic == nil
+                                    ? "Posts from the database will show up here after the feed has data."
+                                    : "No posts matched this topic yet. Try another bubble."
                             )
                         } else {
                             ForEach(viewModel.posts) { post in
@@ -120,7 +101,7 @@ struct FeedView: View {
                         }
                     }
                     .padding(.horizontal)
-                    
+
                     Spacer().frame(height: 40)
                 }
             }
@@ -129,67 +110,55 @@ struct FeedView: View {
             await viewModel.loadFeed(using: authSession)
         }
     }
-    
-    // bubble chip
-    private func bubbleChip(_ name: String, _ icon: String, _ color: Color, _ isActive: Bool) -> some View {
-        
-        HStack(spacing: 8) {
-            
-            Image(systemName: icon)
-                .font(.caption)
-            
-            Text(name)
-                .font(.caption.bold())
-        }
-        .foregroundColor(.white)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(
-            Capsule()
-                .fill(isActive ? color.opacity(0.35) : Color.white.opacity(0.10))
-                .overlay(
-                    Capsule()
-                        .stroke(
-                            isActive ? color.opacity(0.6) : Color.white.opacity(0.15),
-                            lineWidth: 1
-                        )
-                )
-                .shadow(color: isActive ? color.opacity(0.4) : .clear, radius: 10)
-        )
-    }
-    
-    private func topicIcon(for topic: String) -> String {
-        switch topic.lowercased() {
-        case "tech", "technology":
-            return "desktopcomputer"
-        case "sports":
-            return "basketball.fill"
-        case "space", "science":
-            return "globe.americas.fill"
-        case "ai":
-            return "brain.head.profile"
-        case "music":
-            return "music.note"
-        default:
-            return "circle.grid.2x2.fill"
-        }
-    }
 
-    private func topicColor(for topic: String) -> Color {
-        switch topic.lowercased() {
-        case "tech", "technology":
-            return .blue
-        case "sports":
-            return .green
-        case "space", "science":
-            return .purple
-        case "ai":
-            return .pink
-        case "music":
-            return .orange
-        default:
-            return .cyan
+    private func topicChip(_ topic: String?) -> some View {
+        let label: String
+        let icon: String
+        let color: Color
+        let isActive: Bool
+
+        if let topic {
+            label = KnownTopics.displayName(for: topic)
+            icon = TopicStyle.icon(for: topic)
+            color = TopicStyle.color(for: topic)
+            isActive = viewModel.selectedTopic?.caseInsensitiveCompare(topic) == .orderedSame
+        } else {
+            label = "All"
+            icon = "sparkles"
+            color = .cyan
+            isActive = viewModel.selectedTopic == nil
         }
+
+        return Button {
+            Task {
+                await viewModel.selectTopic(topic, using: authSession)
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.caption)
+
+                Text(label)
+                    .font(.caption.bold())
+            }
+            .foregroundColor(.white)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                Capsule()
+                    .fill(isActive ? color.opacity(0.35) : Color.white.opacity(0.10))
+                    .overlay(
+                        Capsule()
+                            .stroke(
+                                isActive ? color.opacity(0.6) : Color.white.opacity(0.15),
+                                lineWidth: 1
+                            )
+                    )
+                    .shadow(color: isActive ? color.opacity(0.4) : .clear, radius: 10)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(viewModel.isLoading)
     }
 
     private func stateCard(title: String, message: String, showsProgress: Bool = false) -> some View {

@@ -2,8 +2,9 @@
 - Create API for Profile stats
 - Deal with Orphaned screens (BubbleDetail, UserProfileView)
 - Test Settings properly
-- topic buttons don't work in FeedView
 - make GraphFeedView more bubbly
+- Fix search
+- Optimize HF loads
 
 -- BEFORE PRODUCTION
 add media support

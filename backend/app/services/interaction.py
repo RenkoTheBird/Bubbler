@@ -11,6 +11,9 @@ class InteractionService:
         view_time = body.view_time
         return await self.repo.record(user_id, post_id, type, view_time)
 
+    async def delete_like(self, user_id: int, post_id: str) -> bool:
+        return await self.repo.delete_like(user_id, post_id)
+
     async def get_user_interactions(self, user_id: int, limit: int = 20):
         # Cap profile trail loads so a heavy interaction history can't flood the client.
         return await self.repo.get_recent_interactions(user_id, limit=limit)

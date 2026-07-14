@@ -99,7 +99,7 @@ struct GraphFeedView: View {
                 .foregroundColor(.white)
                 .tracking(2)
 
-            Text(viewModel.isCurrentTopicPreferred ? "Preferred bubble path active" : "Graph recommendation loop")
+            Text(topicStatusSubtitle)
                 .font(.subheadline)
                 .foregroundColor(.white.opacity(0.72))
         }
@@ -171,7 +171,7 @@ struct GraphFeedView: View {
             if viewModel.currentNode == nil, !viewModel.isLoading {
                 bubbleCard("Load a session first to see graph-connected choices.")
             } else if viewModel.nextChoices.isEmpty {
-                bubbleCard("No connected posts are ready yet. You can like, skip, or refresh to pull new posts.")
+                bubbleCard("No connected posts are ready yet. You can like, skip, prefer/blacklist the topic, or refresh.")
             } else {
                 ForEach(viewModel.nextChoices) { node in
                     Button {
@@ -193,13 +193,13 @@ struct GraphFeedView: View {
         VStack(spacing: 12) {
             HStack(spacing: 12) {
                 actionButton(
-                    title: "Like",
-                    systemImage: "heart.fill",
+                    title: viewModel.isCurrentPostLiked ? "Unlike" : "Like",
+                    systemImage: viewModel.isCurrentPostLiked ? "heart.slash.fill" : "heart.fill",
                     tint: .pink,
                     isPrimary: true
                 ) {
                     Task {
-                        await viewModel.likeCurrentPost(using: authSession)
+                        await viewModel.toggleCurrentPostLike(using: authSession)
                     }
                 }
                 .disabled(viewModel.isLoading || viewModel.isSubmitting || !viewModel.hasCurrentPost)
@@ -217,6 +217,42 @@ struct GraphFeedView: View {
                 .disabled(viewModel.isLoading || viewModel.isSubmitting || !viewModel.hasCurrentPost)
             }
 
+            HStack(spacing: 12) {
+                actionButton(
+                    title: viewModel.isCurrentTopicPreferred ? "Unprefer" : "Prefer Topic",
+                    systemImage: viewModel.isCurrentTopicPreferred ? "star.slash.fill" : "star.fill",
+                    tint: .yellow,
+                    isPrimary: false
+                ) {
+                    Task {
+                        await viewModel.togglePreferCurrentTopic(using: authSession)
+                    }
+                }
+                .disabled(
+                    viewModel.isLoading
+                        || viewModel.isSubmitting
+                        || !viewModel.hasCurrentPost
+                        || !viewModel.hasCurrentTopic
+                )
+
+                actionButton(
+                    title: viewModel.isCurrentTopicBlacklisted ? "Unblacklist" : "Blacklist Topic",
+                    systemImage: viewModel.isCurrentTopicBlacklisted ? "eye" : "eye.slash.fill",
+                    tint: .orange,
+                    isPrimary: false
+                ) {
+                    Task {
+                        await viewModel.toggleBlacklistCurrentTopic(using: authSession)
+                    }
+                }
+                .disabled(
+                    viewModel.isLoading
+                        || viewModel.isSubmitting
+                        || !viewModel.hasCurrentPost
+                        || !viewModel.hasCurrentTopic
+                )
+            }
+
             actionButton(
                 title: viewModel.isLoading ? "Refreshing..." : "Load New Session",
                 systemImage: "arrow.clockwise",
@@ -229,6 +265,16 @@ struct GraphFeedView: View {
             }
             .disabled(viewModel.isLoading || viewModel.isSubmitting)
         }
+    }
+
+    private var topicStatusSubtitle: String {
+        if viewModel.isCurrentTopicBlacklisted {
+            return "Topic blacklisted"
+        }
+        if viewModel.isCurrentTopicPreferred {
+            return "Preferred bubble path active"
+        }
+        return "Graph recommendation loop"
     }
 
     private func sectionTitle(_ title: String) -> some View {
@@ -296,6 +342,10 @@ struct GraphFeedView: View {
                     if node.isPreferredTopic {
                         tagLabel("Preferred Topic", tint: .pink)
                     }
+
+                    if node.isBlacklistedTopic {
+                        tagLabel("Blacklisted Topic", tint: .orange)
+                    }
                 }
 
                 Spacer()
@@ -318,9 +368,19 @@ struct GraphFeedView: View {
                 .foregroundColor(.white)
                 .multilineTextAlignment(.leading)
 
-            Text("Posted by user #\(node.userId)")
-                .font(.caption)
-                .foregroundColor(.white.opacity(0.72))
+            HStack {
+                Text("Posted by user #\(node.userId)")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.72))
+
+                Spacer()
+
+                if !isInteractive, viewModel.isCurrentPostLiked {
+                    Label("Liked", systemImage: "heart.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(.pink.opacity(0.9))
+                }
+            }
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)

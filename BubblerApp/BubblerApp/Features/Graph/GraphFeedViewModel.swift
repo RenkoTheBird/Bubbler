@@ -7,12 +7,14 @@ final class GraphFeedViewModel: ObservableObject {
     @Published private(set) var nextChoices: [GraphFeedNode] = []
     @Published private(set) var isLoading = false
     @Published private(set) var isSubmitting = false
+    @Published private(set) var isCurrentPostLiked = false
     @Published var errorMessage: String?
     @Published var statusMessage: String?
 
     private var preferences = UserPreferences.placeholder
     private var sessionQueue: [GraphFeedNode] = []
     private var currentPostStartedAt: Date?
+    private var likedPostIDs = Set<String>()
 
     var hasCurrentPost: Bool {
         currentNode != nil
@@ -22,8 +24,16 @@ final class GraphFeedViewModel: ObservableObject {
         currentNode?.topicName ?? "Topicless bubble"
     }
 
+    var hasCurrentTopic: Bool {
+        currentNode?.topicName != nil
+    }
+
     var isCurrentTopicPreferred: Bool {
         currentNode?.isPreferredTopic == true
+    }
+
+    var isCurrentTopicBlacklisted: Bool {
+        currentNode?.isBlacklistedTopic == true
     }
 
     func load(using authSession: AuthSession) async {
@@ -45,12 +55,50 @@ final class GraphFeedViewModel: ObservableObject {
     }
 
     func likeCurrentPost(using authSession: AuthSession) async {
-        await advance(
-            byRecording: .like,
-            explicitNextNode: nil,
-            using: authSession,
-            fallbackMessage: "Saved as a positive interaction."
-        )
+        guard let currentNode else {
+            await loadSession(using: authSession, message: "Building your graph session.")
+            return
+        }
+
+        isSubmitting = true
+        errorMessage = nil
+
+        do {
+            try await recordInteraction(for: currentNode, type: .like)
+            likedPostIDs.insert(currentNode.id)
+            isCurrentPostLiked = true
+            statusMessage = "Liked this post."
+        } catch {
+            handle(error, using: authSession, fallbackMessage: "We couldn't save that like.")
+        }
+
+        isSubmitting = false
+    }
+
+    func unlikeCurrentPost(using authSession: AuthSession) async {
+        guard let currentNode else { return }
+
+        isSubmitting = true
+        errorMessage = nil
+
+        do {
+            try await APIClient.deleteLike(postId: currentNode.id)
+            likedPostIDs.remove(currentNode.id)
+            isCurrentPostLiked = false
+            statusMessage = "Removed your like."
+        } catch {
+            handle(error, using: authSession, fallbackMessage: "We couldn't remove that like.")
+        }
+
+        isSubmitting = false
+    }
+
+    func toggleCurrentPostLike(using authSession: AuthSession) async {
+        if isCurrentPostLiked {
+            await unlikeCurrentPost(using: authSession)
+        } else {
+            await likeCurrentPost(using: authSession)
+        }
     }
 
     func skipCurrentPost(using authSession: AuthSession) async {
@@ -60,6 +108,79 @@ final class GraphFeedViewModel: ObservableObject {
             using: authSession,
             fallbackMessage: "Skipping ahead to the next bubble."
         )
+    }
+
+    func togglePreferCurrentTopic(using authSession: AuthSession) async {
+        guard let topic = currentNode?.topicName else { return }
+
+        isSubmitting = true
+        errorMessage = nil
+
+        do {
+            var updated = preferences
+            if contains(normalizedTopicName(from: topic), in: updated.preferredTopics) {
+                updated.unpreferTopic(topic)
+                statusMessage = "Removed \(topic) from preferred topics."
+            } else {
+                updated.preferTopic(topic)
+                statusMessage = "Preferred topic: \(topic)."
+            }
+
+            preferences = try await APIClient.updatePreferences(updated.sanitized().updatePayload).sanitized()
+            refreshPreferenceFlags()
+        } catch {
+            handle(error, using: authSession, fallbackMessage: "We couldn't update topic preferences.")
+        }
+
+        isSubmitting = false
+    }
+
+    func toggleBlacklistCurrentTopic(using authSession: AuthSession) async {
+        guard let currentNode,
+              let topic = currentNode.topicName else {
+            return
+        }
+
+        isSubmitting = true
+        errorMessage = nil
+
+        do {
+            var updated = preferences
+            let wasBlacklisted = contains(
+                normalizedTopicName(from: topic),
+                in: updated.blacklistedTopics
+            )
+
+            if wasBlacklisted {
+                updated.unblacklistTopic(topic)
+                preferences = try await APIClient.updatePreferences(updated.sanitized().updatePayload).sanitized()
+                refreshPreferenceFlags()
+                statusMessage = "Removed \(topic) from blacklist."
+            } else {
+                updated.blacklistTopic(topic)
+                preferences = try await APIClient.updatePreferences(updated.sanitized().updatePayload).sanitized()
+                nextChoices = nextChoices.map { makeNode(from: $0.post) }
+                sessionQueue = sessionQueue.map { makeNode(from: $0.post) }
+
+                try await recordInteraction(for: currentNode, type: .skip)
+
+                if let nextNode = nextAutomaticNode(excluding: currentNode.id) {
+                    await setCurrentNode(nextNode, using: authSession)
+                    if errorMessage == nil {
+                        statusMessage = "Blacklisted \(topic) and moved ahead."
+                    }
+                } else {
+                    await loadSession(
+                        using: authSession,
+                        message: "Blacklisted \(topic). Loading a fresh session."
+                    )
+                }
+            }
+        } catch {
+            handle(error, using: authSession, fallbackMessage: "We couldn't update topic preferences.")
+        }
+
+        isSubmitting = false
     }
 
     func updateCurrentPostContent(_ content: String) {
@@ -90,6 +211,7 @@ final class GraphFeedViewModel: ObservableObject {
             try await APIClient.deletePost(id: currentNode.id)
             authSession.showSuccessMessage("Post deleted.")
 
+            likedPostIDs.remove(currentNode.id)
             nextChoices.removeAll { $0.id == currentNode.id }
             sessionQueue.removeAll { $0.id == currentNode.id }
 
@@ -120,6 +242,7 @@ final class GraphFeedViewModel: ObservableObject {
 
         do {
             preferences = try await APIClient.getPreferences().sanitized()
+            await refreshLikedPostIDs()
 
             let sessionNodes = try await fetchUsableSessionNodes()
             guard let firstNode = sessionNodes.first else {
@@ -136,6 +259,7 @@ final class GraphFeedViewModel: ObservableObject {
             currentNode = nil
             nextChoices = []
             sessionQueue = []
+            isCurrentPostLiked = false
             handle(error, using: authSession, fallbackMessage: "We couldn't build a graph session right now.")
         }
 
@@ -190,6 +314,7 @@ final class GraphFeedViewModel: ObservableObject {
 
         currentNode = node
         currentPostStartedAt = Date()
+        isCurrentPostLiked = likedPostIDs.contains(node.id)
 
         do {
             nextChoices = try await loadChoices(for: node)
@@ -235,9 +360,14 @@ final class GraphFeedViewModel: ObservableObject {
     }
 
     private func nextAutomaticNode(excluding currentID: String) -> GraphFeedNode? {
-        if let choice = nextChoices.first(where: { $0.id != currentID }) {
+        if let choice = nextChoices.first(where: { choice in
+            choice.id != currentID && !choice.isBlacklistedTopic
+        }) {
+            nextChoices.removeAll { $0.id == choice.id || $0.isBlacklistedTopic }
             return choice
         }
+
+        nextChoices.removeAll { $0.isBlacklistedTopic }
 
         while !sessionQueue.isEmpty {
             let nextNode = sessionQueue.removeFirst()
@@ -273,6 +403,28 @@ final class GraphFeedViewModel: ObservableObject {
             isPreferredTopic: contains(normalizedTopic, in: preferences.preferredTopics),
             isBlacklistedTopic: contains(normalizedTopic, in: preferences.blacklistedTopics)
         )
+    }
+
+    private func refreshPreferenceFlags() {
+        if let currentNode {
+            self.currentNode = makeNode(from: currentNode.post)
+        }
+
+        nextChoices = nextChoices.map { makeNode(from: $0.post) }
+        sessionQueue = sessionQueue.map { makeNode(from: $0.post) }
+    }
+
+    private func refreshLikedPostIDs() async {
+        do {
+            let interactions = try await APIClient.getMyInteractions()
+            likedPostIDs = Set(
+                interactions
+                    .filter { $0.type == .like }
+                    .map(\.postId)
+            )
+        } catch {
+            // Keep the local set if trail history can't be loaded.
+        }
     }
 
     private func recordInteraction(for node: GraphFeedNode, type: GraphInteractionType) async throws {

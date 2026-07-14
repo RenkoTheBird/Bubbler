@@ -244,6 +244,13 @@ enum APIClient {
         )
     }
 
+    static func deleteLike(postId: String) async throws {
+        _ = try await authorizedRequest(
+            path: "user/me/interactions/\(postId)/like",
+            method: "DELETE"
+        )
+    }
+
     static func deleteAccount() async throws {
         _ = try await authorizedRequest(path: "user/me", method: "DELETE")
     }

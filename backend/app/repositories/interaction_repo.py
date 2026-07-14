@@ -40,6 +40,21 @@ class InteractionRepository:
                     view_time,
                 )
 
+    async def delete_like(self, user_id: int, post_id: str) -> bool:
+        async with self.pool.acquire() as conn:
+            result = await conn.execute(
+                """
+                DELETE FROM interactions
+                WHERE user_id = $1
+                  AND post_id = $2
+                  AND type = 'like'
+                """,
+                user_id,
+                post_id,
+            )
+        # asyncpg returns strings like "DELETE 1"
+        return result.endswith("1")
+
     async def get_recent_interactions(self, user_id: int, limit: int = 50) -> list[Interaction]:
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(

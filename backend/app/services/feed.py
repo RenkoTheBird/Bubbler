@@ -22,20 +22,23 @@ def _topic_sets(topic_preferences: list[TopicPreference]) -> tuple[set[str], set
 
 class PreferenceService:
     def update_from_interactions(self, prefs, interactions):
+        """Optionally boost preferred topics from view time only.
+
+        Likes never auto-prefer a topic — preferred/blacklisted topics are
+        managed explicitly via user preference updates.
+        """
+        if not prefs.use_view_time:
+            return prefs
+
         topic_scores: dict[str, float] = {}
 
         for i in interactions:
             if not isinstance(i.topic, str) or not i.topic.strip():
                 continue
             topic = i.topic.strip().casefold()
-
-            if i.liked:
-                topic_scores[topic] = topic_scores.get(topic, 0) + 1
-
-            if prefs.use_view_time:
-                topic_scores[topic] = topic_scores.get(topic, 0) + (
-                    i.view_time * prefs.view_time_weight
-                )
+            topic_scores[topic] = topic_scores.get(topic, 0) + (
+                i.view_time * prefs.view_time_weight
+            )
 
         sorted_topics = sorted(topic_scores.items(), key=lambda x: x[1], reverse=True)
         preferred, blacklisted = _topic_sets(prefs.topic_preferences)

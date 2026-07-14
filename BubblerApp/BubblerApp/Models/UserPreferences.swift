@@ -96,6 +96,24 @@ struct UserPreferences: Codable, Equatable {
         topicPreferences = Self.mergeTopicPreferences(preferred: preferred, blacklisted: blacklisted)
     }
 
+    mutating func preferTopic(_ topic: String) {
+        updatePreferredTopics(TopicPreferenceList.add(topic, to: preferredTopics))
+        updateBlacklistedTopics(TopicPreferenceList.remove(topic, from: blacklistedTopics))
+    }
+
+    mutating func unpreferTopic(_ topic: String) {
+        updatePreferredTopics(TopicPreferenceList.remove(topic, from: preferredTopics))
+    }
+
+    mutating func blacklistTopic(_ topic: String) {
+        updatePreferredTopics(TopicPreferenceList.remove(topic, from: preferredTopics))
+        updateBlacklistedTopics(TopicPreferenceList.add(topic, to: blacklistedTopics))
+    }
+
+    mutating func unblacklistTopic(_ topic: String) {
+        updateBlacklistedTopics(TopicPreferenceList.remove(topic, from: blacklistedTopics))
+    }
+
     func sanitized() -> UserPreferences {
         let preferred = TopicPreferenceList.cleaned(preferredTopics)
         let blacklist = TopicPreferenceList.cleaned(blacklistedTopics)

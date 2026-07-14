@@ -71,6 +71,10 @@ def create_user_router(user_service: UserService, interaction_service: Interacti
     async def record_interaction(body: InteractionCreate, user_id: int = Depends(get_current_user_id)):
         return await interaction_service.record(user_id, body)
 
+    @router.delete("/me/interactions/{post_id}/like", status_code=204)
+    async def delete_like(post_id: str, user_id: int = Depends(get_current_user_id)):
+        await interaction_service.delete_like(user_id, post_id)
+
     @router.get("/me/preferences")
     async def get_preferences(user_id: int = Depends(get_current_user_id)):
         return await user_service.get_prefs(user_id)

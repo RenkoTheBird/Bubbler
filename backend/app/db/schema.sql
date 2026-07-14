@@ -107,7 +107,7 @@ CREATE TABLE edges (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     from_post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
     to_post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
-    edge_type TEXT NOT NULL CHECK (edge_type IN ('similar', 'opposite', 'topic')),
+    edge_type TEXT NOT NULL CHECK (edge_type IN ('similar', 'opposite', 'topic', 'bridge')),
     weight FLOAT,
     UNIQUE (from_post_id, to_post_id, edge_type)
 );
@@ -124,7 +124,7 @@ CREATE TABLE user_profiles (
     use_recency BOOLEAN NOT NULL DEFAULT TRUE,
     ai_topic_detection BOOLEAN NOT NULL DEFAULT FALSE,
     strategy_weights JSONB NOT NULL DEFAULT
-        '{"similar":0.7,"graph":0.2,"opposite":0.0,"random":0.1}'
+        '{"similar":0.4,"graph":0.25,"opposite":0.2,"random":0.15}'
 );
 
 -- USER TOPIC PREFERENCES (normalized; replaces preferred_topics/blacklisted_topics arrays)

@@ -169,9 +169,12 @@ enum APIClient {
         return try apiJSONDecoder.decode([Post].self, from: data)
     }
 
-    static func getSessionFeed() async throws -> [Post] {
-        let data = try await authorizedRequest(path: "feed/me/session")
-        return try apiJSONDecoder.decode([Post].self, from: data)
+    static func getSessionFeed(diversify: Bool = false) async throws -> GraphSessionFeed {
+        let queryItems = diversify
+            ? [URLQueryItem(name: "diversify", value: "true")]
+            : nil
+        let data = try await authorizedRequest(path: "feed/me/session", queryItems: queryItems)
+        return try apiJSONDecoder.decode(GraphSessionFeed.self, from: data)
     }
 
     static func getNextGraphPosts(for postID: String) async throws -> [Post] {

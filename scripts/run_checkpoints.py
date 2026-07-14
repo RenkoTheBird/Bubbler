@@ -379,6 +379,9 @@ async def ensure_dense_graph_edges(pool: asyncpg.Pool, post_ids: list[str]) -> N
 
 
 def visible_posts(body: Any) -> list[dict[str, Any]]:
+    if isinstance(body, dict):
+        body = body.get("posts", [])
+
     if not isinstance(body, list):
         return []
 
@@ -399,7 +402,7 @@ def preferences_payload(body: Any, **overrides: Any) -> dict[str, Any]:
     data = body if isinstance(body, dict) else {}
     payload = {
         "diversity_tolerance": float(data.get("diversity_tolerance", 0.4)),
-        "randomness": float(data.get("randomness", 0.3)),
+        "randomness": float(data.get("randomness", 0.4)),
         "topic_preferences": list(data.get("topic_preferences", [])),
         "use_view_time": bool(data.get("use_view_time", False)),
         "view_time_weight": float(data.get("view_time_weight", 0.1)),
@@ -408,7 +411,7 @@ def preferences_payload(body: Any, **overrides: Any) -> dict[str, Any]:
         "strategy_weights": dict(
             data.get(
                 "strategy_weights",
-                {"similar": 0.7, "graph": 0.2, "opposite": 0.0, "random": 0.1},
+                {"similar": 0.4, "graph": 0.25, "opposite": 0.2, "random": 0.15},
             )
         ),
     }
@@ -806,6 +809,12 @@ async def run_phase_5(ctx: Context) -> None:
             len(session_posts) > 0,
             f"visible_posts={len(session_posts)}",
         )
+        ok(
+            ctx,
+            "5.1 Session response includes seed_strategy",
+            isinstance(body, dict) and bool(str(body.get("seed_strategy", "")).strip()),
+            str(body.get("seed_strategy")) if isinstance(body, dict) else type(body).__name__,
+        )
 
         user_posts = await fetch_user_posts(ctx.pool, ctx.user_id)
         ok(
@@ -893,7 +902,7 @@ async def run_phase_5(ctx: Context) -> None:
     ok(
         ctx,
         "5.4 GraphFeedViewModel loads session posts",
-        "APIClient.getSessionFeed()" in graph_view_model,
+        "APIClient.getSessionFeed(diversify:" in graph_view_model,
     )
     ok(
         ctx,

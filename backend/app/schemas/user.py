@@ -6,10 +6,10 @@ from pydantic import BaseModel, EmailStr, Field, field_serializer
 from app.db.datetime_utils import ensure_utc, utc_iso_z
 
 DEFAULT_STRATEGY_WEIGHTS: dict[str, float] = {
-    "similar": 0.7,
-    "graph": 0.2,
-    "opposite": 0.0,
-    "random": 0.1,
+    "similar": 0.4,
+    "graph": 0.25,
+    "opposite": 0.2,
+    "random": 0.15,
 }
 
 
@@ -22,7 +22,7 @@ def default_user_prefs(user_id: int = 0) -> "UserProfile":
     return UserProfile(
         user_id=user_id,
         diversity_tolerance=0.4,
-        randomness=0.3,
+        randomness=0.4,
         topic_preferences=[],
         strategy_weights=dict(DEFAULT_STRATEGY_WEIGHTS),
     )

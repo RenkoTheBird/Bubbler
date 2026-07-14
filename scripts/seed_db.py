@@ -312,6 +312,34 @@ async def ensure_schema(pool: asyncpg.Pool) -> None:
                 """
             )
 
+        # Allow bridge edges for cross-topic graph paths.
+        edge_checks = await conn.fetch(
+            """
+            SELECT conname, pg_get_constraintdef(oid) AS def
+            FROM pg_constraint
+            WHERE conrelid = 'edges'::regclass
+              AND contype = 'c'
+              AND pg_get_constraintdef(oid) LIKE '%edge_type%'
+            """
+        )
+        needs_bridge_constraint = True
+        for row in edge_checks:
+            if "bridge" in row["def"]:
+                needs_bridge_constraint = False
+            else:
+                await conn.execute(
+                    f'ALTER TABLE edges DROP CONSTRAINT IF EXISTS "{row["conname"]}"'
+                )
+                needs_bridge_constraint = True
+        if needs_bridge_constraint:
+            await conn.execute(
+                """
+                ALTER TABLE edges
+                ADD CONSTRAINT edges_edge_type_check
+                CHECK (edge_type IN ('similar', 'opposite', 'topic', 'bridge'))
+                """
+            )
+
 
 async def main():
     pool = await asyncpg.create_pool(my_env_vars.db_url)
@@ -376,7 +404,7 @@ async def main():
             print("Inserted post", post_id, f"topic={topic_name}")
 
         # Rebuild outbound edges after all inserts so early posts also get
-        # similar / opposite / topic neighbors for graph exploration.
+        # similar / opposite / topic / bridge neighbors for graph exploration.
         print(f"Building edges for {len(inserted)} posts…")
         for post_id, vector in inserted:
             edges = await edge_builder_repo.build_edges_for_post(post_id, vector)

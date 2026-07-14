@@ -20,6 +20,31 @@ struct GraphFeedNode: Identifiable {
     }
 }
 
+struct GraphSessionFeed: Codable {
+    let posts: [Post]
+    let seedStrategy: String
+    let diversify: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case posts
+        case seedStrategy = "seed_strategy"
+        case diversify
+    }
+
+    var statusLabel: String {
+        switch seedStrategy {
+        case "diversify", "diversify_fallback":
+            return "Exploring across topics"
+        case "soft_prior", "soft_prior_fallback":
+            return "Seeded from recent interests"
+        case "random":
+            return "Random topic mix"
+        default:
+            return "Graph session ready"
+        }
+    }
+}
+
 enum GraphInteractionType: String, Codable {
     case like
     case skip

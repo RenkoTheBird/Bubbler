@@ -136,6 +136,7 @@ From Settings:
 | Screen | What it does |
 |--------|----------------|
 | **Bubble Sensitivity** | Tune diversity, randomness, topic lists, and feed weights (live API) |
+| **Explore Other Bubbles** | Forces a diversified graph session (`?diversify=true`) to escape a topic region |
 | **Classic Feed** | Scrollable feed view backed by `GET /feed/me` |
 
 Some settings rows (profile, notifications, search) are still placeholder UI.

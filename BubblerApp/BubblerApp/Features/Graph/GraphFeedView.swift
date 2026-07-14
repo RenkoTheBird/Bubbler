@@ -113,11 +113,18 @@ struct GraphFeedView: View {
                 .foregroundColor(.white.opacity(0.8))
                 .tracking(1)
 
-            Text("Session posts come from your graph feed. Connected choices load from neighboring posts, and every action records interaction time.")
+            Text("Session posts come from your graph feed. Connected choices mix same-topic, bridge, and opposite neighbors so you can walk between bubbles.")
                 .font(.caption)
                 .foregroundColor(.white.opacity(0.68))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 10)
+
+            if let seedStrategyLabel = viewModel.seedStrategyLabel {
+                Text(seedStrategyLabel)
+                    .font(.caption2.bold())
+                    .foregroundColor(.white.opacity(0.78))
+                    .padding(.top, 2)
+            }
         }
         .padding(18)
         .frame(maxWidth: .infinity)
@@ -254,8 +261,8 @@ struct GraphFeedView: View {
             }
 
             actionButton(
-                title: viewModel.isLoading ? "Refreshing..." : "Load New Session",
-                systemImage: "arrow.clockwise",
+                title: viewModel.isLoading ? "Exploring..." : "Explore Other Bubbles",
+                systemImage: "arrow.triangle.branch",
                 tint: accentColor,
                 isPrimary: false
             ) {

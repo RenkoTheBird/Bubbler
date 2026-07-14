@@ -20,6 +20,12 @@ def _topic_sets(topic_preferences: list[TopicPreference]) -> tuple[set[str], set
     return preferred, blacklisted
 
 
+def _normalize_topic(topic: str | None) -> str | None:
+    if not isinstance(topic, str) or not topic.strip():
+        return None
+    return topic.strip().casefold()
+
+
 class PreferenceService:
     def update_from_interactions(self, prefs, interactions):
         """Optionally boost preferred topics from view time only.
@@ -79,11 +85,7 @@ class RankingService:
 
         for post in posts:
             post_topic = post.get("topic")
-            normalized_topic = (
-                post_topic.strip().casefold()
-                if isinstance(post_topic, str) and post_topic.strip()
-                else None
-            )
+            normalized_topic = _normalize_topic(post_topic)
 
             if normalized_topic and normalized_topic in blacklisted_topics:
                 continue
@@ -133,6 +135,22 @@ class StrategyService:
                 strategies.append(("random", random_posts))
 
         return strategies
+
+
+# Target mix for graph "next" choices: deepen, bridge, jump, explore.
+_NEXT_EDGE_QUOTA = (
+    ("topic", 1),
+    ("similar", 1),
+    ("bridge", 1),
+    ("opposite", 1),
+)
+_NEXT_CHOICE_LIMIT = 4
+_EDGE_TYPE_SCORE_BONUS = {
+    "bridge": 0.15,
+    "opposite": 0.1,
+    "similar": 0.05,
+    "topic": 0.0,
+}
 
 
 class FeedService:
@@ -239,28 +257,175 @@ class FeedService:
 
         return [with_utc_created_at(post) for post in ranked[:20]]
 
-    async def get_new_session_posts(self, user_id: int):
+    async def get_new_session_posts(self, user_id: int, *, diversify: bool = False):
         prefs = await self.user_repo.get_prefs(user_id)
+        _, blacklisted = _topic_sets(prefs.topic_preferences)
         yesterday_post, liked_topic = await self._yesterday_liked_signal(user_id)
-        posts = await self.repo.get_new_session_posts(
-            prefs.diversity_tolerance, yesterday_post, liked_topic
+
+        candidates, seed_strategy, max_per_topic = await self.repo.get_new_session_posts(
+            prefs.diversity_tolerance,
+            yesterday_post,
+            liked_topic,
+            blacklisted_topics=blacklisted,
+            diversify=diversify,
         )
-        return [with_utc_created_at(post) for post in posts]
+
+        ranked = self.ranking_service.apply_preferences(prefs, candidates)
+        selected = self._select_topic_diverse(
+            ranked,
+            limit=6,
+            max_per_topic=max_per_topic,
+        )
+
+        posts = []
+        for post in selected:
+            public_post = {
+                key: value
+                for key, value in post.items()
+                if not str(key).startswith("_") and key != "score"
+            }
+            posts.append(with_utc_created_at(public_post))
+
+        return {
+            "posts": posts,
+            "seed_strategy": seed_strategy,
+            "diversify": diversify,
+        }
+
+    @staticmethod
+    def _select_topic_diverse(
+        posts: list[dict],
+        *,
+        limit: int,
+        max_per_topic: int,
+    ) -> list[dict]:
+        selected: list[dict] = []
+        topic_counts: dict[str, int] = {}
+
+        for post in posts:
+            if len(selected) >= limit:
+                break
+            topic = _normalize_topic(post.get("topic"))
+            key = topic if topic else f"_none:{post['id']}"
+            if topic_counts.get(key, 0) >= max_per_topic:
+                continue
+            topic_counts[key] = topic_counts.get(key, 0) + 1
+            selected.append(post)
+
+        if len(selected) < limit:
+            selected_ids = {p["id"] for p in selected}
+            for post in posts:
+                if len(selected) >= limit:
+                    break
+                if post["id"] in selected_ids:
+                    continue
+                selected.append(post)
+                selected_ids.add(post["id"])
+
+        return selected
 
     async def get_next_posts(self, user_id: int, post_id: str):
         prefs = await self.user_repo.get_prefs(user_id)
-        # Over-fetch neighbors so blacklist / preference filtering still leaves choices.
+        preferred_topics, blacklisted_topics = _topic_sets(prefs.topic_preferences)
+
         async with self.repo.acquire() as conn:
-            neighbors = await self.repo.get_neighbors(post_id, limit=20, conn=conn)
-            ids = [n.to_post_id for n in neighbors]
+            current_rows = await self.repo.get_posts_by_ids([post_id], conn=conn)
+            current_topic = (
+                _normalize_topic(current_rows[0].get("topic")) if current_rows else None
+            )
+            edges = await self.repo.get_outbound_edges_by_type(post_id, conn=conn)
+            ids = [edge.to_post_id for edge in edges]
             posts = await self.repo.get_posts_by_ids(ids, conn=conn)
 
-        weight_by_id = {
-            n.to_post_id: float(n.weight) if n.weight is not None else 0.0
-            for n in neighbors
-        }
-        for post in posts:
-            post["similarity"] = weight_by_id.get(post["id"], 0.0)
+        posts_by_id = {post["id"]: post for post in posts}
+        candidates: list[dict] = []
+        for edge in edges:
+            post = posts_by_id.get(edge.to_post_id)
+            if not post:
+                continue
+            normalized_topic = _normalize_topic(post.get("topic"))
+            if normalized_topic and normalized_topic in blacklisted_topics:
+                continue
 
-        ranked = self.ranking_service.apply_preferences(prefs, posts)
-        return [with_utc_created_at(post) for post in ranked[:4]]
+            weight = float(edge.weight) if edge.weight is not None else 0.0
+            score = weight + _EDGE_TYPE_SCORE_BONUS.get(edge.type, 0.0)
+            if normalized_topic and normalized_topic in preferred_topics:
+                score += 0.3
+            # Prefer different-topic hops for bridge/opposite, slight novelty for others.
+            if current_topic and normalized_topic and normalized_topic != current_topic:
+                score += 0.12
+            elif edge.type in ("bridge", "opposite"):
+                score += 0.05
+            score += random.random() * prefs.randomness
+
+            candidate = dict(post)
+            candidate["similarity"] = weight
+            candidate["score"] = score
+            candidate["_edge_type"] = edge.type
+            candidates.append(candidate)
+
+        selected = self._select_next_quota(candidates, current_topic=current_topic)
+        cleaned = []
+        for post in selected:
+            public_post = {
+                key: value
+                for key, value in post.items()
+                if not str(key).startswith("_") and key != "score"
+            }
+            cleaned.append(with_utc_created_at(public_post))
+        return cleaned
+
+    def _select_next_quota(
+        self,
+        candidates: list[dict],
+        *,
+        current_topic: str | None,
+        limit: int = _NEXT_CHOICE_LIMIT,
+    ) -> list[dict]:
+        by_type: dict[str, list[dict]] = {}
+        for candidate in sorted(
+            candidates, key=lambda p: p.get("score", 0), reverse=True
+        ):
+            edge_type = candidate.get("_edge_type", "similar")
+            by_type.setdefault(edge_type, []).append(candidate)
+
+        selected: list[dict] = []
+        selected_ids: set[str] = set()
+        same_topic_count = 0
+        max_same_topic = max(1, limit // 2)
+
+        def try_add(post: dict) -> bool:
+            nonlocal same_topic_count
+            if len(selected) >= limit:
+                return False
+            post_id = post["id"]
+            if post_id in selected_ids:
+                return False
+            topic = _normalize_topic(post.get("topic"))
+            is_same = bool(current_topic and topic and topic == current_topic)
+            if is_same and same_topic_count >= max_same_topic:
+                return False
+            selected.append(post)
+            selected_ids.add(post_id)
+            if is_same:
+                same_topic_count += 1
+            return True
+
+        for edge_type, quota in _NEXT_EDGE_QUOTA:
+            taken = 0
+            for post in by_type.get(edge_type, []):
+                if taken >= quota:
+                    break
+                if try_add(post):
+                    taken += 1
+
+        if len(selected) < limit:
+            leftovers = sorted(
+                candidates, key=lambda p: p.get("score", 0), reverse=True
+            )
+            for post in leftovers:
+                if len(selected) >= limit:
+                    break
+                try_add(post)
+
+        return selected

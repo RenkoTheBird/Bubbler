@@ -9,6 +9,9 @@ _EDGE_INSERT = """
 """
 
 _SIMILAR_LIMIT = 5
+# Topic peers are demoted below typical similar weights so pure topic
+# links do not dominate neighbor selection.
+_TOPIC_EDGE_WEIGHT = 0.55
 
 # NOTE: named as similar_posts instead of similar as similar is a reserved word in PostgreSQL
 _EDGES_QUERY = """
@@ -27,11 +30,27 @@ _EDGES_QUERY = """
         LIMIT $3
     ),
     topic_neighbors AS (
-        SELECT DISTINCT p.id, 1.0 AS similarity, 'topic' AS edge_type
+        SELECT DISTINCT p.id, $4::float AS similarity, 'topic' AS edge_type
         FROM post_topics pt_self
         JOIN post_topics pt_peer ON pt_peer.topic_name = pt_self.topic_name
         JOIN posts p ON p.id = pt_peer.post_id
         WHERE pt_self.post_id = $2 AND p.id != $2
+        LIMIT $3
+    ),
+    bridge_neighbors AS (
+        SELECT p.id,
+               1 - (p.embedding <=> $1::vector) AS similarity,
+               'bridge' AS edge_type
+        FROM posts p
+        JOIN posts_with_topic pwt ON pwt.id = p.id
+        WHERE p.id != $2
+          AND p.embedding IS NOT NULL
+          AND (
+              pwt.topic IS DISTINCT FROM (
+                  SELECT topic FROM posts_with_topic WHERE id = $2
+              )
+          )
+        ORDER BY p.embedding <=> $1::vector
         LIMIT $3
     )
     SELECT id, similarity, edge_type FROM similar_posts
@@ -39,6 +58,8 @@ _EDGES_QUERY = """
     SELECT id, similarity, edge_type FROM opposite_posts
     UNION ALL
     SELECT id, similarity, edge_type FROM topic_neighbors
+    UNION ALL
+    SELECT id, similarity, edge_type FROM bridge_neighbors
 """
 
 
@@ -68,7 +89,10 @@ class EdgeBuilderRepo:
             )
             rows = await connection.fetch(
                 _EDGES_QUERY,
-                vec, post_id, _SIMILAR_LIMIT,
+                vec,
+                post_id,
+                _SIMILAR_LIMIT,
+                _TOPIC_EDGE_WEIGHT,
             )
             records = [
                 (post_id, row["id"], row["edge_type"], float(row["similarity"]))

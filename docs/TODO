@@ -1,13 +1,9 @@
 -- IMMEDIATE
-- Fix issue with login persistence (we did rebuild the db every time though.)
-- Create a Search API
 - Create API for Profile stats
 - Deal with Orphaned screens (BubbleDetail, UserProfileView)
-- Wire Settings properly
-- Add notification toggles!
+- Test Settings properly
 - topic buttons don't work in FeedView
 - make GraphFeedView more bubbly
-- Fix issue where only tech shows up.
 
 -- BEFORE PRODUCTION
 add media support

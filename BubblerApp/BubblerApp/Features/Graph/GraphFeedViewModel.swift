@@ -8,6 +8,7 @@ final class GraphFeedViewModel: ObservableObject {
     @Published private(set) var isLoading = false
     @Published private(set) var isSubmitting = false
     @Published private(set) var isCurrentPostLiked = false
+    @Published private(set) var seedStrategyLabel: String?
     @Published var errorMessage: String?
     @Published var statusMessage: String?
 
@@ -38,11 +39,19 @@ final class GraphFeedViewModel: ObservableObject {
 
     func load(using authSession: AuthSession) async {
         guard !isLoading else { return }
-        await loadSession(using: authSession, message: "Building your graph session.")
+        await loadSession(
+            using: authSession,
+            diversify: false,
+            message: "Building your graph session."
+        )
     }
 
     func refreshSession(using authSession: AuthSession) async {
-        await loadSession(using: authSession, message: "Generating a new topic path.")
+        await loadSession(
+            using: authSession,
+            diversify: true,
+            message: "Exploring a fresh path across topics."
+        )
     }
 
     func choose(_ node: GraphFeedNode, using authSession: AuthSession) async {
@@ -56,7 +65,11 @@ final class GraphFeedViewModel: ObservableObject {
 
     func likeCurrentPost(using authSession: AuthSession) async {
         guard let currentNode else {
-            await loadSession(using: authSession, message: "Building your graph session.")
+            await loadSession(
+                using: authSession,
+                diversify: false,
+                message: "Building your graph session."
+            )
             return
         }
 
@@ -159,22 +172,16 @@ final class GraphFeedViewModel: ObservableObject {
             } else {
                 updated.blacklistTopic(topic)
                 preferences = try await APIClient.updatePreferences(updated.sanitized().updatePayload).sanitized()
-                nextChoices = nextChoices.map { makeNode(from: $0.post) }
-                sessionQueue = sessionQueue.map { makeNode(from: $0.post) }
+                nextChoices = []
+                sessionQueue = []
 
                 try await recordInteraction(for: currentNode, type: .skip)
 
-                if let nextNode = nextAutomaticNode(excluding: currentNode.id) {
-                    await setCurrentNode(nextNode, using: authSession)
-                    if errorMessage == nil {
-                        statusMessage = "Blacklisted \(topic) and moved ahead."
-                    }
-                } else {
-                    await loadSession(
-                        using: authSession,
-                        message: "Blacklisted \(topic). Loading a fresh session."
-                    )
-                }
+                await loadSession(
+                    using: authSession,
+                    diversify: true,
+                    message: "Blacklisted \(topic). Exploring other bubbles."
+                )
             }
         } catch {
             handle(error, using: authSession, fallbackMessage: "We couldn't update topic preferences.")
@@ -221,7 +228,11 @@ final class GraphFeedViewModel: ObservableObject {
                     statusMessage = "Deleted your post and moved ahead."
                 }
             } else {
-                await loadSession(using: authSession, message: "Deleted your post. Loading a fresh session.")
+                await loadSession(
+                    using: authSession,
+                    diversify: true,
+                    message: "Deleted your post. Exploring other bubbles."
+                )
             }
         } catch {
             handle(error, using: authSession, fallbackMessage: "We couldn't delete that post.")
@@ -235,7 +246,11 @@ final class GraphFeedViewModel: ObservableObject {
         return "\(elapsedSeconds)s tracked"
     }
 
-    private func loadSession(using authSession: AuthSession, message: String) async {
+    private func loadSession(
+        using authSession: AuthSession,
+        diversify: Bool = false,
+        message: String
+    ) async {
         isLoading = true
         errorMessage = nil
         statusMessage = message
@@ -244,7 +259,7 @@ final class GraphFeedViewModel: ObservableObject {
             preferences = try await APIClient.getPreferences().sanitized()
             await refreshLikedPostIDs()
 
-            let sessionNodes = try await fetchUsableSessionNodes()
+            let sessionNodes = try await fetchUsableSessionNodes(diversify: diversify)
             guard let firstNode = sessionNodes.first else {
                 throw GraphFeedError.noUsablePosts
             }
@@ -253,13 +268,18 @@ final class GraphFeedViewModel: ObservableObject {
             await setCurrentNode(firstNode, using: authSession)
 
             if errorMessage == nil {
-                statusMessage = statusMessage(for: firstNode, defaultMessage: "Session ready.")
+                let seedNote = seedStrategyLabel.map { " \($0)." } ?? ""
+                statusMessage = statusMessage(
+                    for: firstNode,
+                    defaultMessage: "Session ready.\(seedNote)"
+                )
             }
         } catch {
             currentNode = nil
             nextChoices = []
             sessionQueue = []
             isCurrentPostLiked = false
+            seedStrategyLabel = nil
             handle(error, using: authSession, fallbackMessage: "We couldn't build a graph session right now.")
         }
 
@@ -273,7 +293,11 @@ final class GraphFeedViewModel: ObservableObject {
         fallbackMessage: String
     ) async {
         guard let currentNode else {
-            await loadSession(using: authSession, message: "Building your graph session.")
+            await loadSession(
+                using: authSession,
+                diversify: false,
+                message: "Building your graph session."
+            )
             return
         }
 
@@ -294,7 +318,11 @@ final class GraphFeedViewModel: ObservableObject {
                     statusMessage = statusMessage(for: nextNode, defaultMessage: fallbackMessage)
                 }
             } else {
-                await loadSession(using: authSession, message: "Loading a fresh set of posts.")
+                await loadSession(
+                    using: authSession,
+                    diversify: true,
+                    message: "Loading a fresh cross-topic path."
+                )
             }
         } catch {
             handle(error, using: authSession, fallbackMessage: "We couldn't save that interaction.")
@@ -307,7 +335,8 @@ final class GraphFeedViewModel: ObservableObject {
         guard !node.isBlacklistedTopic else {
             await loadSession(
                 using: authSession,
-                message: "That topic is blacklisted, so the session is being regenerated."
+                diversify: true,
+                message: "That topic is blacklisted, so exploring other bubbles."
             )
             return
         }
@@ -328,10 +357,20 @@ final class GraphFeedViewModel: ObservableObject {
         }
     }
 
-    private func fetchUsableSessionNodes(maxAttempts: Int = 3) async throws -> [GraphFeedNode] {
-        for _ in 0 ..< maxAttempts {
-            let posts = try await APIClient.getSessionFeed()
-            let nodes = rankedNodes(from: posts)
+    private func fetchUsableSessionNodes(
+        diversify: Bool,
+        maxAttempts: Int = 3
+    ) async throws -> [GraphFeedNode] {
+        var lastSeedLabel: String?
+
+        for attempt in 0 ..< maxAttempts {
+            // Escalate to diversify on retries so blacklist / empty pools can escape.
+            let forceDiversify = diversify || attempt > 0
+            let session = try await APIClient.getSessionFeed(diversify: forceDiversify)
+            lastSeedLabel = session.statusLabel
+            seedStrategyLabel = session.statusLabel
+
+            let nodes = rankedNodes(from: session.posts)
 
             guard let proposedCurrent = nodes.first else {
                 continue
@@ -348,6 +387,7 @@ final class GraphFeedViewModel: ObservableObject {
             return [proposedCurrent] + remainingNodes
         }
 
+        seedStrategyLabel = lastSeedLabel
         throw GraphFeedError.noUsablePosts
     }
 
@@ -472,15 +512,23 @@ final class GraphFeedViewModel: ObservableObject {
     }
 
     private func statusMessage(for node: GraphFeedNode, defaultMessage: String) -> String {
+        var parts: [String] = []
+
         if node.isPreferredTopic, let topicName = node.topicName {
-            return "Preferred topic active: \(topicName)."
+            parts.append("Preferred topic active: \(topicName)")
+        } else if let topicName = node.topicName {
+            parts.append("Current topic: \(topicName)")
         }
 
-        if let topicName = node.topicName {
-            return "Current topic: \(topicName)."
+        if let seedStrategyLabel {
+            parts.append(seedStrategyLabel)
         }
 
-        return defaultMessage
+        if parts.isEmpty {
+            return defaultMessage
+        }
+
+        return parts.joined(separator: " · ")
     }
 
     private func handle(_ error: Error, using authSession: AuthSession, fallbackMessage: String) {

@@ -46,7 +46,7 @@ struct UserPreferences: Codable, Equatable {
     static let placeholder = UserPreferences(
         userId: 0,
         diversityTolerance: 0.4,
-        randomness: 0.3,
+        randomness: 0.4,
         topicPreferences: [],
         useViewTime: false,
         viewTimeWeight: 0.1,
@@ -187,10 +187,10 @@ struct FeedStrategyWeights: Codable, Equatable {
     var random: Double
 
     static let `default` = FeedStrategyWeights(
-        similar: 0.7,
-        graph: 0.2,
-        opposite: 0.0,
-        random: 0.1
+        similar: 0.4,
+        graph: 0.25,
+        opposite: 0.2,
+        random: 0.15
     )
 
     var total: Double {

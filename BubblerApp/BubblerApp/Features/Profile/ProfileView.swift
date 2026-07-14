@@ -91,14 +91,6 @@ struct ProfileView: View {
                         }
                     }
                     
-                    // stats (Connections / Clicks still placeholders)
-                    HStack(spacing: 14) {
-                        statCard(number: "\(viewModel.postedTopics.count)", label: "Bubbles")
-                        statCard(number: "—", label: "Connections")
-                        statCard(number: "—", label: "Clicks")
-                    }
-                    .padding(.horizontal, 20)
-                    
                     // active bubbles from topics you've posted about
                     VStack(alignment: .leading, spacing: 14) {
                         
@@ -194,31 +186,6 @@ struct ProfileView: View {
                 .font(.caption.bold())
                 .foregroundColor(.white.opacity(0.9))
         }
-    }
-    
-    // statistics card
-    private func statCard(number: String, label: String) -> some View {
-        
-        VStack(spacing: 6) {
-            
-            Text(number)
-                .font(.title2.bold())
-                .foregroundColor(.white)
-            
-            Text(label)
-                .font(.caption)
-                .foregroundColor(.white.opacity(0.7))
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 14)
-        .background(
-            RoundedRectangle(cornerRadius: 18)
-                .fill(Color.white.opacity(0.10))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18)
-                        .stroke(Color.white.opacity(0.18), lineWidth: 1)
-                )
-        )
     }
     
     // feed card

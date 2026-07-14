@@ -32,29 +32,6 @@ struct GraphFeedView: View {
 
             ScrollView {
                 VStack(spacing: 28) {
-                    HStack {
-                        Spacer()
-
-                        NavigationLink {
-                            CreatePostView()
-                        } label: {
-                            Image(systemName: "square.and.pencil")
-                                .font(.system(size: 20, weight: .semibold))
-                                .foregroundColor(.white)
-                                .padding(10)
-                                .background(Color.white.opacity(0.15))
-                                .clipShape(Circle())
-                                .overlay(
-                                    Circle()
-                                        .stroke(Color.white.opacity(0.25), lineWidth: 1)
-                                )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    .padding(.top, 8)
-
-                    Spacer().frame(height: 25)
-
                     headerSection
                     contextCard
 

@@ -33,6 +33,15 @@ struct MainTabView: View {
                         }
                         .accessibilityLabel(feedMode == .graph ? "Switch to Feed" : "Switch to Graph")
                     }
+
+                    ToolbarItem(placement: .topBarTrailing) {
+                        NavigationLink {
+                            CreatePostView()
+                        } label: {
+                            Label("Create Post", systemImage: "square.and.pencil")
+                        }
+                        .accessibilityLabel("Create Post")
+                    }
                 }
             }
             .tabItem {

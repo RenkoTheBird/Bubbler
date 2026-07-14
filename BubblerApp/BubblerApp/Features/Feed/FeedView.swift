@@ -47,32 +47,6 @@ struct FeedView: View {
             ScrollView {
                 
                 VStack(spacing: 28) {
-                    
-                    // Create Post button
-                    HStack {
-
-                        Spacer()
-
-                        NavigationLink {
-                            CreatePostView()
-                        } label: {
-                            Image(systemName: "square.and.pencil")
-                                .font(.system(size: 20, weight: .semibold))
-                                .foregroundColor(.white)
-                                .padding(10)
-                                .background(Color.white.opacity(0.15))
-                                .clipShape(Circle())
-                                .overlay(
-                                    Circle()
-                                        .stroke(Color.white.opacity(0.25), lineWidth: 1)
-                                )
-                        }
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.top, -20)
-
-                    Spacer().frame(height: 1)
-                    
                     // header
                     VStack(spacing: 8) {
                         

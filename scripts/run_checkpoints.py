@@ -4,7 +4,7 @@ Bubbler checkpoint runner — roadmap Phases 0–6.
 
 Prerequisites:
   - Postgres running (credentials in backend/.env, e.g. PORT=5433)
-  - API server: cd backend && pipenv run uvicorn main:app --host 127.0.0.1 --port 8000
+  - API server: cd backend && pipenv run uvicorn main:app --host 127.0.0.1 --port 8000 --workers 1
 
 Run from repo root:
   pipenv run --directory backend python ../scripts/run_checkpoints.py
@@ -45,7 +45,7 @@ Phase 7 maps to post/topic features on the new schema (post_topics, topic_traini
 How to run
 Terminal 1 — start the API (if not already running):
 
-cd backend && pipenv run uvicorn main:app --host 127.0.0.1 --port 8000
+cd backend && pipenv run uvicorn main:app --host 127.0.0.1 --port 8000 --workers 1
 
 Terminal 2 — run checkpoints:
 
@@ -99,7 +99,7 @@ from app.db.topics import DEFAULT_TOPIC, KNOWN_TOPICS  # noqa: E402
 from app.repositories.edge_builder_repo import EdgeBuilderRepo  # noqa: E402
 from app.services.feed import RankingService  # noqa: E402
 from app.services.post import EmbeddingService  # noqa: E402
-from app.ml.embeddings.generate import embed  # noqa: E402
+from app.ml.embeddings.generate import embed_many  # noqa: E402
 from app.db.vector import to_pgvector  # noqa: E402
 
 # --- Test identity (isolated from manual/dev accounts) ---
@@ -216,8 +216,9 @@ def ios_swift_sources() -> list[tuple[str, str]]:
 
 async def seed_topic_embeddings(conn: asyncpg.Connection, topic_names: set[str]) -> None:
     """Upsert topic rows with embeddings for the curated topic list."""
-    for name in sorted(topic_names):
-        topic_vector = to_pgvector(embed(name))
+    names = sorted(topic_names)
+    vectors = embed_many(names)
+    for name, topic_vector in zip(names, vectors):
         await conn.execute(
             """
             INSERT INTO topics (name, embedding)
@@ -226,7 +227,7 @@ async def seed_topic_embeddings(conn: asyncpg.Connection, topic_names: set[str])
             SET embedding = COALESCE(topics.embedding, EXCLUDED.embedding)
             """,
             name,
-            topic_vector,
+            to_pgvector(topic_vector),
         )
 
 
@@ -249,8 +250,9 @@ async def seed_checkpoint_posts(pool: asyncpg.Pool, user_id: int) -> int:
             {*SAMPLE_TOPICS, DEFAULT_TOPIC, *KNOWN_TOPICS},
         )
 
-        for content, topic_name in SAMPLE_POSTS:
-            vector = embed(content)
+        post_contents = [content for content, _ in SAMPLE_POSTS]
+        post_vectors = embed_many(post_contents)
+        for (content, topic_name), vector in zip(SAMPLE_POSTS, post_vectors):
             post_id = await conn.fetchval(
                 """
                 INSERT INTO posts (user_id, content, embedding)

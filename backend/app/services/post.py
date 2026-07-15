@@ -1,10 +1,16 @@
-from app.ml.embeddings.generate import embed
+from app.ml.embeddings.generate import embed, embed_many, preload_model
 from fastapi import HTTPException
 
 
 class EmbeddingService:
-    def embed_text(self, post: str):
+    def preload(self) -> None:
+        preload_model()
+
+    def embed_text(self, post: str) -> list[float]:
         return embed(post)
+
+    def embed_texts(self, texts: list[str]) -> list[list[float]]:
+        return embed_many(texts)
 
 
 class PostService:

@@ -315,9 +315,10 @@ main() {
   fi
 
   print_ready_message
-  log "Starting uvicorn on ${API_HOST}:${API_PORT}"
+  # Single worker so the Hugging Face embedding model loads once in-process.
+  log "Starting uvicorn on ${API_HOST}:${API_PORT} (workers=1)"
   cd "$BACKEND"
-  exec pipenv run uvicorn main:app --host "$API_HOST" --port "$API_PORT"
+  exec pipenv run uvicorn main:app --host "$API_HOST" --port "$API_PORT" --workers 1
 }
 
 main "$@"

@@ -1,19 +1,35 @@
+import threading
+
 _MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 _model = None
+_lock = threading.Lock()
 
 
 def _get_model():
-    """Lazy-load SentenceTransformer so import/startup stays cheap."""
+    """Load SentenceTransformer once per process (thread-safe)."""
     global _model
     if _model is None:
-        from sentence_transformers import SentenceTransformer
+        with _lock:
+            if _model is None:
+                from sentence_transformers import SentenceTransformer
 
-        # all-MiniLM-L6-v2 is a lightweight model for embeddings
-        _model = SentenceTransformer(_MODEL_NAME)
+                # all-MiniLM-L6-v2 is a lightweight model for embeddings
+                _model = SentenceTransformer(_MODEL_NAME)
     return _model
 
 
-def embed(post):
-    # these need to be passed from backend
-    # assume embedding one post at a time
-    return _get_model().encode(post).tolist()
+def preload_model() -> None:
+    """Eagerly load weights so the first request is not a cold start."""
+    _get_model()
+
+
+def embed_many(texts: list[str]) -> list[list[float]]:
+    """Batch-encode texts into embedding vectors."""
+    if not texts:
+        return []
+    vectors = _get_model().encode(texts, show_progress_bar=False)
+    return [vector.tolist() for vector in vectors]
+
+
+def embed(post: str) -> list[float]:
+    return embed_many([post])[0]

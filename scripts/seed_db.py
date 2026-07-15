@@ -19,7 +19,7 @@ load_dotenv(BACKEND_ROOT / ".env")
 from config import my_env_vars  # noqa: E402
 from app.db.topics import DEFAULT_TOPIC, KNOWN_TOPICS  # noqa: E402
 from app.repositories.edge_builder_repo import EdgeBuilderRepo  # noqa: E402
-from app.ml.embeddings.generate import embed  # noqa: E402
+from app.ml.embeddings.generate import embed_many  # noqa: E402
 from app.db.vector import to_pgvector  # noqa: E402
 
 # Topics used for sample content (names must match topics.py).
@@ -365,8 +365,9 @@ async def main():
             user_id,
         )
 
-        for name in sorted({*SAMPLE_TOPICS, DEFAULT_TOPIC, *KNOWN_TOPICS}):
-            topic_vector = to_pgvector(embed(name))
+        topic_names = sorted({*SAMPLE_TOPICS, DEFAULT_TOPIC, *KNOWN_TOPICS})
+        topic_vectors = embed_many(topic_names)
+        for name, topic_vector in zip(topic_names, topic_vectors):
             await conn.execute(
                 """
                 INSERT INTO topics (name, embedding)
@@ -375,12 +376,13 @@ async def main():
                 SET embedding = COALESCE(topics.embedding, EXCLUDED.embedding)
                 """,
                 name,
-                topic_vector,
+                to_pgvector(topic_vector),
             )
 
+        post_contents = [content for content, _ in SAMPLE_POSTS]
+        post_vectors = embed_many(post_contents)
         inserted: list[tuple[object, list[float]]] = []
-        for content, topic_name in SAMPLE_POSTS:
-            vector = embed(content)
+        for (content, topic_name), vector in zip(SAMPLE_POSTS, post_vectors):
             post_id = await conn.fetchval(
                 """
                 INSERT INTO posts (user_id, content, embedding)

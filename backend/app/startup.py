@@ -70,6 +70,8 @@ async def lifespan(fastapi: FastAPI):
     graph_service = GraphService(feed_repo)
     interaction_service = InteractionService(interaction_repo)
     embedding_service = EmbeddingService()
+    embedding_service.preload()
+    logger.info("Embedding model loaded (single API worker owns the model)")
     topic_detection_service = TopicDetectionService(post_repo, embedding_service)
     post_service = PostService(post_repo, edge_builder_repo, embedding_service, topic_detection_service)
     user_service = UserService(user_repo)

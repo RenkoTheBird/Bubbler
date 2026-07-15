@@ -17,10 +17,9 @@ class TopicDetectionService:
 
     def _get_known_topic_embeddings(self) -> dict[str, list[float]]:
         if self._known_topic_embeddings is None:
-            self._known_topic_embeddings = {
-                topic_name: self.embedding_service.embed_text(topic_name)
-                for topic_name in sorted(KNOWN_TOPICS)
-            }
+            topic_names = sorted(KNOWN_TOPICS)
+            vectors = self.embedding_service.embed_texts(topic_names)
+            self._known_topic_embeddings = dict(zip(topic_names, vectors))
         return self._known_topic_embeddings
 
     @staticmethod

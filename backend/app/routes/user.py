@@ -91,4 +91,20 @@ def create_user_router(user_service: UserService, interaction_service: Interacti
     async def delete_user(user_id: int = Depends(get_current_user_id)):
         return await user_service.delete_user(user_id)
 
+    # Public profile lookup — registered after /me so literal "me" paths win.
+    @router.get("/{username}/profile")
+    async def get_profile_by_username(
+        username: str,
+        _user_id: int = Depends(get_current_user_id),
+    ):
+        return await user_service.get_profile_by_username(username)
+
+    @router.get("/{username}/posts")
+    async def get_posts_by_username(
+        username: str,
+        _user_id: int = Depends(get_current_user_id),
+    ):
+        profile = await user_service.get_profile_by_username(username)
+        return await post_service.get_user_posts(profile.id)
+
     return router

@@ -42,6 +42,21 @@ class UserInfo(BaseModel):
         return utc_iso_z(value)
 
 
+class PublicUserInfo(BaseModel):
+    """Profile data safe to show for any user (no email)."""
+
+    id: int
+    username: str
+    created_at: datetime.datetime
+
+    def model_post_init(self, __context) -> None:
+        object.__setattr__(self, "created_at", ensure_utc(self.created_at))
+
+    @field_serializer("created_at")
+    def serialize_created_at(self, value: datetime.datetime) -> str:
+        return utc_iso_z(value)
+
+
 # Doesnt need ID or Register Time autofilled by DB 
 class CreateUser(BaseModel):
     username: str = Field(min_length=1, max_length=20)

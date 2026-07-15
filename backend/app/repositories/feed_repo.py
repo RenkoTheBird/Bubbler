@@ -27,13 +27,16 @@ class FeedRepository:
             yield conn
 
     def _map_post_row(self, row: Any) -> dict[str, Any]:
-        return {
+        mapped = {
             "id": str(row["id"]),
             "content": row["content"],
             "topic": row["topic"],
             "created_at": ensure_utc(row["created_at"]),
             "user_id": row["user_id"],
         }
+        if "username" in row.keys():
+            mapped["username"] = row["username"]
+        return mapped
 
     def _map_similarity_row(self, row: Any) -> dict[str, Any]:
         mapped = {
@@ -46,6 +49,8 @@ class FeedRepository:
             mapped["created_at"] = ensure_utc(row["created_at"])
         if "user_id" in row.keys():
             mapped["user_id"] = row["user_id"]
+        if "username" in row.keys():
+            mapped["username"] = row["username"]
         return mapped
 
     @staticmethod
@@ -89,7 +94,7 @@ class FeedRepository:
         params.append(limit)
         rows = await conn.fetch(
             f"""
-            SELECT pwt.id, pwt.content, pwt.topic, pwt.created_at, pwt.user_id,
+            SELECT {POSTS_WITH_TOPIC_COLUMNS},
                    1 - (pwt.embedding <=> $1::vector) AS similarity
             {POSTS_BASE_FROM}
             WHERE {" AND ".join(where)}

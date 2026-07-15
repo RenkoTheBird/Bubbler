@@ -2,6 +2,7 @@ from app.db.jsonb import normalize_strategy_weights, to_jsonb
 from app.db.datetime_utils import ensure_utc
 from app.schemas.user import (
     DEFAULT_STRATEGY_WEIGHTS,
+    PublicUserInfo,
     TopicPreference,
     UserInfo,
     UserProfile,
@@ -34,6 +35,13 @@ class UserRepository:
             id=row["id"],
             username=row["username"],
             email=row["email"],
+            created_at=ensure_utc(row["created_at"]),
+        )
+
+    def _row_to_public_user_info(self, row) -> PublicUserInfo:
+        return PublicUserInfo(
+            id=row["id"],
+            username=row["username"],
             created_at=ensure_utc(row["created_at"]),
         )
 
@@ -109,6 +117,22 @@ class UserRepository:
             return None
 
         return self._row_to_user_info(row)
+
+    async def get_profile_by_username(self, username: str) -> PublicUserInfo | None:
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT id, username, created_at
+                FROM users
+                WHERE username_lower = lower($1)
+                """,
+                username,
+            )
+
+        if not row:
+            return None
+
+        return self._row_to_public_user_info(row)
 
     async def put_email(self, email: str, user_id: int) -> UserInfo | None:
         async with self.pool.acquire() as conn:

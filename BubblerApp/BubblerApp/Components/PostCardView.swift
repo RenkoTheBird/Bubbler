@@ -67,9 +67,7 @@ struct PostCardView: View {
                 .foregroundColor(.white)
                 .multilineTextAlignment(.leading)
 
-            Text("Posted by user #\(post.userId)")
-                .font(.caption)
-                .foregroundColor(.white.opacity(0.7))
+            authorRow
 
             if isOwned {
                 ownerActions
@@ -106,6 +104,24 @@ struct PostCardView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This permanently removes your post.")
+        }
+    }
+
+    @ViewBuilder
+    private var authorRow: some View {
+        if let username = post.username, !username.isEmpty {
+            NavigationLink {
+                UserProfileView(username: username)
+            } label: {
+                Text("Posted by \(post.authorLabel)")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.7))
+            }
+            .buttonStyle(.plain)
+        } else {
+            Text("Posted by \(post.authorLabel)")
+                .font(.caption)
+                .foregroundColor(.white.opacity(0.7))
         }
     }
 
@@ -191,6 +207,7 @@ struct PostCardView: View {
                 post: Post(
                     id: "preview-post",
                     userId: 0,
+                    username: "preview",
                     content: "",
                     createdAt: .now.addingTimeInterval(-2_700),
                     topic: nil,

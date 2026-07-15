@@ -181,14 +181,11 @@ struct GraphFeedView: View {
                 bubbleCard("No connected posts are ready yet. You can like, skip, prefer/blacklist the topic, or refresh.")
             } else {
                 ForEach(viewModel.nextChoices) { node in
-                    Button {
+                    postCard(node, isInteractive: true) {
                         Task {
                             await viewModel.choose(node, using: authSession)
                         }
-                    } label: {
-                        postCard(node, isInteractive: true)
                     }
-                    .buttonStyle(.plain)
                     .disabled(viewModel.isSubmitting)
                 }
             }
@@ -327,58 +324,81 @@ struct GraphFeedView: View {
         }
     }
 
-    private func postCard(_ node: GraphFeedNode, isInteractive: Bool) -> some View {
+    private func postCard(
+        _ node: GraphFeedNode,
+        isInteractive: Bool,
+        onSelect: (() -> Void)? = nil
+    ) -> some View {
         let topicName = node.topicName ?? "Topicless"
         let nodeColor = topicColor(for: topicName)
 
         return VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(nodeColor)
-                            .frame(width: 8, height: 8)
-                            .shadow(color: nodeColor.opacity(0.8), radius: 6)
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 8) {
+                            Circle()
+                                .fill(nodeColor)
+                                .frame(width: 8, height: 8)
+                                .shadow(color: nodeColor.opacity(0.8), radius: 6)
 
-                        Text(topicName.uppercased())
-                            .font(.caption.bold())
-                            .foregroundColor(.white.opacity(0.85))
-                            .tracking(1)
+                            Text(topicName.uppercased())
+                                .font(.caption.bold())
+                                .foregroundColor(.white.opacity(0.85))
+                                .tracking(1)
+                        }
+
+                        if node.isPreferredTopic {
+                            tagLabel("Preferred Topic", tint: .pink)
+                        }
+
+                        if node.isBlacklistedTopic {
+                            tagLabel("Blacklisted Topic", tint: .orange)
+                        }
                     }
 
-                    if node.isPreferredTopic {
-                        tagLabel("Preferred Topic", tint: .pink)
-                    }
+                    Spacer()
 
-                    if node.isBlacklistedTopic {
-                        tagLabel("Blacklisted Topic", tint: .orange)
+                    VStack(alignment: .trailing, spacing: 6) {
+                        Text(node.createdAt, style: .relative)
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.65))
+
+                        if isInteractive {
+                            Text("Tap to explore")
+                                .font(.caption2.bold())
+                                .foregroundColor(.white.opacity(0.58))
+                        }
                     }
                 }
 
-                Spacer()
-
-                VStack(alignment: .trailing, spacing: 6) {
-                    Text(node.createdAt, style: .relative)
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.65))
-
-                    if isInteractive {
-                        Text("Tap to explore")
-                            .font(.caption2.bold())
-                            .foregroundColor(.white.opacity(0.58))
-                    }
-                }
+                Text(node.content)
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                guard isInteractive else { return }
+                onSelect?()
             }
 
-            Text(node.content)
-                .font(.headline)
-                .foregroundColor(.white)
-                .multilineTextAlignment(.leading)
-
             HStack {
-                Text("Posted by user #\(node.userId)")
-                    .font(.caption)
-                    .foregroundColor(.white.opacity(0.72))
+                if let username = node.post.username, !username.isEmpty {
+                    NavigationLink {
+                        UserProfileView(username: username)
+                    } label: {
+                        Text("Posted by \(node.post.authorLabel)")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.72))
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Text("Posted by \(node.post.authorLabel)")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.72))
+                }
 
                 Spacer()
 

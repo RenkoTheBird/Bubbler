@@ -10,7 +10,12 @@ import Combine
 
 struct ProfileView: View {
     @EnvironmentObject private var authSession: AuthSession
-    @StateObject private var viewModel = ProfileViewModel()
+    @StateObject private var viewModel: ProfileViewModel
+
+    /// `nil` shows the signed-in user's profile. Pass a username for another user.
+    init(username: String? = nil) {
+        _viewModel = StateObject(wrappedValue: ProfileViewModel(username: username))
+    }
 
     var body: some View {
         
@@ -78,7 +83,7 @@ struct ProfileView: View {
                             .font(.system(size: 24, weight: .black, design: .rounded))
                             .foregroundColor(.white)
                         
-                        Text("Your bubble profile 🫧")
+                        Text(viewModel.profileSubtitle)
                             .font(.subheadline)
                             .foregroundColor(.white.opacity(0.85))
 
@@ -91,7 +96,7 @@ struct ProfileView: View {
                         }
                     }
                     
-                    // active bubbles from topics you've posted about
+                    // active bubbles from topics they've posted about
                     VStack(alignment: .leading, spacing: 14) {
                         
                         Text("Active Bubbles")
@@ -100,11 +105,7 @@ struct ProfileView: View {
                             .padding(.horizontal, 35)
                         
                         if viewModel.postedTopics.isEmpty {
-                            Text(
-                                viewModel.isLoading
-                                    ? "Loading your bubbles…"
-                                    : "Post about a topic to grow your bubbles."
-                            )
+                            Text(viewModel.emptyBubblesMessage)
                             .font(.subheadline)
                             .foregroundColor(.white.opacity(0.75))
                             .padding(.horizontal, 35)
@@ -125,23 +126,21 @@ struct ProfileView: View {
                         }
                     }
                     
-                    // bubble trail (GET /user/me, max 20)
-                    VStack(alignment: .leading, spacing: 14) {
-                        
-                        Text("Your Bubble Trail")
-                            .font(.title3.bold())
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 35)
-                        
-                        if viewModel.trailInteractions.isEmpty {
-                            feedSnippet(
-                                viewModel.isLoading
-                                    ? "Loading your bubble trail…"
-                                    : "Your bubble trail will appear here once you start interacting with posts."
-                            )
-                        } else {
-                            ForEach(viewModel.trailInteractions) { interaction in
-                                feedSnippet(interaction.trailSummary)
+                    // bubble trail — only for the signed-in user's own profile
+                    if viewModel.isOwnProfile {
+                        VStack(alignment: .leading, spacing: 14) {
+                            
+                            Text("Your Bubble Trail")
+                                .font(.title3.bold())
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 35)
+                            
+                            if viewModel.trailInteractions.isEmpty {
+                                feedSnippet(viewModel.emptyTrailMessage)
+                            } else {
+                                ForEach(viewModel.trailInteractions) { interaction in
+                                    feedSnippet(interaction.trailSummary)
+                                }
                             }
                         }
                     }
@@ -212,7 +211,12 @@ struct ProfileView: View {
     }
 }
 
-#Preview {
+#Preview("Own profile") {
     ProfileView()
+        .environmentObject(AuthSession())
+}
+
+#Preview("Other user") {
+    ProfileView(username: "alex")
         .environmentObject(AuthSession())
 }

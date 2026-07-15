@@ -118,7 +118,7 @@ struct SettingsView: View {
                         NavigationLink {
                             PreferencesSettingsView()
                         } label: {
-                            settingsRow(icon: "slider.horizontal.3", title: "Bubble Sensitivity")
+                            settingsRow(icon: "slider.horizontal.3", title: "Recommendation Preferences")
                         }
                         .buttonStyle(.plain)
                     }

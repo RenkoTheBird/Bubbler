@@ -196,6 +196,7 @@ final class GraphFeedViewModel: ObservableObject {
         let updatedPost = Post(
             id: existing.id,
             userId: existing.userId,
+            username: existing.username,
             content: content,
             createdAt: existing.createdAt,
             topic: existing.topic,

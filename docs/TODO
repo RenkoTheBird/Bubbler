@@ -1,10 +1,10 @@
 -- IMMEDIATE
-- Create API for Profile stats
-- Deal with Orphaned screens (BubbleDetail, UserProfileView)
+- Deal with Orphaned screens (BubbleDetail)
 - Test Settings properly
 - make GraphFeedView more bubbly
 - Fix search
 - Optimize HF loads
+- Own posts can't show up in feed
 
 -- BEFORE PRODUCTION
 add media support

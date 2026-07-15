@@ -10,6 +10,12 @@ class UserService:
             raise HTTPException(status_code=404, detail="User not found")
         return profile
 
+    async def get_profile_by_username(self, username: str):
+        profile = await self.user_repo.get_profile_by_username(username)
+        if profile is None:
+            raise HTTPException(status_code=404, detail="User not found")
+        return profile
+
     async def put_email(self, email, user_id):
         updated = await self.user_repo.put_email(email, user_id)
         if updated is None:

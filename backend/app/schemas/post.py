@@ -29,6 +29,7 @@ class PostUpdate(BaseModel):
 class Post(BaseModel):
     id: str
     user_id: int
+    username: Optional[str] = None
     content: str
     embedding: Optional[list[float]] = None
     created_at: datetime.datetime

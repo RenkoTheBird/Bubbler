@@ -5,6 +5,7 @@ import Foundation
 struct Post: Codable, Identifiable {
     let id: String
     let userId: Int
+    let username: String?
     let content: String
     let createdAt: Date
     let topic: String?
@@ -15,9 +16,17 @@ struct Post: Codable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case id
         case userId = "user_id"
+        case username
         case content
         case createdAt = "created_at"
         case embedding
         case topic
+    }
+
+    var authorLabel: String {
+        if let username, !username.isEmpty {
+            return "@\(username)"
+        }
+        return "user #\(userId)"
     }
 }

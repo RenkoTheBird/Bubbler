@@ -355,9 +355,11 @@ class PostRepository:
         return result == "DELETE 1"
 
     def _map_row(self, row) -> Post:
+        username = row["username"] if "username" in row.keys() else None
         return Post(
             id=str(row["id"]),
             user_id=row["user_id"],
+            username=username,
             content=row["content"],
             embedding=None,
             created_at=ensure_utc(row["created_at"]),

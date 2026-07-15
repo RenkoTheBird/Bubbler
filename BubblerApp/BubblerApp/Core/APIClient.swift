@@ -132,6 +132,13 @@ enum APIClient {
         return try apiJSONDecoder.decode(User.self, from: data)
     }
 
+    /// Public profile for any user by username.
+    static func getUser(username: String) async throws -> PublicUser {
+        let encoded = username.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? username
+        let data = try await authorizedRequest(path: "user/\(encoded)/profile")
+        return try apiJSONDecoder.decode(PublicUser.self, from: data)
+    }
+
     static func updateEmail(_ email: String) async throws -> User {
         let body = try JSONEncoder().encode(EmailUpdateBody(email: email))
         let data = try await authorizedRequest(
@@ -184,6 +191,12 @@ enum APIClient {
 
     static func getMyPosts() async throws -> [Post] {
         let data = try await authorizedRequest(path: "user/me/posts")
+        return try apiJSONDecoder.decode([Post].self, from: data)
+    }
+
+    static func getUserPosts(username: String) async throws -> [Post] {
+        let encoded = username.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? username
+        let data = try await authorizedRequest(path: "user/\(encoded)/posts")
         return try apiJSONDecoder.decode([Post].self, from: data)
     }
 

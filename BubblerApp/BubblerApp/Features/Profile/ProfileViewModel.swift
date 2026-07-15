@@ -14,13 +14,27 @@ final class ProfileViewModel: ObservableObject {
     @Published private(set) var isLoading = false
     @Published var errorMessage: String?
 
+    /// `nil` loads the signed-in user's profile (`/user/me/...`).
+    let targetUsername: String?
+
     private var hasLoaded = false
+
+    init(username: String? = nil) {
+        let trimmed = username?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        self.targetUsername = trimmed.isEmpty ? nil : trimmed
+    }
+
+    var isOwnProfile: Bool { targetUsername == nil }
 
     var displayUsername: String {
         if let username, !username.isEmpty {
             return "@\(username)"
         }
         return isLoading ? "Loading..." : "@…"
+    }
+
+    var profileSubtitle: String {
+        isOwnProfile ? "Your bubble profile 🫧" : "Bubble node in your network"
     }
 
     var activeBubbleLabel: String {
@@ -30,6 +44,21 @@ final class ProfileViewModel: ObservableObject {
         return "🫧 Active Bubble: \(KnownTopics.displayName(for: topic))"
     }
 
+    var emptyBubblesMessage: String {
+        if isLoading {
+            return isOwnProfile ? "Loading your bubbles…" : "Loading bubbles…"
+        }
+        return isOwnProfile
+            ? "Post about a topic to grow your bubbles."
+            : "No bubbles yet."
+    }
+
+    var emptyTrailMessage: String {
+        isLoading
+            ? "Loading your bubble trail…"
+            : "Your bubble trail will appear here once you start interacting with posts."
+    }
+
     func loadProfile(using authSession: AuthSession, force: Bool = false) async {
         guard force || !hasLoaded else { return }
 
@@ -37,17 +66,29 @@ final class ProfileViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            async let profileTask = APIClient.getProfile()
-            async let postsTask = APIClient.getMyPosts()
-            async let interactionsTask = APIClient.getMyInteractions()
+            if let targetUsername {
+                async let profileTask = APIClient.getUser(username: targetUsername)
+                async let postsTask = APIClient.getUserPosts(username: targetUsername)
 
-            let profile = try await profileTask
-            let posts = try await postsTask
-            let interactions = try await interactionsTask
+                let profile = try await profileTask
+                let posts = try await postsTask
 
-            username = profile.username
-            postedTopics = Self.uniqueTopics(from: posts)
-            trailInteractions = interactions
+                username = profile.username
+                postedTopics = Self.uniqueTopics(from: posts)
+                trailInteractions = []
+            } else {
+                async let profileTask = APIClient.getProfile()
+                async let postsTask = APIClient.getMyPosts()
+                async let interactionsTask = APIClient.getMyInteractions()
+
+                let profile = try await profileTask
+                let posts = try await postsTask
+                let interactions = try await interactionsTask
+
+                username = profile.username
+                postedTopics = Self.uniqueTopics(from: posts)
+                trailInteractions = interactions
+            }
             hasLoaded = true
         } catch {
             if case APIClientError.unauthorized = error {
@@ -55,7 +96,9 @@ final class ProfileViewModel: ObservableObject {
             }
             let description = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
             errorMessage = description.isEmpty
-                ? "We couldn't load your profile."
+                ? (isOwnProfile
+                    ? "We couldn't load your profile."
+                    : "We couldn't load this profile.")
                 : description
         }
 

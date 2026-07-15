@@ -2,13 +2,28 @@ import SwiftUI
 
 struct PostCardView: View {
     let post: Post
+    var isLiked: Bool = false
+    var showsSkip: Bool = false
+    var isCompact: Bool = false
+    var isTopicPreferred: Bool = false
+    var isTopicBlacklisted: Bool = false
+    var onSkip: (() -> Void)?
+    var onLikeChanged: ((Bool) -> Void)?
+    var onTopicPreferenceChanged: (() -> Void)?
     var onDeleted: (() -> Void)?
     var onEdited: ((String) -> Void)?
 
     @EnvironmentObject private var authSession: AuthSession
     @State private var showDeleteConfirmation = false
+    @State private var showTopicMenu = false
     @State private var isDeleting = false
+    @State private var isTogglingLike = false
+    @State private var isUpdatingTopicPreference = false
+    @State private var likedLocally: Bool?
+    @State private var preferredLocally: Bool?
+    @State private var blacklistedLocally: Bool?
     @State private var actionError: String?
+    @State private var appearedAt = Date()
 
     private var isOwned: Bool {
         guard let userId = authSession.userId else { return false }
@@ -25,23 +40,27 @@ struct PostCardView: View {
 
     private var accentColor: Color {
         guard let topicName else { return .white }
+        return TopicStyle.color(for: topicName)
+    }
 
-        switch topicName.lowercased() {
-        case "tech", "technology", "ai":
-            return .blue
-        case "space", "science":
-            return .purple
-        case "sports":
-            return .green
-        case "music":
-            return .orange
-        default:
-            return .cyan
-        }
+    private var currentlyLiked: Bool {
+        likedLocally ?? isLiked
+    }
+
+    private var currentlyPreferred: Bool {
+        preferredLocally ?? isTopicPreferred
+    }
+
+    private var currentlyBlacklisted: Bool {
+        blacklistedLocally ?? isTopicBlacklisted
+    }
+
+    private var contentLineLimit: Int? {
+        isCompact ? 3 : nil
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: isCompact ? 10 : 12) {
             HStack(alignment: .center) {
                 HStack(spacing: 8) {
                     Circle()
@@ -53,6 +72,18 @@ struct PostCardView: View {
                         .font(.caption.bold())
                         .foregroundColor(.white.opacity(0.85))
                         .tracking(1)
+
+                    if currentlyPreferred {
+                        Image(systemName: "star.fill")
+                            .font(.caption2)
+                            .foregroundColor(.yellow.opacity(0.9))
+                    }
+
+                    if currentlyBlacklisted {
+                        Image(systemName: "eye.slash.fill")
+                            .font(.caption2)
+                            .foregroundColor(.orange.opacity(0.9))
+                    }
                 }
 
                 Spacer()
@@ -60,14 +91,33 @@ struct PostCardView: View {
                 Text(post.createdAt, style: .relative)
                     .font(.caption)
                     .foregroundColor(.white.opacity(0.65))
+
+                if topicName != nil {
+                    Button {
+                        showTopicMenu = true
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.body.weight(.semibold))
+                            .foregroundColor(.white.opacity(0.85))
+                            .padding(8)
+                            .background(Color.white.opacity(0.12))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isUpdatingTopicPreference)
+                    .accessibilityLabel("Topic options")
+                }
             }
 
             Text(post.content)
-                .font(.headline)
+                .font(isCompact ? .subheadline.weight(.semibold) : .headline)
                 .foregroundColor(.white)
                 .multilineTextAlignment(.leading)
+                .lineLimit(contentLineLimit)
 
             authorRow
+
+            actionRow
 
             if isOwned {
                 ownerActions
@@ -79,20 +129,42 @@ struct PostCardView: View {
                     .foregroundColor(.red.opacity(0.9))
             }
         }
-        .padding(16)
+        .padding(isCompact ? 12 : 16)
         .background(
             ZStack {
-                RoundedRectangle(cornerRadius: 22)
+                RoundedRectangle(cornerRadius: isCompact ? 18 : 22)
                     .fill(Color.white.opacity(0.10))
 
-                RoundedRectangle(cornerRadius: 22)
+                RoundedRectangle(cornerRadius: isCompact ? 18 : 22)
                     .stroke(accentColor.opacity(0.25), lineWidth: 1)
 
-                RoundedRectangle(cornerRadius: 22)
+                RoundedRectangle(cornerRadius: isCompact ? 18 : 22)
                     .stroke(Color.white.opacity(0.08), lineWidth: 1)
             }
         )
         .shadow(color: accentColor.opacity(0.15), radius: 20, x: 0, y: 10)
+        .onAppear {
+            appearedAt = Date()
+            likedLocally = nil
+            preferredLocally = nil
+            blacklistedLocally = nil
+        }
+        .onChange(of: post.id) { _, _ in
+            appearedAt = Date()
+            likedLocally = nil
+            preferredLocally = nil
+            blacklistedLocally = nil
+            actionError = nil
+        }
+        .onChange(of: isLiked) { _, _ in
+            likedLocally = nil
+        }
+        .onChange(of: isTopicPreferred) { _, _ in
+            preferredLocally = nil
+        }
+        .onChange(of: isTopicBlacklisted) { _, _ in
+            blacklistedLocally = nil
+        }
         .confirmationDialog(
             "Delete this post?",
             isPresented: $showDeleteConfirmation,
@@ -105,6 +177,33 @@ struct PostCardView: View {
         } message: {
             Text("This permanently removes your post.")
         }
+        .confirmationDialog(
+            topicMenuTitle,
+            isPresented: $showTopicMenu,
+            titleVisibility: .visible
+        ) {
+            if let topicName {
+                Button(currentlyPreferred ? "Unprefer Topic" : "Prefer Topic") {
+                    Task { await togglePreferTopic(topicName) }
+                }
+                Button(
+                    currentlyBlacklisted ? "Unblacklist Topic" : "Blacklist Topic",
+                    role: currentlyBlacklisted ? nil : .destructive
+                ) {
+                    Task { await toggleBlacklistTopic(topicName) }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            if let topicName {
+                Text("Update how Bubbler treats \(KnownTopics.displayName(for: topicName)).")
+            }
+        }
+    }
+
+    private var topicMenuTitle: String {
+        guard let topicName else { return "Topic options" }
+        return KnownTopics.displayName(for: topicName)
     }
 
     @ViewBuilder
@@ -123,6 +222,66 @@ struct PostCardView: View {
                 .font(.caption)
                 .foregroundColor(.white.opacity(0.7))
         }
+    }
+
+    private var actionRow: some View {
+        HStack(spacing: 10) {
+            Button {
+                Task { await toggleLike() }
+            } label: {
+                HStack(spacing: 6) {
+                    if isTogglingLike {
+                        ProgressView()
+                            .tint(.white)
+                            .scaleEffect(0.8)
+                    } else {
+                        Image(systemName: currentlyLiked ? "heart.fill" : "heart")
+                    }
+                    Text(currentlyLiked ? "Liked" : "Like")
+                        .font(.caption.weight(.semibold))
+                }
+                .foregroundColor(currentlyLiked ? .pink : .white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule()
+                        .fill(currentlyLiked ? Color.pink.opacity(0.22) : Color.white.opacity(0.12))
+                        .overlay(
+                            Capsule()
+                                .stroke(
+                                    currentlyLiked ? Color.pink.opacity(0.45) : Color.white.opacity(0.16),
+                                    lineWidth: 1
+                                )
+                        )
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(isTogglingLike)
+
+            if showsSkip {
+                Button {
+                    onSkip?()
+                } label: {
+                    Label("Skip", systemImage: "arrow.right.circle")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(
+                            Capsule()
+                                .fill(Color.white.opacity(0.12))
+                                .overlay(
+                                    Capsule()
+                                        .stroke(Color.white.opacity(0.16), lineWidth: 1)
+                                )
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+
+            Spacer()
+        }
+        .padding(.top, 2)
     }
 
     private var ownerActions: some View {
@@ -170,6 +329,88 @@ struct PostCardView: View {
         .padding(.top, 4)
     }
 
+    private func toggleLike() async {
+        isTogglingLike = true
+        actionError = nil
+        defer { isTogglingLike = false }
+
+        do {
+            if currentlyLiked {
+                try await APIClient.deleteLike(postId: post.id)
+                likedLocally = false
+                onLikeChanged?(false)
+            } else {
+                let viewTime = max(0, Date().timeIntervalSince(appearedAt))
+                try await APIClient.recordInteraction(
+                    GraphInteractionPayload(
+                        postId: post.id,
+                        type: .like,
+                        viewTime: viewTime
+                    )
+                )
+                likedLocally = true
+                onLikeChanged?(true)
+            }
+        } catch {
+            if case APIClientError.unauthorized = error {
+                authSession.signOut()
+            }
+            actionError = error.localizedDescription
+        }
+    }
+
+    private func togglePreferTopic(_ topic: String) async {
+        isUpdatingTopicPreference = true
+        actionError = nil
+        defer { isUpdatingTopicPreference = false }
+
+        do {
+            var preferences = try await APIClient.getPreferences().sanitized()
+            if currentlyPreferred {
+                preferences.unpreferTopic(topic)
+                preferredLocally = false
+            } else {
+                preferences.preferTopic(topic)
+                preferredLocally = true
+                blacklistedLocally = false
+            }
+            _ = try await APIClient.updatePreferences(preferences.sanitized().updatePayload)
+            onTopicPreferenceChanged?()
+        } catch {
+            if case APIClientError.unauthorized = error {
+                authSession.signOut()
+            }
+            preferredLocally = nil
+            actionError = error.localizedDescription
+        }
+    }
+
+    private func toggleBlacklistTopic(_ topic: String) async {
+        isUpdatingTopicPreference = true
+        actionError = nil
+        defer { isUpdatingTopicPreference = false }
+
+        do {
+            var preferences = try await APIClient.getPreferences().sanitized()
+            if currentlyBlacklisted {
+                preferences.unblacklistTopic(topic)
+                blacklistedLocally = false
+            } else {
+                preferences.blacklistTopic(topic)
+                blacklistedLocally = true
+                preferredLocally = false
+            }
+            _ = try await APIClient.updatePreferences(preferences.sanitized().updatePayload)
+            onTopicPreferenceChanged?()
+        } catch {
+            if case APIClientError.unauthorized = error {
+                authSession.signOut()
+            }
+            blacklistedLocally = nil
+            actionError = error.localizedDescription
+        }
+    }
+
     private func deletePost() async {
         isDeleting = true
         actionError = nil
@@ -208,14 +449,14 @@ struct PostCardView: View {
                     id: "preview-post",
                     userId: 0,
                     username: "preview",
-                    content: "",
+                    content: "A sample bubble post for the card preview.",
                     createdAt: .now.addingTimeInterval(-2_700),
-                    topic: nil,
+                    topic: "technology",
                     embedding: nil
-                )
+                ),
+                showsSkip: true
             )
             .padding()
-            .redacted(reason: .placeholder)
         }
         .environmentObject(AuthSession())
     }

@@ -209,6 +209,37 @@ final class GraphFeedViewModel: ObservableObject {
         )
     }
 
+    func syncCurrentPostLiked(_ liked: Bool) {
+        guard let currentNode else { return }
+        if liked {
+            likedPostIDs.insert(currentNode.id)
+        } else {
+            likedPostIDs.remove(currentNode.id)
+        }
+        isCurrentPostLiked = liked
+    }
+
+    /// Reloads preferences and refreshes prefer/blacklist flags after PostCardView owns the prefs update.
+    func syncTopicPreferences(using authSession: AuthSession) async {
+        do {
+            preferences = try await APIClient.getPreferences().sanitized()
+            refreshPreferenceFlags()
+
+            if let currentNode, currentNode.isBlacklistedTopic {
+                nextChoices = []
+                sessionQueue = []
+                try await recordInteraction(for: currentNode, type: .skip)
+                await loadSession(
+                    using: authSession,
+                    diversify: true,
+                    message: "Topic blacklisted. Exploring other bubbles."
+                )
+            }
+        } catch {
+            handle(error, using: authSession, fallbackMessage: "We couldn't refresh topic preferences.")
+        }
+    }
+
     func deleteCurrentPost(using authSession: AuthSession) async {
         guard let currentNode else { return }
 
@@ -218,28 +249,47 @@ final class GraphFeedViewModel: ObservableObject {
         do {
             try await APIClient.deletePost(id: currentNode.id)
             authSession.showSuccessMessage("Post deleted.")
-
-            likedPostIDs.remove(currentNode.id)
-            nextChoices.removeAll { $0.id == currentNode.id }
-            sessionQueue.removeAll { $0.id == currentNode.id }
-
-            if let nextNode = nextAutomaticNode(excluding: currentNode.id) {
-                await setCurrentNode(nextNode, using: authSession)
-                if errorMessage == nil {
-                    statusMessage = "Deleted your post and moved ahead."
-                }
-            } else {
-                await loadSession(
-                    using: authSession,
-                    diversify: true,
-                    message: "Deleted your post. Exploring other bubbles."
-                )
-            }
+            await advanceAfterCurrentPostRemoved(
+                using: authSession,
+                successMessage: "Deleted your post and moved ahead."
+            )
         } catch {
             handle(error, using: authSession, fallbackMessage: "We couldn't delete that post.")
         }
 
         isSubmitting = false
+    }
+
+    /// Called when PostCardView already deleted the current post via the API.
+    func handleCurrentPostDeleted(using authSession: AuthSession) async {
+        await advanceAfterCurrentPostRemoved(
+            using: authSession,
+            successMessage: "Deleted your post and moved ahead."
+        )
+    }
+
+    private func advanceAfterCurrentPostRemoved(
+        using authSession: AuthSession,
+        successMessage: String
+    ) async {
+        guard let currentNode else { return }
+
+        likedPostIDs.remove(currentNode.id)
+        nextChoices.removeAll { $0.id == currentNode.id }
+        sessionQueue.removeAll { $0.id == currentNode.id }
+
+        if let nextNode = nextAutomaticNode(excluding: currentNode.id) {
+            await setCurrentNode(nextNode, using: authSession)
+            if errorMessage == nil {
+                statusMessage = successMessage
+            }
+        } else {
+            await loadSession(
+                using: authSession,
+                diversify: true,
+                message: "Deleted your post. Exploring other bubbles."
+            )
+        }
     }
 
     func viewTimeText(at date: Date) -> String {
@@ -516,9 +566,7 @@ final class GraphFeedViewModel: ObservableObject {
         var parts: [String] = []
 
         if node.isPreferredTopic, let topicName = node.topicName {
-            parts.append("Preferred topic active: \(topicName)")
-        } else if let topicName = node.topicName {
-            parts.append("Current topic: \(topicName)")
+            parts.append("Preferred: \(topicName)")
         }
 
         if let seedStrategyLabel {

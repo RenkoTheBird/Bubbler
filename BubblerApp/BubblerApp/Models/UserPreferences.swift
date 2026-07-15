@@ -43,17 +43,22 @@ struct UserPreferences: Codable, Equatable {
         case strategyWeights = "strategy_weights"
     }
 
-    static let placeholder = UserPreferences(
-        userId: 0,
-        diversityTolerance: 0.4,
-        randomness: 0.4,
-        topicPreferences: [],
-        useViewTime: false,
-        viewTimeWeight: 0.1,
-        useRecency: true,
-        aiTopicDetection: false,
-        strategyWeights: .default
-    )
+    static let placeholder = systemDefaults(userId: 0)
+
+    /// Built-in algorithm defaults (matches backend `default_user_prefs`).
+    static func systemDefaults(userId: Int) -> UserPreferences {
+        UserPreferences(
+            userId: userId,
+            diversityTolerance: 0.4,
+            randomness: 0.4,
+            topicPreferences: [],
+            useViewTime: false,
+            viewTimeWeight: 0.1,
+            useRecency: true,
+            aiTopicDetection: false,
+            strategyWeights: .default
+        )
+    }
 
     var preferredTopics: [String] {
         topicPreferences

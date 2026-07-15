@@ -197,14 +197,38 @@ struct PreferencesSettingsView: View {
     private var aiTopicSection: some View {
         PreferenceSectionCard(
             title: "AI Topic Detection",
-            subtitle: "When enabled, your topic classifications can help train smarter topic suggestions. AI suggestions are not active yet."
+            subtitle: PreferencesSettingsViewModel.isAITopicDetectionAvailable
+                ? "When enabled, your topic classifications can help train smarter topic suggestions."
+                : "Coming soon. Topic training contributions and AI suggestions are not available yet."
         ) {
-            Toggle(isOn: $viewModel.preferences.aiTopicDetection) {
-                Text("Contribute Topic Classifications")
-                    .foregroundColor(.white.opacity(0.9))
-                    .font(.subheadline.weight(.semibold))
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Contribute Topic Classifications")
+                        .foregroundColor(.white.opacity(
+                            PreferencesSettingsViewModel.isAITopicDetectionAvailable ? 0.9 : 0.55
+                        ))
+                        .font(.subheadline.weight(.semibold))
+
+                    if !PreferencesSettingsViewModel.isAITopicDetectionAvailable {
+                        Text("Unavailable")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(.white.opacity(0.45))
+                    }
+                }
+
+                Spacer()
+
+                Toggle(
+                    "",
+                    isOn: PreferencesSettingsViewModel.isAITopicDetectionAvailable
+                        ? $viewModel.preferences.aiTopicDetection
+                        : .constant(false)
+                )
+                .labelsHidden()
+                .toggleStyle(SwitchToggleStyle(tint: .mint))
+                .disabled(!PreferencesSettingsViewModel.isAITopicDetectionAvailable)
+                .opacity(PreferencesSettingsViewModel.isAITopicDetectionAvailable ? 1 : 0.45)
             }
-            .toggleStyle(SwitchToggleStyle(tint: .mint))
         }
     }
 
@@ -253,6 +277,23 @@ struct PreferencesSettingsView: View {
             }
             .disabled(viewModel.isSaving)
 
+            Button {
+                viewModel.restoreDefaults()
+            } label: {
+                Text("Restore Defaults")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .foregroundColor(.white.opacity(0.9))
+                    .background(Color.white.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 18))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18)
+                            .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                    )
+            }
+            .disabled(viewModel.isSaving)
+
             Button("Reload from Server") {
                 Task {
                     await viewModel.reloadPreferences(using: authSession)
@@ -260,6 +301,7 @@ struct PreferencesSettingsView: View {
             }
             .foregroundColor(.white.opacity(0.78))
             .font(.subheadline)
+            .disabled(viewModel.isSaving)
         }
     }
 }

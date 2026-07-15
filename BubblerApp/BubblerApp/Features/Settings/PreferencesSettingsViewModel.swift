@@ -8,6 +8,9 @@ import Combine
 
 @MainActor
 final class PreferencesSettingsViewModel: ObservableObject {
+    /// Flip when AI topic detection / contribution is actually hooked up server-side.
+    static let isAITopicDetectionAvailable = false
+
     @Published var preferences = UserPreferences.placeholder
     @Published var isLoading = true
     @Published var isSaving = false
@@ -30,6 +33,7 @@ final class PreferencesSettingsViewModel: ObservableObject {
 
         do {
             preferences = try await APIClient.getPreferences()
+            applyFeatureGates()
             hasLoaded = true
         } catch {
             handle(error, using: authSession, fallbackMessage: "We couldn't fetch your saved preferences.")
@@ -43,6 +47,13 @@ final class PreferencesSettingsViewModel: ObservableObject {
         await loadPreferences(using: authSession, force: true)
     }
 
+    func restoreDefaults() {
+        preferences = UserPreferences.systemDefaults(userId: preferences.userId)
+        applyFeatureGates()
+        errorMessage = nil
+        successMessage = "Defaults restored locally. Tap Save Preferences to apply them."
+    }
+
     func savePreferences(using authSession: AuthSession) async {
         isSaving = true
         errorTitle = "Couldn't save preferences"
@@ -50,15 +61,23 @@ final class PreferencesSettingsViewModel: ObservableObject {
         successMessage = nil
 
         do {
+            applyFeatureGates()
             let sanitized = preferences.sanitized()
             let savedPreferences = try await APIClient.updatePreferences(sanitized.updatePayload)
             preferences = savedPreferences
+            applyFeatureGates()
             successMessage = "Your recommendation settings were saved successfully."
         } catch {
             handle(error, using: authSession, fallbackMessage: "We couldn't save your preferences.")
         }
 
         isSaving = false
+    }
+
+    private func applyFeatureGates() {
+        if !Self.isAITopicDetectionAvailable {
+            preferences.aiTopicDetection = false
+        }
     }
 
     private func handle(_ error: Error, using authSession: AuthSession, fallbackMessage: String) {

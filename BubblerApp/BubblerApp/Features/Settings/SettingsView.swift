@@ -113,8 +113,6 @@ struct SettingsView: View {
                     
                     // bubbler system
                     settingsSection(title: "Bubble System") {
-                        settingsRow(icon: "bubble.left.and.bubble.right.fill", title: "Manage Interests")
-                        settingsRow(icon: "arrow.counterclockwise", title: "Reset Bubble Profile")
                         NavigationLink {
                             PreferencesSettingsView()
                         } label: {

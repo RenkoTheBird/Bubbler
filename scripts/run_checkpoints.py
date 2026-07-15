@@ -121,6 +121,7 @@ REQUIRED_OPENAPI_PATHS = [
     "/auth/register",
     "/feed/me",
     "/feed/me/session",
+    "/search",
     "/user/me",
     "/user/me/posts",
     "/user/me/posts/{post_id}",
@@ -764,6 +765,34 @@ async def run_phase_4(ctx: Context) -> None:
         ctx,
         "4.2 APIClient.getFeed hits feed/me",
         'authorizedRequest(path: "feed/me"' in api_client,
+    )
+    ok(ctx, "4.2 APIClient.search exists", "func search(query:" in api_client)
+    ok(
+        ctx,
+        "4.2 APIClient.search hits /search",
+        'authorizedRequest(\n            path: "search"' in api_client
+        or 'path: "search"' in api_client,
+    )
+
+    status, search_body, search_raw = ctx.api.request(
+        "GET", "/search?q=science", token=ctx.token
+    )
+    ok(ctx, "4.2 GET /search?q=science → 200", status == 200, search_raw[:200])
+    ok(
+        ctx,
+        "4.2 Search response has exact_matches and related",
+        isinstance(search_body, dict)
+        and isinstance(search_body.get("exact_matches"), list)
+        and isinstance(search_body.get("related"), list),
+        str(type(search_body)),
+    )
+
+    search_view_model = read_ios_file("Features/Search/SearchViewModel.swift")
+    ok(ctx, "4.2 SearchViewModel.swift exists", bool(search_view_model))
+    ok(
+        ctx,
+        "4.2 SearchViewModel calls APIClient.search",
+        "APIClient.search" in search_view_model,
     )
 
     feed_view_model = read_ios_file("Features/Feed/FeedViewModel.swift")

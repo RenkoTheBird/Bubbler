@@ -32,7 +32,11 @@ CREATE TABLE posts (
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
     content TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT NOW(),
-    embedding vector(384)
+    embedding vector(384),
+    -- Full-text search document (content only; topics/usernames matched at query time)
+    search_vector tsvector GENERATED ALWAYS AS (
+        to_tsvector('english', coalesce(content, ''))
+    ) STORED
 );
 
 CREATE INDEX posts_user_id_idx ON posts (user_id);
@@ -40,6 +44,10 @@ CREATE INDEX posts_user_id_idx ON posts (user_id);
 CREATE INDEX posts_embedding_idx
 ON posts
 USING hnsw (embedding vector_cosine_ops);
+
+CREATE INDEX posts_search_vector_idx
+ON posts
+USING GIN (search_vector);
 
 -- POST-TOPICS (every post has >= 1 row; names resolve without joining topics)
 CREATE TABLE post_topics (

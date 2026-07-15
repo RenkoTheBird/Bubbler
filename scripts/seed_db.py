@@ -297,6 +297,32 @@ async def ensure_schema(pool: asyncpg.Pool) -> None:
                 """
             )
 
+        if not await _column_exists(conn, "posts", "search_vector"):
+            await conn.execute(
+                """
+                ALTER TABLE posts
+                ADD COLUMN search_vector tsvector
+                GENERATED ALWAYS AS (
+                    to_tsvector('english', coalesce(content, ''))
+                ) STORED
+                """
+            )
+            await conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS posts_search_vector_idx
+                ON posts
+                USING GIN (search_vector)
+                """
+            )
+        elif not await _index_exists(conn, "posts_search_vector_idx"):
+            await conn.execute(
+                """
+                CREATE INDEX posts_search_vector_idx
+                ON posts
+                USING GIN (search_vector)
+                """
+            )
+
         # explore/skip may repeat; only likes stay unique per user+post.
         if await _constraint_exists(conn, "interactions_user_id_post_id_key"):
             await conn.execute(

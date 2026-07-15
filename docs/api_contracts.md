@@ -23,3 +23,16 @@ Graph session (`GET /feed/me/session?diversify=true|false`) returns:
   "seed_strategy": "soft_prior | diversify | random | …",
   "diversify": false
 }
+
+Hybrid search (`GET /search?q=...`) returns:
+
+{
+  "query": "space",
+  "exact_matches": [ /* Post objects — tsvector keyword, topic, or username hits */ ],
+  "related": [ /* Post objects — embedding-similar and light graph neighbors */ ]
+}
+
+Notes:
+- `exact_matches` are ranked by Postgres `ts_rank_cd` plus topic/username boosts (no opposite/random feed mix).
+- `related` requires embedding cosine similarity ≥ 0.35, excludes exact-match IDs, and soft-filters blacklisted topics.
+- Known topic queries (for example `science`) boost same-topic exact matches.

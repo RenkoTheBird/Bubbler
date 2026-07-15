@@ -138,8 +138,9 @@ From Settings:
 | **Bubble Sensitivity** | Tune diversity, randomness, topic lists, and feed weights (live API) |
 | **Explore Other Bubbles** | Forces a diversified graph session (`?diversify=true`) to escape a topic region |
 | **Classic Feed** | Scrollable feed view backed by `GET /feed/me` |
+| **Search** | Hybrid look-up via `GET /search` (keyword/topic/username, then related) |
 
-Some settings rows (profile, notifications, search) are still placeholder UI.
+Some settings rows (profile, notifications) are still placeholder UI.
 
 ## 6. Stop everything
 

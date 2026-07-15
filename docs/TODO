@@ -1,13 +1,9 @@
 -- IMMEDIATE
-- Deal with Orphaned screens (BubbleDetail)
-- Test Settings properly
-- make GraphFeedView more bubbly
-- Fix search
-- Optimize HF loads
-- Own posts can't show up in feed
+- Fix search ✓ (hybrid `GET /search` with tsvector + semantic)
 
 -- BEFORE PRODUCTION
 add media support
+add the ability to follow others
 
 -- IMPORTANT CHECKS
 routing efficiency/gotchas
@@ -15,3 +11,5 @@ routing efficiency/gotchas
 -- FUTURE
 add proper topic system (e.g. AI/ML based topic determination)
    -- NOTE: Continue from step 3.2
+provide a statistics system to show the user the real impact of their preferences.
+incorporate Roundabout

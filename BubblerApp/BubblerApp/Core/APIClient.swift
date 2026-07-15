@@ -176,6 +176,16 @@ enum APIClient {
         return try apiJSONDecoder.decode([Post].self, from: data)
     }
 
+    /// Hybrid search: keyword/topic/username hits, then semantic related posts.
+    static func search(query: String) async throws -> SearchResponse {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let data = try await authorizedRequest(
+            path: "search",
+            queryItems: [URLQueryItem(name: "q", value: trimmed)]
+        )
+        return try apiJSONDecoder.decode(SearchResponse.self, from: data)
+    }
+
     static func getSessionFeed(diversify: Bool = false) async throws -> GraphSessionFeed {
         let queryItems = diversify
             ? [URLQueryItem(name: "diversify", value: "true")]

@@ -8,6 +8,7 @@ import logging
 from app.routes.auth import create_auth_router
 from app.routes.feed import create_feed_router
 from app.routes.graph import create_graph_router
+from app.routes.search import create_search_router
 from app.routes.system import create_system_router
 from app.routes.user import create_user_router
 
@@ -21,6 +22,7 @@ from app.services.graph import GraphService
 from app.services.interaction import InteractionService
 from app.services.post import EmbeddingService
 from app.services.post import PostService
+from app.services.search import SearchService
 from app.services.topic_detection import TopicDetectionService
 from app.services.user import UserService
 
@@ -30,6 +32,7 @@ from .repositories.edge_builder_repo import EdgeBuilderRepo
 from .repositories.feed_repo import FeedRepository
 from .repositories.interaction_repo import InteractionRepository
 from .repositories.post_repo import PostRepository
+from .repositories.search_repo import SearchRepository
 from .repositories.user_repo import UserRepository
 
 # Dependencies
@@ -61,6 +64,7 @@ async def lifespan(fastapi: FastAPI):
     auth_repo = AuthRepository(pool)
     feed_repo = FeedRepository(pool)
     post_repo = PostRepository(pool)
+    search_repo = SearchRepository(pool)
     user_repo = UserRepository(pool)
     interaction_repo = InteractionRepository(pool)
     edge_builder_repo = EdgeBuilderRepo(pool)
@@ -78,11 +82,15 @@ async def lifespan(fastapi: FastAPI):
     strategy_service = StrategyService(feed_repo)
     feed_service = FeedService(feed_repo, graph_service, RankingService(), embedding_service, strategy_service,
                                PreferenceService(), user_repo, interaction_repo)
+    search_service = SearchService(
+        search_repo, graph_service, embedding_service, user_repo
+    )
 
     # start routers
     auth_router = create_auth_router(auth_service)
     feed_router = create_feed_router(feed_service, get_current_user_id)
     graph_router = create_graph_router(feed_service, get_current_user_id)  # graph routes use feed service
+    search_router = create_search_router(search_service, get_current_user_id)
     system_router = create_system_router(pool)
     user_router = create_user_router(user_service, interaction_service, post_service, get_current_user_id)
 
@@ -90,6 +98,7 @@ async def lifespan(fastapi: FastAPI):
     fastapi.include_router(auth_router, prefix="/auth", tags=["auth"])
     fastapi.include_router(feed_router, prefix="/feed", tags=["feed"])
     fastapi.include_router(graph_router, prefix="/graph", tags=["graph"])
+    fastapi.include_router(search_router, tags=["search"])
     fastapi.include_router(system_router, tags=["system"])
     fastapi.include_router(user_router, prefix="/user", tags=["user"])
 

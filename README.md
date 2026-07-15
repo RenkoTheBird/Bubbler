@@ -25,6 +25,7 @@ Bubbler/
 │       │   ├── GraphFeedNode.swift
 │       │   ├── KnownTopics.swift
 │       │   ├── Post.swift
+│       │   ├── SearchResponse.swift
 │       │   ├── Topic.swift
 │       │   ├── TopicPreferenceList.swift
 │       │   ├── User.swift
@@ -53,7 +54,8 @@ Bubbler/
 │       │   │   ├── ProfileView.swift
 │       │   │   └── UserProfileView.swift
 │       │   ├── Search/
-│       │   │   └── SearchView.swift
+│       │   │   ├── SearchView.swift
+│       │   │   └── SearchViewModel.swift
 │       │   └── Settings/
 │       │       ├── PreferencesSettingsView.swift
 │       │       ├── PreferencesSettingsViewModel.swift
@@ -74,6 +76,7 @@ Bubbler/
 │       │   ├── auth.py
 │       │   ├── feed.py
 │       │   ├── graph.py          # Graph expansion endpoint
+│       │   ├── search.py         # Hybrid keyword + semantic search
 │       │   ├── system.py
 │       │   └── user.py           # Posts, topics, preferences, interactions
 │       │
@@ -87,6 +90,7 @@ Bubbler/
 │       ├── schemas/              # Pydantic schemas
 │       │   ├── user.py
 │       │   ├── post.py
+│       │   ├── search.py
 │       │   └── edge.py
 │       │
 │       ├── services/             # Business logic
@@ -94,6 +98,7 @@ Bubbler/
 │       │   ├── post.py
 │       │   ├── feed.py
 │       │   ├── graph.py
+│       │   ├── search.py
 │       │   ├── user.py
 │       │   ├── interaction.py
 │       │   └── topic_detection.py
@@ -101,6 +106,7 @@ Bubbler/
 │       ├── repositories/         # DB access layer
 │       │   ├── auth_repo.py
 │       │   ├── post_repo.py
+│       │   ├── search_repo.py
 │       │   ├── user_repo.py
 │       │   ├── feed_repo.py
 │       │   ├── interaction_repo.py

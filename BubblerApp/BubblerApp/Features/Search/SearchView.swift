@@ -61,6 +61,9 @@ struct SearchView: View {
                                     await viewModel.search(using: authSession)
                                 }
                             }
+                            .onChange(of: viewModel.searchText) { _, _ in
+                                viewModel.scheduleLiveSearch(using: authSession)
+                            }
 
                         if !viewModel.searchText.isEmpty {
                             Button {
@@ -138,7 +141,7 @@ struct SearchView: View {
 
     @ViewBuilder
     private var resultsSection: some View {
-        if viewModel.isLoading {
+        if viewModel.isLoading && viewModel.posts.isEmpty {
             stateCard(
                 title: "Searching",
                 message: "Looking for bubbles that match your query.",
@@ -150,30 +153,56 @@ struct SearchView: View {
                 message: errorMessage
             )
         } else if viewModel.hasSearched {
-            VStack(alignment: .leading, spacing: 14) {
-                Text(viewModel.posts.isEmpty ? "No results" : "Results")
+            VStack(alignment: .leading, spacing: 22) {
+                if viewModel.posts.isEmpty {
+                    stateCard(
+                        title: "Nothing matched \"\(viewModel.lastQuery)\"",
+                        message: "Try different words, a topic name, or a username."
+                    )
+                } else {
+                    if !viewModel.exactMatches.isEmpty {
+                        postSection(
+                            title: "Exact matches",
+                            subtitle: "Keyword, topic, or username hits",
+                            posts: viewModel.exactMatches
+                        )
+                    }
+
+                    if !viewModel.related.isEmpty {
+                        postSection(
+                            title: "Related",
+                            subtitle: "Similar meaning and nearby bubbles",
+                            posts: viewModel.related
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private func postSection(title: String, subtitle: String, posts: [Post]) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
                     .font(.system(size: 22, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
 
-                if viewModel.posts.isEmpty {
-                    stateCard(
-                        title: "Nothing matched",
-                        message: "Try a different query or pick a recent search."
-                    )
-                } else {
-                    VStack(spacing: 18) {
-                        ForEach(viewModel.posts) { post in
-                            PostCardView(
-                                post: post,
-                                onDeleted: {
-                                    viewModel.removePost(id: post.id)
-                                },
-                                onEdited: { content in
-                                    viewModel.updatePostContent(id: post.id, content: content)
-                                }
-                            )
+                Text(subtitle)
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundColor(.white.opacity(0.65))
+            }
+
+            VStack(spacing: 18) {
+                ForEach(posts) { post in
+                    PostCardView(
+                        post: post,
+                        onDeleted: {
+                            viewModel.removePost(id: post.id)
+                        },
+                        onEdited: { content in
+                            viewModel.updatePostContent(id: post.id, content: content)
                         }
-                    }
+                    )
                 }
             }
         }

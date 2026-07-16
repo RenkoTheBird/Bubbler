@@ -164,7 +164,7 @@ struct PreferencesSettingsView: View {
         VStack(spacing: 20) {
             PreferenceTopicsEditor(
                 title: "Preferred Topics",
-                subtitle: "These topics get extra weight in your bubble.",
+                subtitle: "Search existing topics to give them extra weight in your bubble.",
                 icon: "heart.fill",
                 iconColor: .pink,
                 topics: Binding(
@@ -179,7 +179,7 @@ struct PreferencesSettingsView: View {
 
             PreferenceTopicsEditor(
                 title: "Blacklisted Topics",
-                subtitle: "These topics are filtered out of your recommendations.",
+                subtitle: "Search existing topics to filter them out of your recommendations.",
                 icon: "nosign",
                 iconColor: .orange,
                 topics: Binding(

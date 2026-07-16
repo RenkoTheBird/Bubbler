@@ -88,7 +88,7 @@ final class SearchViewModel: ObservableObject {
                 let response = try await APIClient.search(query: trimmed)
                 guard !Task.isCancelled else { return }
                 exactMatches = Self.prioritizeTopicMatches(
-                    response.exactMatches,
+                    posts: response.exactMatches,
                     query: trimmed
                 )
                 related = response.related

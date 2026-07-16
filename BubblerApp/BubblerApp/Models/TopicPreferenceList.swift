@@ -19,8 +19,7 @@ enum TopicPreferenceList {
     }
 
     static func add(_ rawTopic: String, to topics: [String]) -> [String] {
-        let topic = normalizedTopic(from: rawTopic)
-        guard !topic.isEmpty else {
+        guard let topic = KnownTopics.resolve(rawTopic) else {
             return cleaned(topics)
         }
 

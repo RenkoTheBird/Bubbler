@@ -20,13 +20,15 @@ Bubbler/
 │       │   ├── APIClient.swift
 │       │   ├── AuthSession.swift
 │       │   ├── BackendConnection.swift
-│       │   └── KeychainStore.swift
+│       │   ├── KeychainStore.swift
+│       │   └── LikedPostsStore.swift
 │       ├── Models/
 │       │   ├── GraphFeedNode.swift
+│       │   ├── Interaction.swift
 │       │   ├── KnownTopics.swift
 │       │   ├── Post.swift
+│       │   ├── PublicUser.swift
 │       │   ├── SearchResponse.swift
-│       │   ├── Topic.swift
 │       │   ├── TopicPreferenceList.swift
 │       │   ├── User.swift
 │       │   └── UserPreferences.swift
@@ -50,15 +52,24 @@ Bubbler/
 │       │   │   ├── CreatePostView.swift
 │       │   │   └── CreatePostViewModel.swift
 │       │   ├── Profile/
-│       │   │   ├── BubbleDetail.swift
+│       │   │   ├── BubbleTrailView.swift
 │       │   │   ├── ProfileView.swift
+│       │   │   ├── ProfileViewModel.swift
 │       │   │   └── UserProfileView.swift
 │       │   ├── Search/
 │       │   │   ├── SearchView.swift
 │       │   │   └── SearchViewModel.swift
 │       │   └── Settings/
+│       │       ├── DeleteAccountView.swift
+│       │       ├── DeleteAccountViewModel.swift
+│       │       ├── EmailSettingsView.swift
+│       │       ├── EmailSettingsViewModel.swift
+│       │       ├── PasswordSecurityView.swift
+│       │       ├── PasswordSecurityViewModel.swift
 │       │       ├── PreferencesSettingsView.swift
 │       │       ├── PreferencesSettingsViewModel.swift
+│       │       ├── ProfileInformationView.swift
+│       │       ├── ProfileInformationViewModel.swift
 │       │       └── SettingsView.swift
 │       └── Assets.xcassets/
 │
@@ -82,6 +93,8 @@ Bubbler/
 │       │
 │       ├── db/
 │       │   ├── schema.sql        # users, topics, posts, post_topics, …
+│       │   ├── conn.py
+│       │   ├── datetime_utils.py
 │       │   ├── topics.py         # KNOWN_TOPICS curated list
 │       │   ├── feed_sql.py       # posts_with_topic view helpers
 │       │   ├── vector.py
@@ -113,7 +126,6 @@ Bubbler/
 │       │   └── edge_builder_repo.py
 │       │
 │       └── ml/                   # Lightweight ML/NLP layer
-│           ├── service.py
 │           └── embeddings/
 │               └── generate.py
 │
@@ -124,7 +136,6 @@ Bubbler/
 │
 └── docs/
     ├── api_contracts.md
-    ├── roadmap.md
     ├── run_on_mac.md
     └── TODO
 ```

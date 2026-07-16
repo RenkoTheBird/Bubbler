@@ -60,7 +60,13 @@ struct SettingsView: View {
                         }
                         .buttonStyle(.plain)
 
-                        settingsRow(icon: "lock.fill", title: "Password & Security")
+                        NavigationLink {
+                            PasswordSecurityView()
+                        } label: {
+                            settingsRow(icon: "lock.fill", title: "Password & Security")
+                        }
+                        .buttonStyle(.plain)
+
                         Button {
                             authSession.signOut()
                         } label: {

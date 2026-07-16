@@ -1,7 +1,7 @@
 import datetime
 from typing import Literal
 
-from pydantic import BaseModel, EmailStr, Field, field_serializer
+from pydantic import BaseModel, EmailStr, Field, field_serializer, model_validator
 
 from app.db.datetime_utils import ensure_utc, utc_iso_z
 
@@ -66,6 +66,19 @@ class CreateUser(BaseModel):
 
 class EmailUpdate(BaseModel):
     email: EmailStr = Field(max_length=80)
+
+
+class PasswordUpdate(BaseModel):
+    email_or_username: str = Field(min_length=1, max_length=80)
+    current_password: str = Field(min_length=1, max_length=40)
+    new_password: str = Field(min_length=5, max_length=40)
+    confirm_new_password: str = Field(min_length=5, max_length=40)
+
+    @model_validator(mode="after")
+    def passwords_must_match(self):
+        if self.new_password != self.confirm_new_password:
+            raise ValueError("New passwords do not match")
+        return self
 
 
 # Shared preference fields — used for both profile load and preference updates

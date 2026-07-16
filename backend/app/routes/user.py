@@ -3,7 +3,7 @@ from app.services.user import UserService
 from app.services.interaction import InteractionService
 from app.services.post import PostService
 from app.schemas.post import InteractionCreate, PostCreate, PostTopicMutation, PostUpdate
-from app.schemas.user import EmailUpdate, PrefsUpdate
+from app.schemas.user import EmailUpdate, PasswordUpdate, PrefsUpdate
 from app.db.topics import normalize_known_topic
 
 
@@ -24,6 +24,10 @@ def create_user_router(user_service: UserService, interaction_service: Interacti
     @router.put("/me/profile/email")
     async def put_email(body: EmailUpdate, user_id: int = Depends(get_current_user_id)):
         return await user_service.put_email(body.email, user_id)
+
+    @router.put("/me/profile/password")
+    async def put_password(body: PasswordUpdate, user_id: int = Depends(get_current_user_id)):
+        return await user_service.put_password(body, user_id)
 
     @router.get("/me")
     async def get_user_interactions(user_id: int = Depends(get_current_user_id)):

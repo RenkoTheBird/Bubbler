@@ -1,12 +1,15 @@
 -- IMMEDIATE
-- Fix search ✓ (hybrid `GET /search` with tsvector + semantic)
+= add ability to reset/change password (done)
 
 -- BEFORE PRODUCTION
 add media support
 add the ability to follow others
+add ability to add comments to posts
+add ability to block users
+forgot password functionality
 
 -- IMPORTANT CHECKS
-routing efficiency/gotchas
+folder structure
 
 -- FUTURE
 add proper topic system (e.g. AI/ML based topic determination)

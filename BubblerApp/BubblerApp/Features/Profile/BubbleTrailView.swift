@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import Combine
 
 /// Signed-in user's interaction history (likes, skips, explores).
 struct BubbleTrailView: View {

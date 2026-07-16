@@ -152,6 +152,30 @@ class UserRepository:
 
         return self._row_to_user_info(row)
 
+    async def get_password_credentials(self, user_id: int):
+        async with self.pool.acquire() as conn:
+            return await conn.fetchrow(
+                """
+                SELECT id, username, email, password
+                FROM users
+                WHERE id = $1
+                """,
+                user_id,
+            )
+
+    async def put_password(self, password_hash: str, user_id: int) -> bool:
+        async with self.pool.acquire() as conn:
+            result = await conn.execute(
+                """
+                UPDATE users
+                SET password = $1
+                WHERE id = $2
+                """,
+                password_hash,
+                user_id,
+            )
+        return result == "UPDATE 1"
+
     async def get_prefs(self, user_id: int) -> UserProfile:
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow(

@@ -44,6 +44,20 @@ private struct EmailUpdateBody: Encodable {
     let email: String
 }
 
+private struct PasswordUpdateBody: Encodable {
+    let emailOrUsername: String
+    let currentPassword: String
+    let newPassword: String
+    let confirmNewPassword: String
+
+    enum CodingKeys: String, CodingKey {
+        case emailOrUsername = "email_or_username"
+        case currentPassword = "current_password"
+        case newPassword = "new_password"
+        case confirmNewPassword = "confirm_new_password"
+    }
+}
+
 private struct APIErrorBody: Decodable {
     let detail: String
 }
@@ -148,6 +162,28 @@ enum APIClient {
             contentType: "application/json"
         )
         return try apiJSONDecoder.decode(User.self, from: data)
+    }
+
+    static func updatePassword(
+        emailOrUsername: String,
+        currentPassword: String,
+        newPassword: String,
+        confirmNewPassword: String
+    ) async throws {
+        let body = try JSONEncoder().encode(
+            PasswordUpdateBody(
+                emailOrUsername: emailOrUsername,
+                currentPassword: currentPassword,
+                newPassword: newPassword,
+                confirmNewPassword: confirmNewPassword
+            )
+        )
+        _ = try await authorizedRequest(
+            path: "user/me/profile/password",
+            method: "PUT",
+            body: body,
+            contentType: "application/json"
+        )
     }
 
     static func getPreferences() async throws -> UserPreferences {

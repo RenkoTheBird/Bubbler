@@ -10,6 +10,7 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var authSession = AuthSession()
     @StateObject private var backendConnection = BackendConnection()
+    @StateObject private var likedPosts = LikedPostsStore()
 
     var body: some View {
         Group {
@@ -24,6 +25,14 @@ struct ContentView: View {
         .id(authSession.isSignedIn)
         .environmentObject(authSession)
         .environmentObject(backendConnection)
+        .environmentObject(likedPosts)
+        .task(id: authSession.accessToken) {
+            if authSession.isSignedIn {
+                await likedPosts.refresh()
+            } else {
+                likedPosts.clear()
+            }
+        }
         .overlay(alignment: .top) {
             if let successMessage = authSession.successMessage {
                 Text(successMessage)

@@ -216,6 +216,12 @@ enum APIClient {
         return try apiJSONDecoder.decode([Interaction].self, from: data)
     }
 
+    /// All post IDs the current user has liked (uncapped).
+    static func getLikedPostIDs() async throws -> [String] {
+        let data = try await authorizedRequest(path: "user/me/likes")
+        return try apiJSONDecoder.decode([String].self, from: data)
+    }
+
     static func createPost(content: String, topic: String) async throws -> Post {
         let body = try JSONEncoder().encode(CreatePostBody(post: content, topic: topic))
         let data = try await authorizedRequest(

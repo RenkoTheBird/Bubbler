@@ -17,4 +17,7 @@ class InteractionService:
     async def get_user_interactions(self, user_id: int, limit: int = 20):
         # Cap profile trail loads so a heavy interaction history can't flood the client.
         return await self.repo.get_recent_interactions(user_id, limit=limit)
-    
+
+    async def get_liked_post_ids(self, user_id: int) -> list[str]:
+        return await self.repo.get_liked_post_ids(user_id)
+

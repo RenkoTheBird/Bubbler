@@ -76,4 +76,5 @@ struct MainTabView: View {
 #Preview {
     MainTabView()
         .environmentObject(AuthSession())
+        .environmentObject(LikedPostsStore())
 }

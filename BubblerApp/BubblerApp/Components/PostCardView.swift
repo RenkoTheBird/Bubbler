@@ -2,7 +2,6 @@ import SwiftUI
 
 struct PostCardView: View {
     let post: Post
-    var isLiked: Bool = false
     var showsSkip: Bool = false
     var isCompact: Bool = false
     var isTopicPreferred: Bool = false
@@ -14,12 +13,12 @@ struct PostCardView: View {
     var onEdited: ((String) -> Void)?
 
     @EnvironmentObject private var authSession: AuthSession
+    @EnvironmentObject private var likedPosts: LikedPostsStore
     @State private var showDeleteConfirmation = false
     @State private var showTopicMenu = false
     @State private var isDeleting = false
     @State private var isTogglingLike = false
     @State private var isUpdatingTopicPreference = false
-    @State private var likedLocally: Bool?
     @State private var preferredLocally: Bool?
     @State private var blacklistedLocally: Bool?
     @State private var actionError: String?
@@ -44,7 +43,7 @@ struct PostCardView: View {
     }
 
     private var currentlyLiked: Bool {
-        likedLocally ?? isLiked
+        likedPosts.isLiked(post.id)
     }
 
     private var currentlyPreferred: Bool {
@@ -145,19 +144,14 @@ struct PostCardView: View {
         .shadow(color: accentColor.opacity(0.15), radius: 20, x: 0, y: 10)
         .onAppear {
             appearedAt = Date()
-            likedLocally = nil
             preferredLocally = nil
             blacklistedLocally = nil
         }
         .onChange(of: post.id) { _, _ in
             appearedAt = Date()
-            likedLocally = nil
             preferredLocally = nil
             blacklistedLocally = nil
             actionError = nil
-        }
-        .onChange(of: isLiked) { _, _ in
-            likedLocally = nil
         }
         .onChange(of: isTopicPreferred) { _, _ in
             preferredLocally = nil
@@ -337,7 +331,7 @@ struct PostCardView: View {
         do {
             if currentlyLiked {
                 try await APIClient.deleteLike(postId: post.id)
-                likedLocally = false
+                likedPosts.setLiked(post.id, liked: false)
                 onLikeChanged?(false)
             } else {
                 let viewTime = max(0, Date().timeIntervalSince(appearedAt))
@@ -348,7 +342,7 @@ struct PostCardView: View {
                         viewTime: viewTime
                     )
                 )
-                likedLocally = true
+                likedPosts.setLiked(post.id, liked: true)
                 onLikeChanged?(true)
             }
         } catch {
@@ -418,6 +412,7 @@ struct PostCardView: View {
 
         do {
             try await APIClient.deletePost(id: post.id)
+            likedPosts.setLiked(post.id, liked: false)
             authSession.showSuccessMessage("Post deleted.")
             onDeleted?()
         } catch {
@@ -459,5 +454,6 @@ struct PostCardView: View {
             .padding()
         }
         .environmentObject(AuthSession())
+        .environmentObject(LikedPostsStore())
     }
 }

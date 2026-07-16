@@ -201,5 +201,6 @@ struct FeedView: View {
     NavigationStack {
         FeedView()
             .environmentObject(AuthSession())
+            .environmentObject(LikedPostsStore())
     }
 }

@@ -74,6 +74,21 @@ class InteractionRepository:
             )
         return [self._row_to_interaction(row) for row in rows]
 
+    async def get_liked_post_ids(self, user_id: int) -> list[str]:
+        """All post IDs the user currently likes (uncapped; used for heart state)."""
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT post_id
+                FROM interactions
+                WHERE user_id = $1
+                  AND type = 'like'
+                ORDER BY created_at DESC
+                """,
+                user_id,
+            )
+        return [str(row["post_id"]) for row in rows]
+
     async def get_yesterday_liked_post(
         self, user_id: int
     ) -> tuple[list[float] | None, str | None]:

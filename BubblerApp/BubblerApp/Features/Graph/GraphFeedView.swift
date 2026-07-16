@@ -178,7 +178,6 @@ struct GraphFeedView: View {
             ScrollView {
                 PostCardView(
                     post: node.post,
-                    isLiked: false,
                     showsSkip: false,
                     isCompact: false,
                     isTopicPreferred: node.isPreferredTopic,
@@ -199,7 +198,6 @@ struct GraphFeedView: View {
 
                 PostCardView(
                     post: node.post,
-                    isLiked: viewModel.isCurrentPostLiked,
                     showsSkip: true,
                     isCompact: true,
                     isTopicPreferred: node.isPreferredTopic,
@@ -209,9 +207,6 @@ struct GraphFeedView: View {
                         Task {
                             await viewModel.skipCurrentPost(using: authSession)
                         }
-                    },
-                    onLikeChanged: { liked in
-                        viewModel.syncCurrentPostLiked(liked)
                     },
                     onTopicPreferenceChanged: {
                         Task {
@@ -348,5 +343,6 @@ private struct GraphNeighborBubble: View {
     NavigationStack {
         GraphFeedView()
             .environmentObject(AuthSession())
+            .environmentObject(LikedPostsStore())
     }
 }

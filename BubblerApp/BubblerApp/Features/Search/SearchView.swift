@@ -244,5 +244,6 @@ struct SearchView: View {
     NavigationStack {
         SearchView()
             .environmentObject(AuthSession())
+            .environmentObject(LikedPostsStore())
     }
 }

@@ -29,6 +29,10 @@ def create_user_router(user_service: UserService, interaction_service: Interacti
     async def get_user_interactions(user_id: int = Depends(get_current_user_id)):
         return await interaction_service.get_user_interactions(user_id)
 
+    @router.get("/me/likes")
+    async def get_liked_post_ids(user_id: int = Depends(get_current_user_id)):
+        return await interaction_service.get_liked_post_ids(user_id)
+
     @router.get("/me/posts")
     async def get_user_posts(user_id: int = Depends(get_current_user_id)):
         return await post_service.get_user_posts(user_id)

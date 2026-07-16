@@ -7,7 +7,6 @@ final class GraphFeedViewModel: ObservableObject {
     @Published private(set) var nextChoices: [GraphFeedNode] = []
     @Published private(set) var isLoading = false
     @Published private(set) var isSubmitting = false
-    @Published private(set) var isCurrentPostLiked = false
     @Published private(set) var seedStrategyLabel: String?
     @Published var errorMessage: String?
     @Published var statusMessage: String?
@@ -15,7 +14,6 @@ final class GraphFeedViewModel: ObservableObject {
     private var preferences = UserPreferences.placeholder
     private var sessionQueue: [GraphFeedNode] = []
     private var currentPostStartedAt: Date?
-    private var likedPostIDs = Set<String>()
 
     var hasCurrentPost: Bool {
         currentNode != nil
@@ -61,57 +59,6 @@ final class GraphFeedViewModel: ObservableObject {
             using: authSession,
             fallbackMessage: "Following a connected post."
         )
-    }
-
-    func likeCurrentPost(using authSession: AuthSession) async {
-        guard let currentNode else {
-            await loadSession(
-                using: authSession,
-                diversify: false,
-                message: "Building your graph session."
-            )
-            return
-        }
-
-        isSubmitting = true
-        errorMessage = nil
-
-        do {
-            try await recordInteraction(for: currentNode, type: .like)
-            likedPostIDs.insert(currentNode.id)
-            isCurrentPostLiked = true
-            statusMessage = "Liked this post."
-        } catch {
-            handle(error, using: authSession, fallbackMessage: "We couldn't save that like.")
-        }
-
-        isSubmitting = false
-    }
-
-    func unlikeCurrentPost(using authSession: AuthSession) async {
-        guard let currentNode else { return }
-
-        isSubmitting = true
-        errorMessage = nil
-
-        do {
-            try await APIClient.deleteLike(postId: currentNode.id)
-            likedPostIDs.remove(currentNode.id)
-            isCurrentPostLiked = false
-            statusMessage = "Removed your like."
-        } catch {
-            handle(error, using: authSession, fallbackMessage: "We couldn't remove that like.")
-        }
-
-        isSubmitting = false
-    }
-
-    func toggleCurrentPostLike(using authSession: AuthSession) async {
-        if isCurrentPostLiked {
-            await unlikeCurrentPost(using: authSession)
-        } else {
-            await likeCurrentPost(using: authSession)
-        }
     }
 
     func skipCurrentPost(using authSession: AuthSession) async {
@@ -209,16 +156,6 @@ final class GraphFeedViewModel: ObservableObject {
         )
     }
 
-    func syncCurrentPostLiked(_ liked: Bool) {
-        guard let currentNode else { return }
-        if liked {
-            likedPostIDs.insert(currentNode.id)
-        } else {
-            likedPostIDs.remove(currentNode.id)
-        }
-        isCurrentPostLiked = liked
-    }
-
     /// Reloads preferences and refreshes prefer/blacklist flags after PostCardView owns the prefs update.
     func syncTopicPreferences(using authSession: AuthSession) async {
         do {
@@ -274,7 +211,6 @@ final class GraphFeedViewModel: ObservableObject {
     ) async {
         guard let currentNode else { return }
 
-        likedPostIDs.remove(currentNode.id)
         nextChoices.removeAll { $0.id == currentNode.id }
         sessionQueue.removeAll { $0.id == currentNode.id }
 
@@ -308,7 +244,6 @@ final class GraphFeedViewModel: ObservableObject {
 
         do {
             preferences = try await APIClient.getPreferences().sanitized()
-            await refreshLikedPostIDs()
 
             let sessionNodes = try await fetchUsableSessionNodes(diversify: diversify)
             guard let firstNode = sessionNodes.first else {
@@ -329,7 +264,6 @@ final class GraphFeedViewModel: ObservableObject {
             currentNode = nil
             nextChoices = []
             sessionQueue = []
-            isCurrentPostLiked = false
             seedStrategyLabel = nil
             handle(error, using: authSession, fallbackMessage: "We couldn't build a graph session right now.")
         }
@@ -394,7 +328,6 @@ final class GraphFeedViewModel: ObservableObject {
 
         currentNode = node
         currentPostStartedAt = Date()
-        isCurrentPostLiked = likedPostIDs.contains(node.id)
 
         do {
             nextChoices = try await loadChoices(for: node)
@@ -503,19 +436,6 @@ final class GraphFeedViewModel: ObservableObject {
 
         nextChoices = nextChoices.map { makeNode(from: $0.post) }
         sessionQueue = sessionQueue.map { makeNode(from: $0.post) }
-    }
-
-    private func refreshLikedPostIDs() async {
-        do {
-            let interactions = try await APIClient.getMyInteractions()
-            likedPostIDs = Set(
-                interactions
-                    .filter { $0.type == .like }
-                    .map(\.postId)
-            )
-        } catch {
-            // Keep the local set if trail history can't be loaded.
-        }
     }
 
     private func recordInteraction(for node: GraphFeedNode, type: GraphInteractionType) async throws {

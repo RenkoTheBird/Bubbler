@@ -95,53 +95,75 @@ struct ProfileView: View {
                                 .padding(.horizontal, 24)
                         }
                     }
-                    
-                    // active bubbles from topics they've posted about
+
+                    // Bubble Trail — only for the signed-in user's own profile
+                    if viewModel.isOwnProfile {
+                        NavigationLink {
+                            BubbleTrailView()
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "point.bottomleft.forward.to.point.topright.scurvepath")
+                                    .font(.body.weight(.semibold))
+
+                                Text("Bubble Trail")
+                                    .font(.subheadline.bold())
+
+                                Spacer()
+
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.bold))
+                                    .foregroundColor(.white.opacity(0.55))
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 14)
+                            .background(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(Color.white.opacity(0.12))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                                    )
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, 20)
+                    }
+
+                    // user's posts
                     VStack(alignment: .leading, spacing: 14) {
                         
-                        Text("Active Bubbles")
+                        Text(viewModel.isOwnProfile ? "Your Posts" : "Posts")
                             .font(.title3.bold())
                             .foregroundColor(.white)
-                            .padding(.horizontal, 35)
+                            .padding(.horizontal, 20)
                         
-                        if viewModel.postedTopics.isEmpty {
-                            Text(viewModel.emptyBubblesMessage)
-                            .font(.subheadline)
-                            .foregroundColor(.white.opacity(0.75))
-                            .padding(.horizontal, 35)
+                        if viewModel.isLoading && viewModel.posts.isEmpty {
+                            Text(viewModel.emptyPostsMessage)
+                                .font(.subheadline)
+                                .foregroundColor(.white.opacity(0.75))
+                                .padding(.horizontal, 20)
+                        } else if viewModel.posts.isEmpty {
+                            Text(viewModel.emptyPostsMessage)
+                                .font(.subheadline)
+                                .foregroundColor(.white.opacity(0.75))
+                                .padding(.horizontal, 20)
                         } else {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 14) {
-                                    ForEach(viewModel.postedTopics, id: \.self) { topic in
-                                        bubble(
-                                            KnownTopics.displayName(for: topic),
-                                            TopicStyle.icon(for: topic),
-                                            TopicStyle.color(for: topic),
-                                            0.95
-                                        )
-                                    }
-                                }
-                                .padding(.horizontal, 15)
-                            }
-                        }
-                    }
-                    
-                    // bubble trail — only for the signed-in user's own profile
-                    if viewModel.isOwnProfile {
-                        VStack(alignment: .leading, spacing: 14) {
-                            
-                            Text("Your Bubble Trail")
-                                .font(.title3.bold())
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 35)
-                            
-                            if viewModel.trailInteractions.isEmpty {
-                                feedSnippet(viewModel.emptyTrailMessage)
-                            } else {
-                                ForEach(viewModel.trailInteractions) { interaction in
-                                    feedSnippet(interaction.trailSummary)
+                            VStack(spacing: 18) {
+                                ForEach(viewModel.posts) { post in
+                                    PostCardView(
+                                        post: post,
+                                        isCompact: true,
+                                        onDeleted: {
+                                            viewModel.removePost(id: post.id)
+                                        },
+                                        onEdited: { content in
+                                            viewModel.updatePostContent(id: post.id, content: content)
+                                        }
+                                    )
                                 }
                             }
+                            .padding(.horizontal, 20)
                         }
                     }
                     
@@ -153,70 +175,20 @@ struct ProfileView: View {
             await viewModel.loadProfile(using: authSession)
         }
     }
-    
-    // bubble
-    private func bubble(_ title: String, _ icon: String, _ color: Color, _ scale: CGFloat) -> some View {
-        
-        VStack(spacing: 10) {
-            
-            ZStack {
-                
-                Circle()
-                    .fill(color.opacity(0.12))
-                    .frame(width: 92, height: 92)
-                    .overlay(
-                        Circle()
-                            .stroke(Color.white.opacity(0.18), lineWidth: 1)
-                    )
-                
-                Circle()
-                    .fill(color.opacity(0.20))
-                    .frame(width: 78, height: 78)
-                    .overlay(
-                        Image(systemName: icon)
-                            .font(.system(size: 20, weight: .bold))
-                            .foregroundColor(.white)
-                    )
-            }
-            .scaleEffect(scale)
-            .shadow(color: color.opacity(0.35), radius: 12)
-            
-            Text(title)
-                .font(.caption.bold())
-                .foregroundColor(.white.opacity(0.9))
-        }
-    }
-    
-    // feed card
-    private func feedSnippet(_ text: String) -> some View {
-        
-        HStack {
-            Text(text)
-                .foregroundColor(.white.opacity(0.9))
-                .font(.subheadline)
-                .padding(.vertical, 14)
-                .padding(.horizontal, 14)
-            
-            Spacer()
-        }
-        .background(
-            RoundedRectangle(cornerRadius: 18)
-                .fill(Color.white.opacity(0.10))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18)
-                        .stroke(Color.white.opacity(0.15), lineWidth: 1)
-                )
-        )
-        .padding(.horizontal, 20)
-    }
 }
 
 #Preview("Own profile") {
-    ProfileView()
-        .environmentObject(AuthSession())
+    NavigationStack {
+        ProfileView()
+            .environmentObject(AuthSession())
+            .environmentObject(LikedPostsStore())
+    }
 }
 
 #Preview("Other user") {
-    ProfileView(username: "alex")
-        .environmentObject(AuthSession())
+    NavigationStack {
+        ProfileView(username: "alex")
+            .environmentObject(AuthSession())
+            .environmentObject(LikedPostsStore())
+    }
 }

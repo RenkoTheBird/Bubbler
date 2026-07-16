@@ -9,8 +9,7 @@ import Combine
 @MainActor
 final class ProfileViewModel: ObservableObject {
     @Published private(set) var username: String?
-    @Published private(set) var postedTopics: [String] = []
-    @Published private(set) var trailInteractions: [Interaction] = []
+    @Published private(set) var posts: [Post] = []
     @Published private(set) var isLoading = false
     @Published var errorMessage: String?
 
@@ -38,25 +37,19 @@ final class ProfileViewModel: ObservableObject {
     }
 
     var activeBubbleLabel: String {
-        guard let topic = postedTopics.first else {
+        guard let topic = uniqueTopics(from: posts).first else {
             return isLoading ? "Loading bubbles…" : "No active bubble yet"
         }
         return "🫧 Active Bubble: \(KnownTopics.displayName(for: topic))"
     }
 
-    var emptyBubblesMessage: String {
+    var emptyPostsMessage: String {
         if isLoading {
-            return isOwnProfile ? "Loading your bubbles…" : "Loading bubbles…"
+            return isOwnProfile ? "Loading your posts…" : "Loading posts…"
         }
         return isOwnProfile
-            ? "Post about a topic to grow your bubbles."
-            : "No bubbles yet."
-    }
-
-    var emptyTrailMessage: String {
-        isLoading
-            ? "Loading your bubble trail…"
-            : "Your bubble trail will appear here once you start interacting with posts."
+            ? "Posts you create will show up here."
+            : "No posts yet."
     }
 
     func loadProfile(using authSession: AuthSession, force: Bool = false) async {
@@ -71,23 +64,19 @@ final class ProfileViewModel: ObservableObject {
                 async let postsTask = APIClient.getUserPosts(username: targetUsername)
 
                 let profile = try await profileTask
-                let posts = try await postsTask
+                let loadedPosts = try await postsTask
 
                 username = profile.username
-                postedTopics = Self.uniqueTopics(from: posts)
-                trailInteractions = []
+                posts = loadedPosts
             } else {
                 async let profileTask = APIClient.getProfile()
                 async let postsTask = APIClient.getMyPosts()
-                async let interactionsTask = APIClient.getMyInteractions()
 
                 let profile = try await profileTask
-                let posts = try await postsTask
-                let interactions = try await interactionsTask
+                let loadedPosts = try await postsTask
 
                 username = profile.username
-                postedTopics = Self.uniqueTopics(from: posts)
-                trailInteractions = interactions
+                posts = loadedPosts
             }
             hasLoaded = true
         } catch {
@@ -105,8 +94,26 @@ final class ProfileViewModel: ObservableObject {
         isLoading = false
     }
 
+    func removePost(id: String) {
+        posts.removeAll { $0.id == id }
+    }
+
+    func updatePostContent(id: String, content: String) {
+        guard let index = posts.firstIndex(where: { $0.id == id }) else { return }
+        let existing = posts[index]
+        posts[index] = Post(
+            id: existing.id,
+            userId: existing.userId,
+            username: existing.username,
+            content: content,
+            createdAt: existing.createdAt,
+            topic: existing.topic,
+            embedding: existing.embedding
+        )
+    }
+
     /// Topics from the user's posts, most recently posted first, case-insensitive unique.
-    private static func uniqueTopics(from posts: [Post]) -> [String] {
+    private func uniqueTopics(from posts: [Post]) -> [String] {
         var seen = Set<String>()
         var topics: [String] = []
 

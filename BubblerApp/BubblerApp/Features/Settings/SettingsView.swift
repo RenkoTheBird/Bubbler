@@ -6,14 +6,9 @@
 //
 
 import SwiftUI
-import Combine
 
 struct SettingsView: View {
     @EnvironmentObject private var authSession: AuthSession
-    
-    @State private var pushNotifications = true
-    @State private var bubbleActivityAlerts = true
-    @State private var trendingContentAlerts = false
     
     var body: some View {
         
@@ -84,33 +79,6 @@ struct SettingsView: View {
                         .buttonStyle(.plain)
                     }
                     
-                    // notifications
-                    settingsSection(title: "Notifications") {
-                        settingsToggle(
-                            icon: "bell.fill",
-                            title: "Push Notifications",
-                            isOn: $pushNotifications
-                        )
-                        
-                        settingsToggle(
-                            icon: "bubble.left.and.bubble.right.fill",
-                            title: "Bubble Activity Alerts",
-                            isOn: $bubbleActivityAlerts
-                        )
-                        
-                        settingsToggle(
-                            icon: "flame.fill",
-                            title: "Trending Content Alerts",
-                            isOn: $trendingContentAlerts
-                        )
-                    }
-                    
-                    // privacy
-                    settingsSection(title: "Privacy") {
-                        settingsRow(icon: "eye.slash.fill", title: "Visibility Settings")
-                        settingsRow(icon: "hand.raised.fill", title: "Blocked Accounts")
-                    }
-                    
                     // bubbler system
                     settingsSection(title: "Bubble System") {
                         NavigationLink {
@@ -119,12 +87,6 @@ struct SettingsView: View {
                             settingsRow(icon: "slider.horizontal.3", title: "Recommendation Preferences")
                         }
                         .buttonStyle(.plain)
-                    }
-                    
-                    // app
-                    settingsSection(title: "App") {
-                        settingsRow(icon: "trash.fill", title: "Clear Cache")
-                        settingsRow(icon: "info.circle.fill", title: "About Bubbler")
                     }
                     
                     Spacer().frame(height: 30)
@@ -180,31 +142,6 @@ struct SettingsView: View {
             
             Image(systemName: "chevron.right")
                 .foregroundColor(.white.opacity(0.4))
-        }
-    }
-    
-    // toggle row
-    private func settingsToggle(
-        icon: String,
-        title: String,
-        isOn: Binding<Bool>
-    ) -> some View {
-        
-        HStack {
-            
-            Image(systemName: icon)
-                .foregroundColor(.white.opacity(0.8))
-                .frame(width: 22)
-            
-            Text(title)
-                .foregroundColor(.white.opacity(0.9))
-                .font(.subheadline)
-            
-            Spacer()
-            
-            Toggle("", isOn: isOn)
-                .labelsHidden()
-                .tint(.blue)
         }
     }
 }

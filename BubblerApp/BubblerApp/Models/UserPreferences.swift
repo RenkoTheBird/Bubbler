@@ -89,7 +89,11 @@ struct UserPreferences: Codable, Equatable {
         let preferred = TopicPreferenceList.cleaned(topics).map {
             TopicPreference(topic: $0, preferenceType: .preferred)
         }
-        let blacklisted = topicPreferences.filter { $0.preferenceType == .blacklisted }
+        let preferredKeys = Set(preferred.map { $0.topic.lowercased() })
+        // Preferring a topic must clear any blacklist entry in the same update.
+        let blacklisted = topicPreferences.filter {
+            $0.preferenceType == .blacklisted && !preferredKeys.contains($0.topic.lowercased())
+        }
         topicPreferences = Self.mergeTopicPreferences(preferred: preferred, blacklisted: blacklisted)
     }
 
@@ -97,7 +101,12 @@ struct UserPreferences: Codable, Equatable {
         let blacklisted = TopicPreferenceList.cleaned(topics).map {
             TopicPreference(topic: $0, preferenceType: .blacklisted)
         }
-        let preferred = topicPreferences.filter { $0.preferenceType == .preferred }
+        let blacklistedKeys = Set(blacklisted.map { $0.topic.lowercased() })
+        // Blacklisting a topic must clear any preferred entry in the same update.
+        // Without this, merge keeps preferred and the blacklist add is dropped.
+        let preferred = topicPreferences.filter {
+            $0.preferenceType == .preferred && !blacklistedKeys.contains($0.topic.lowercased())
+        }
         topicPreferences = Self.mergeTopicPreferences(preferred: preferred, blacklisted: blacklisted)
     }
 

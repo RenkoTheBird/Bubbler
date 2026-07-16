@@ -185,13 +185,15 @@ struct PreferenceTopicsEditor: View {
             return
         }
 
-        topics = TopicPreferenceList.add(resolved, to: topics)
+        // Clear the other list first so preferred → blacklisted doesn't get
+        // dropped by merge (preferred wins when both are present).
         if let conflictingTopics {
             conflictingTopics.wrappedValue = TopicPreferenceList.remove(
                 resolved,
                 from: conflictingTopics.wrappedValue
             )
         }
+        topics = TopicPreferenceList.add(resolved, to: topics)
         draft = ""
         errorMessage = nil
     }

@@ -1164,9 +1164,8 @@ def test_diversity(api: ApiClient, token: str) -> KnobResult:
 
 
 def test_view_time(api: ApiClient, token: str) -> KnobResult:
-    """use_view_time auto-prefers topics from high view_time interactions."""
+    """use_view_time applies a score boost to topics with high view_time."""
     _print_knob_header("use_view_time / view_time_weight")
-    # Clear any previously persisted preferred topics first.
     baseline = dict(
         randomness=0.0,
         use_view_time=False,
@@ -1186,7 +1185,6 @@ def test_view_time(api: ApiClient, token: str) -> KnobResult:
         use_recency=False,
     )
     put_prefs(api, token, **variant)
-    # First call may persist preferred topics; subsequent trials use updated prefs.
     feeds_b = collect_feeds(api, token, IMPACT_N, endpoint="feed")
     share_b = float(np.mean([topic_share(f, VIEW_TIME_TOPIC) for f in feeds_b]))
 
@@ -1203,7 +1201,6 @@ def test_view_time(api: ApiClient, token: str) -> KnobResult:
         )
     print(f"  share rise: {share_rise}")
 
-    # Critical: reset so auto-preferred topics don't leak into later tests.
     put_prefs(api, token, **baseline)
     return KnobResult(
         knob="use_view_time",

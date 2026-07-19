@@ -1,5 +1,6 @@
 import random
 import datetime
+import math
 from typing import List
 
 from app.db.datetime_utils import with_utc_created_at
@@ -27,61 +28,60 @@ def _normalize_topic(topic: str | None) -> str | None:
 
 
 class PreferenceService:
-    def update_from_interactions(self, prefs, interactions):
-        """Optionally boost preferred topics from view time only.
-
-        Likes never auto-prefer a topic — preferred/blacklisted topics are
-        managed explicitly via user preference updates.
-        """
+    def view_time_topic_boosts(self, prefs, interactions) -> dict[str, float]:
+        """Return bounded topic boosts from recent viewing behavior."""
         if not prefs.use_view_time:
-            return prefs
+            return {}
 
         topic_scores: dict[str, float] = {}
-
         for i in interactions:
             if not isinstance(i.topic, str) or not i.topic.strip():
                 continue
             topic = i.topic.strip().casefold()
-            topic_scores[topic] = topic_scores.get(topic, 0) + (
-                i.view_time * prefs.view_time_weight
+            topic_scores[topic] = topic_scores.get(topic, 0.0) + max(
+                float(i.view_time), 0.0
             )
 
-        sorted_topics = sorted(topic_scores.items(), key=lambda x: x[1], reverse=True)
-        preferred, blacklisted = _topic_sets(prefs.topic_preferences)
+        if not topic_scores:
+            return {}
 
-        for name, _ in sorted_topics[:5]:
-            if name not in blacklisted:
-                preferred.add(name)
+        strongest = max(math.log1p(seconds) for seconds in topic_scores.values())
+        if strongest <= 0:
+            return {}
 
-        prefs.topic_preferences = [
-            TopicPreference(topic=topic, preference_type="preferred")
-            for topic in sorted(preferred)
-        ] + [
-            TopicPreference(topic=topic, preference_type="blacklisted")
-            for topic in sorted(blacklisted)
-        ]
-
-        return prefs
+        weight = min(max(float(prefs.view_time_weight), 0.0), 1.0)
+        return {
+            topic: 0.3 * weight * (math.log1p(seconds) / strongest)
+            for topic, seconds in topic_scores.items()
+        }
 
 
 class RankingService:
-    def score(self, post, similarity: float) -> float:
+    RANDOMNESS_SCORE_SCALE = 0.15
+
+    def recency_bonus(self, post, max_bonus: float = 0.3) -> float:
         created_at = post.get("created_at")
         if created_at is None:
-            return similarity
+            return 0.0
 
         now = datetime.datetime.now(datetime.timezone.utc)
         if getattr(created_at, "tzinfo", None) is None:
             created_at = created_at.replace(tzinfo=datetime.timezone.utc)
 
         age_days = max((now - created_at).total_seconds() / 86400.0, 0.0)
-        recency_boost = 1 / (1 + age_days)
-        return similarity * 0.7 + recency_boost * 0.3
+        return max_bonus / (1 + age_days)
 
-    def apply_preferences(self, prefs, posts: List[str]):
+    def apply_preferences(
+        self,
+        prefs,
+        posts: List[dict],
+        *,
+        view_time_boosts: dict[str, float] | None = None,
+    ):
         filtered = []
         preferred_topics, blacklisted_topics = _topic_sets(prefs.topic_preferences)
         use_recency = getattr(prefs, "use_recency", True)
+        view_time_boosts = view_time_boosts or {}
 
         for post in posts:
             post_topic = post.get("topic")
@@ -91,12 +91,20 @@ class RankingService:
                 continue
 
             similarity = post.get("similarity", 0)
-            score = self.score(post, similarity) if use_recency else similarity
+            score = post.get("score", similarity)
+            if use_recency:
+                score += self.recency_bonus(post)
 
             if normalized_topic and normalized_topic in preferred_topics:
                 score += 0.3
+            if normalized_topic:
+                score += view_time_boosts.get(normalized_topic, 0.0)
 
-            score += random.random() * prefs.randomness
+            score += (
+                random.random()
+                * min(max(float(prefs.randomness), 0.0), 1.0)
+                * self.RANDOMNESS_SCORE_SCALE
+            )
 
             post["score"] = score
             filtered.append(post)
@@ -137,19 +145,20 @@ class StrategyService:
         return strategies
 
 
-# Target mix for graph "next" choices: deepen, bridge, jump, explore.
-_NEXT_EDGE_QUOTA = (
-    ("topic", 1),
-    ("similar", 1),
-    ("bridge", 1),
-    ("opposite", 1),
-)
 _NEXT_CHOICE_LIMIT = 4
 _EDGE_TYPE_SCORE_BONUS = {
     "bridge": 0.15,
     "opposite": 0.1,
     "similar": 0.05,
     "topic": 0.0,
+    "random": 0.0,
+}
+_EDGE_STRATEGY = {
+    "topic": "graph",
+    "bridge": "graph",
+    "similar": "similar",
+    "opposite": "opposite",
+    "random": "random",
 }
 
 
@@ -201,19 +210,9 @@ class FeedService:
     async def get_feed(self, user_id: int, user_input: str):
         prefs = await self.user_repo.get_prefs(user_id)
         interactions = await self.interaction_repo.get_recent_interactions(user_id)
-        original_topics = {
-            (pref.topic.strip().casefold(), pref.preference_type)
-            for pref in prefs.topic_preferences
-            if isinstance(pref.topic, str) and pref.topic.strip()
-        }
-        prefs = self.preference_service.update_from_interactions(prefs, interactions)
-        updated_topics = {
-            (pref.topic.strip().casefold(), pref.preference_type)
-            for pref in prefs.topic_preferences
-            if isinstance(pref.topic, str) and pref.topic.strip()
-        }
-        if updated_topics != original_topics:
-            prefs = await self.user_repo.save_prefs(user_id, prefs)
+        view_time_boosts = self.preference_service.view_time_topic_boosts(
+            prefs, interactions
+        )
 
         # Prefer an explicit query; otherwise embed preferred topics as user context.
         query_text = user_input.strip() if isinstance(user_input, str) else ""
@@ -230,30 +229,47 @@ class FeedService:
                 p["_strategy"] = strategy_name
                 seeds.append(p)
 
-        seed_posts = seeds[:10]
+        seed_posts = self._select_strategy_seeds(
+            strategy_results,
+            prefs.strategy_weights,
+            limit=10,
+        )
         async with self.repo.acquire() as conn:
             expanded_ids = await self.graph_service.expand_posts(seed_posts, conn=conn)
             all_ids = set(p["id"] for p in seed_posts) | set(expanded_ids)
             expanded_posts = await self.repo.get_posts_by_ids(list(all_ids), conn=conn)
 
-        seed_map = {p["id"]: p for p in seeds}
+        seed_map: dict[str, dict] = {}
+        for post in seeds:
+            strategy = post.get("_strategy", "graph")
+            candidate_score = self._strategy_score(
+                strategy,
+                post.get("similarity"),
+                prefs.strategy_weights,
+            )
+            current = seed_map.get(post["id"])
+            if current is None or candidate_score > current["_strategy_score"]:
+                mapped = dict(post)
+                mapped["_strategy_score"] = candidate_score
+                seed_map[post["id"]] = mapped
 
         for post in expanded_posts:
             if post["id"] in seed_map:
                 post["similarity"] = seed_map[post["id"]].get("similarity", 0)
                 post["_strategy"] = seed_map[post["id"]].get("_strategy", "graph")
+                post["score"] = seed_map[post["id"]]["_strategy_score"]
             else:
                 post["similarity"] = 0.3
                 post["_strategy"] = "graph"
+                post["score"] = self._strategy_score(
+                    "graph", 0.3, prefs.strategy_weights
+                )
 
-        weighted = []
-        for post in expanded_posts:
-            strategy = post.get("_strategy", "graph")
-            weight = prefs.strategy_weights.get(strategy, 0.1)
-            post["score"] = post["similarity"] * weight
-            weighted.append(post)
-
-        ranked = self.ranking_service.apply_preferences(prefs, weighted)
+        ranked = self.ranking_service.apply_preferences(
+            prefs,
+            expanded_posts,
+            view_time_boosts=view_time_boosts,
+        )
 
         return [with_utc_created_at(post) for post in ranked[:20]]
 
@@ -261,6 +277,10 @@ class FeedService:
         prefs = await self.user_repo.get_prefs(user_id)
         _, blacklisted = _topic_sets(prefs.topic_preferences)
         yesterday_post, liked_topic = await self._yesterday_liked_signal(user_id)
+        interactions = await self.interaction_repo.get_recent_interactions(user_id)
+        view_time_boosts = self.preference_service.view_time_topic_boosts(
+            prefs, interactions
+        )
 
         candidates, seed_strategy, max_per_topic = await self.repo.get_new_session_posts(
             prefs.diversity_tolerance,
@@ -270,7 +290,19 @@ class FeedService:
             diversify=diversify,
         )
 
-        ranked = self.ranking_service.apply_preferences(prefs, candidates)
+        for post in candidates:
+            strategy = post.get("_strategy", "random")
+            post["score"] = self._strategy_score(
+                strategy,
+                post.get("similarity"),
+                prefs.strategy_weights,
+            )
+
+        ranked = self.ranking_service.apply_preferences(
+            prefs,
+            candidates,
+            view_time_boosts=view_time_boosts,
+        )
         selected = self._select_topic_diverse(
             ranked,
             limit=6,
@@ -327,6 +359,10 @@ class FeedService:
     async def get_next_posts(self, user_id: int, post_id: str):
         prefs = await self.user_repo.get_prefs(user_id)
         preferred_topics, blacklisted_topics = _topic_sets(prefs.topic_preferences)
+        interactions = await self.interaction_repo.get_recent_interactions(user_id)
+        view_time_boosts = self.preference_service.view_time_topic_boosts(
+            prefs, interactions
+        )
 
         async with self.repo.acquire() as conn:
             current_rows = await self.repo.get_posts_by_ids([post_id], conn=conn)
@@ -336,6 +372,11 @@ class FeedService:
             edges = await self.repo.get_outbound_edges_by_type(post_id, conn=conn)
             ids = [edge.to_post_id for edge in edges]
             posts = await self.repo.get_posts_by_ids(ids, conn=conn)
+            random_posts = (
+                await self.repo.get_random_posts(limit=8, conn=conn)
+                if prefs.strategy_weights.get("random", 0) > 0
+                else []
+            )
 
         posts_by_id = {post["id"]: post for post in posts}
         candidates: list[dict] = []
@@ -348,15 +389,29 @@ class FeedService:
                 continue
 
             weight = float(edge.weight) if edge.weight is not None else 0.0
-            score = weight + _EDGE_TYPE_SCORE_BONUS.get(edge.type, 0.0)
+            strategy = _EDGE_STRATEGY.get(edge.type, "graph")
+            strategy_weight = max(
+                float(prefs.strategy_weights.get(strategy, 0.0)), 0.0
+            )
+            score = self._strategy_score(
+                strategy, weight, prefs.strategy_weights
+            ) + (_EDGE_TYPE_SCORE_BONUS.get(edge.type, 0.0) * strategy_weight)
             if normalized_topic and normalized_topic in preferred_topics:
                 score += 0.3
+            if normalized_topic:
+                score += view_time_boosts.get(normalized_topic, 0.0)
+            if prefs.use_recency:
+                score += self.ranking_service.recency_bonus(post)
             # Prefer different-topic hops for bridge/opposite, slight novelty for others.
             if current_topic and normalized_topic and normalized_topic != current_topic:
                 score += 0.12
             elif edge.type in ("bridge", "opposite"):
                 score += 0.05
-            score += random.random() * prefs.randomness
+            score += (
+                random.random()
+                * min(max(float(prefs.randomness), 0.0), 1.0)
+                * self.ranking_service.RANDOMNESS_SCORE_SCALE
+            )
 
             candidate = dict(post)
             candidate["similarity"] = weight
@@ -364,7 +419,38 @@ class FeedService:
             candidate["_edge_type"] = edge.type
             candidates.append(candidate)
 
-        selected = self._select_next_quota(candidates, current_topic=current_topic)
+        existing_ids = {post_id, *(candidate["id"] for candidate in candidates)}
+        for post in random_posts:
+            if post["id"] in existing_ids:
+                continue
+            normalized_topic = _normalize_topic(post.get("topic"))
+            if normalized_topic and normalized_topic in blacklisted_topics:
+                continue
+            score = self._strategy_score("random", None, prefs.strategy_weights)
+            if normalized_topic and normalized_topic in preferred_topics:
+                score += 0.3
+            if normalized_topic:
+                score += view_time_boosts.get(normalized_topic, 0.0)
+            if prefs.use_recency:
+                score += self.ranking_service.recency_bonus(post)
+            score += (
+                random.random()
+                * min(max(float(prefs.randomness), 0.0), 1.0)
+                * self.ranking_service.RANDOMNESS_SCORE_SCALE
+            )
+            candidate = dict(post)
+            candidate["similarity"] = 0.0
+            candidate["score"] = score
+            candidate["_edge_type"] = "random"
+            candidates.append(candidate)
+            existing_ids.add(post["id"])
+
+        selected = self._select_next_quota(
+            candidates,
+            current_topic=current_topic,
+            diversity_tolerance=prefs.diversity_tolerance,
+            strategy_weights=prefs.strategy_weights,
+        )
         cleaned = []
         for post in selected:
             public_post = {
@@ -380,6 +466,8 @@ class FeedService:
         candidates: list[dict],
         *,
         current_topic: str | None,
+        diversity_tolerance: float,
+        strategy_weights: dict[str, float],
         limit: int = _NEXT_CHOICE_LIMIT,
     ) -> list[dict]:
         by_type: dict[str, list[dict]] = {}
@@ -392,7 +480,16 @@ class FeedService:
         selected: list[dict] = []
         selected_ids: set[str] = set()
         same_topic_count = 0
-        max_same_topic = max(1, limit // 2)
+        diversity = min(max(float(diversity_tolerance), 0.0), 1.0)
+        if diversity >= 2 / 3:
+            topic_quota = 0
+            max_same_topic = 1
+        elif diversity <= 1 / 3:
+            topic_quota = min(2, limit)
+            max_same_topic = min(3, limit)
+        else:
+            topic_quota = 1
+            max_same_topic = min(2, limit)
 
         def try_add(post: dict) -> bool:
             nonlocal same_topic_count
@@ -411,7 +508,23 @@ class FeedService:
                 same_topic_count += 1
             return True
 
-        for edge_type, quota in _NEXT_EDGE_QUOTA:
+        quotas: list[tuple[str, int]] = []
+        if topic_quota:
+            quotas.append(("topic", topic_quota))
+
+        remaining = max(0, limit - topic_quota)
+        strategy_quota = self._weighted_quotas(
+            {
+                "similar": strategy_weights.get("similar", 0.0),
+                "bridge": strategy_weights.get("graph", 0.0),
+                "opposite": strategy_weights.get("opposite", 0.0),
+                "random": strategy_weights.get("random", 0.0),
+            },
+            remaining,
+        )
+        quotas.extend((edge_type, quota) for edge_type, quota in strategy_quota.items())
+
+        for edge_type, quota in quotas:
             taken = 0
             for post in by_type.get(edge_type, []):
                 if taken >= quota:
@@ -427,5 +540,97 @@ class FeedService:
                 if len(selected) >= limit:
                     break
                 try_add(post)
+
+        return selected
+
+    @staticmethod
+    def _strategy_score(
+        strategy: str,
+        similarity: float | None,
+        strategy_weights: dict[str, float],
+    ) -> float:
+        weight = max(float(strategy_weights.get(strategy, 0.0)), 0.0)
+        if strategy == "opposite":
+            relevance = (1.0 - float(similarity or 0.0)) / 2.0
+        elif strategy == "random":
+            relevance = 0.5
+        else:
+            relevance = max(float(similarity or 0.0), 0.0)
+        return relevance * weight
+
+    @staticmethod
+    def _weighted_quotas(weights: dict[str, float], slots: int) -> dict[str, int]:
+        if slots <= 0:
+            return {key: 0 for key in weights}
+        positive = {key: max(float(value), 0.0) for key, value in weights.items()}
+        total = sum(positive.values())
+        if total <= 0:
+            positive = {key: 1.0 for key in weights}
+            total = float(len(positive))
+
+        raw = {key: slots * value / total for key, value in positive.items()}
+        quotas = {key: int(value) for key, value in raw.items()}
+        unassigned = slots - sum(quotas.values())
+        order = sorted(
+            raw,
+            key=lambda key: (raw[key] - quotas[key], positive[key]),
+            reverse=True,
+        )
+        for key in order[:unassigned]:
+            quotas[key] += 1
+        return quotas
+
+    @classmethod
+    def _select_strategy_seeds(
+        cls,
+        strategy_results: list[tuple[str, list[dict]]],
+        strategy_weights: dict[str, float],
+        *,
+        limit: int,
+    ) -> list[dict]:
+        available = {name: posts for name, posts in strategy_results if posts}
+        quotas = cls._weighted_quotas(
+            {
+                name: strategy_weights.get(name, 0.0)
+                for name in available
+            },
+            limit,
+        )
+        selected: list[dict] = []
+        seen: set[str] = set()
+
+        for name, posts in available.items():
+            taken = 0
+            for post in posts:
+                if taken >= quotas.get(name, 0):
+                    break
+                if post["id"] in seen:
+                    continue
+                selected.append(post)
+                seen.add(post["id"])
+                taken += 1
+
+        if len(selected) < limit:
+            leftovers = [
+                post
+                for _, posts in strategy_results
+                for post in posts
+                if post["id"] not in seen
+            ]
+            leftovers.sort(
+                key=lambda post: cls._strategy_score(
+                    post.get("_strategy", "graph"),
+                    post.get("similarity"),
+                    strategy_weights,
+                ),
+                reverse=True,
+            )
+            for post in leftovers:
+                if len(selected) >= limit:
+                    break
+                if post["id"] in seen:
+                    continue
+                selected.append(post)
+                seen.add(post["id"])
 
         return selected

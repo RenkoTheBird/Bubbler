@@ -331,11 +331,31 @@ private struct GraphNeighborBubble: View {
                         .minimumScaleFactor(0.7)
                 }
                 .padding(.horizontal, 8)
+
+                if node.isPreferredTopic {
+                    Image(systemName: "heart.fill")
+                        .font(.system(size: max(10, size * 0.13), weight: .bold))
+                        .foregroundColor(.pink)
+                        .padding(size * 0.07)
+                        .background(
+                            Circle()
+                                .fill(Color.white.opacity(0.92))
+                        )
+                        .frame(
+                            maxWidth: .infinity,
+                            maxHeight: .infinity,
+                            alignment: .topTrailing
+                        )
+                        .padding(size * 0.08)
+                        .accessibilityHidden(true)
+                }
             }
             .frame(width: size, height: size)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(KnownTopics.displayName(for: topic)) bubble")
+        .accessibilityLabel(
+            "\(KnownTopics.displayName(for: topic)) bubble\(node.isPreferredTopic ? ", preferred topic" : "")"
+        )
     }
 }
 

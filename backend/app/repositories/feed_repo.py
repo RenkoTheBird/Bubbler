@@ -243,7 +243,17 @@ class FeedRepository:
         """
         blacklisted = {t.casefold() for t in (blacklisted_topics or set())}
         if max_per_topic is None:
-            max_per_topic = 1 if diversify else 2
+            effective_diversity = 1.0 if diversify else min(
+                max(float(diversity_tolerance), 0.0), 1.0
+            )
+            # Six-post sessions range from a focused three-per-topic mix to
+            # one post per topic at maximum diversity.
+            if effective_diversity <= 1 / 3:
+                max_per_topic = 3
+            elif effective_diversity >= 2 / 3:
+                max_per_topic = 1
+            else:
+                max_per_topic = 2
 
         target_similarity = max(0.0, 1.0 - diversity_tolerance)
 
@@ -257,39 +267,58 @@ class FeedRepository:
                     {liked_topic.casefold()} if liked_topic else set()
                 )
                 if yesterday_post:
-                    candidates.extend(
-                        await self._fetch_posts_by_embedding(
-                            conn,
-                            yesterday_post,
-                            _SESSION_CANDIDATE_LIMIT // 2,
-                            ascending=False,
-                            exclude_topics=list(exclude) or None,
-                        )
-                    )
-                    candidates.extend(
-                        await self._fetch_posts_by_embedding(
-                            conn,
-                            yesterday_post,
-                            _SESSION_CANDIDATE_LIMIT // 2,
-                            near_target=target_similarity,
-                            exclude_topics=list(exclude) or None,
-                        )
-                    )
-                candidates.extend(await self._fetch_random_posts(conn, _SESSION_CANDIDATE_LIMIT))
-            elif yesterday_post:
-                seed_strategy = "soft_prior"
-                candidates.extend(
-                    await self._fetch_posts_by_embedding(
+                    opposite = await self._fetch_posts_by_embedding(
                         conn,
                         yesterday_post,
-                        _SESSION_CANDIDATE_LIMIT,
-                        near_target=target_similarity,
-                        exclude_topics=list(blacklisted) or None,
+                        _SESSION_CANDIDATE_LIMIT // 2,
+                        ascending=False,
+                        exclude_topics=list(exclude) or None,
                     )
+                    for post in opposite:
+                        post["_strategy"] = "opposite"
+                    candidates.extend(opposite)
+
+                    similar = await self._fetch_posts_by_embedding(
+                        conn,
+                        yesterday_post,
+                        _SESSION_CANDIDATE_LIMIT // 2,
+                        near_target=target_similarity,
+                        exclude_topics=list(exclude) or None,
+                    )
+                    for post in similar:
+                        post["_strategy"] = "similar"
+                    candidates.extend(similar)
+                random_posts = await self._fetch_random_posts(
+                    conn, _SESSION_CANDIDATE_LIMIT
                 )
-                candidates.extend(await self._fetch_random_posts(conn, _SESSION_CANDIDATE_LIMIT // 2))
+                for post in random_posts:
+                    post["_strategy"] = "random"
+                candidates.extend(random_posts)
+            elif yesterday_post:
+                seed_strategy = "soft_prior"
+                similar = await self._fetch_posts_by_embedding(
+                    conn,
+                    yesterday_post,
+                    _SESSION_CANDIDATE_LIMIT,
+                    near_target=target_similarity,
+                    exclude_topics=list(blacklisted) or None,
+                )
+                for post in similar:
+                    post["_strategy"] = "similar"
+                candidates.extend(similar)
+                random_posts = await self._fetch_random_posts(
+                    conn, _SESSION_CANDIDATE_LIMIT // 2
+                )
+                for post in random_posts:
+                    post["_strategy"] = "random"
+                candidates.extend(random_posts)
             else:
-                candidates.extend(await self._fetch_random_posts(conn, _SESSION_CANDIDATE_LIMIT))
+                random_posts = await self._fetch_random_posts(
+                    conn, _SESSION_CANDIDATE_LIMIT
+                )
+                for post in random_posts:
+                    post["_strategy"] = "random"
+                candidates.extend(random_posts)
 
             filtered: list[dict[str, Any]] = []
             seen: set[str] = set()
@@ -311,6 +340,7 @@ class FeedRepository:
             if not filtered:
                 # Last resort: random again without soft prior but still blacklist.
                 for post in await self._fetch_random_posts(conn, _SESSION_CANDIDATE_LIMIT):
+                    post["_strategy"] = "random"
                     topic = post.get("topic")
                     normalized = (
                         topic.strip().casefold()

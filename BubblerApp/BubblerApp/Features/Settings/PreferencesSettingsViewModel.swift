@@ -27,7 +27,11 @@ final class PreferencesSettingsViewModel: ObservableObject {
     func loadPreferences(using authSession: AuthSession, force: Bool = false) async {
         guard force || !hasLoaded else { return }
 
-        isLoading = true
+        // Only show the loading card on the first fetch so subsequent silent
+        // refreshes (e.g. after returning from the graph view) don't flash.
+        if !hasLoaded {
+            isLoading = true
+        }
         errorTitle = "Couldn't load preferences"
         errorMessage = nil
 
@@ -40,6 +44,13 @@ final class PreferencesSettingsViewModel: ObservableObject {
         }
 
         isLoading = false
+    }
+
+    /// Re-fetches the latest saved preferences from the server. Call this when the
+    /// view reappears so external changes (like unpreferring a topic in the graph
+    /// view) are reflected instead of a stale first-load snapshot.
+    func refreshFromServer(using authSession: AuthSession) async {
+        await loadPreferences(using: authSession, force: true)
     }
 
     func reloadPreferences(using authSession: AuthSession) async {

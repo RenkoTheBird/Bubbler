@@ -62,7 +62,7 @@ struct PreferencesSettingsView: View {
         .navigationTitle("Preferences")
         .navigationBarTitleDisplayMode(.inline)
         .task {
-            await viewModel.loadPreferences(using: authSession)
+            await viewModel.refreshFromServer(using: authSession)
         }
     }
 

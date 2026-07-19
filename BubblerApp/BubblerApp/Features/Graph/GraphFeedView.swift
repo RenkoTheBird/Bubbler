@@ -333,9 +333,9 @@ private struct GraphNeighborBubble: View {
                 .padding(.horizontal, 8)
 
                 if node.isPreferredTopic {
-                    Image(systemName: "heart.fill")
+                    Image(systemName: "star.fill")
                         .font(.system(size: max(10, size * 0.13), weight: .bold))
-                        .foregroundColor(.pink)
+                        .foregroundColor(.yellow.opacity(0.9))
                         .padding(size * 0.07)
                         .background(
                             Circle()

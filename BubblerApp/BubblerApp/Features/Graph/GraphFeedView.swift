@@ -3,7 +3,13 @@ import SwiftUI
 struct GraphFeedView: View {
     @EnvironmentObject private var authSession: AuthSession
     @StateObject private var viewModel = GraphFeedViewModel()
-    @State private var previewedChoice: GraphFeedNode?
+    /// Stored as an ID so preference flag refreshes on `nextChoices` stay in sync.
+    @State private var previewedChoiceID: String?
+
+    private var previewedChoice: GraphFeedNode? {
+        guard let previewedChoiceID else { return nil }
+        return viewModel.nextChoices.first { $0.id == previewedChoiceID }
+    }
 
     var body: some View {
         ZStack {
@@ -44,7 +50,12 @@ struct GraphFeedView: View {
             await viewModel.load(using: authSession)
         }
         .onChange(of: viewModel.currentNode?.id) { _, _ in
-            previewedChoice = nil
+            previewedChoiceID = nil
+        }
+        .onChange(of: viewModel.nextChoices.map(\.id)) { _, ids in
+            if let previewedChoiceID, !ids.contains(previewedChoiceID) {
+                self.previewedChoiceID = nil
+            }
         }
     }
 
@@ -58,7 +69,7 @@ struct GraphFeedView: View {
             Spacer()
 
             Button {
-                previewedChoice = nil
+                previewedChoiceID = nil
                 Task {
                     await viewModel.refreshSession(using: authSession)
                 }
@@ -91,8 +102,16 @@ struct GraphFeedView: View {
                 message: "Pulling your initial session from Bubbler.",
                 showsProgress: true
             )
-        } else if let previewedChoice {
-            previewSection(for: previewedChoice)
+        } else if previewedChoiceID != nil {
+            if let previewedChoice {
+                previewSection(for: previewedChoice)
+            } else {
+                stateCard(
+                    title: "Loading preview",
+                    message: "Refreshing this bubble.",
+                    showsProgress: true
+                )
+            }
         } else if viewModel.currentNode == nil {
             stateCard(
                 title: "No session loaded",
@@ -125,7 +144,7 @@ struct GraphFeedView: View {
                     )
 
                     GraphNeighborBubble(node: node, size: bubbleSize) {
-                        previewedChoice = node
+                        previewedChoiceID = node.id
                     }
                     .position(x: center.x + offset.x, y: center.y + offset.y)
                     .disabled(viewModel.isSubmitting)
@@ -139,7 +158,7 @@ struct GraphFeedView: View {
         VStack(spacing: 12) {
             HStack(spacing: 10) {
                 Button {
-                    previewedChoice = nil
+                    previewedChoiceID = nil
                 } label: {
                     Label("Back", systemImage: "chevron.left")
                         .font(.subheadline.weight(.semibold))
@@ -158,7 +177,7 @@ struct GraphFeedView: View {
                 Button {
                     Task {
                         await viewModel.choose(node, using: authSession)
-                        previewedChoice = nil
+                        previewedChoiceID = nil
                     }
                 } label: {
                     Label("Select", systemImage: "checkmark.circle.fill")
@@ -181,7 +200,12 @@ struct GraphFeedView: View {
                     showsSkip: false,
                     isCompact: false,
                     isTopicPreferred: node.isPreferredTopic,
-                    isTopicBlacklisted: node.isBlacklistedTopic
+                    isTopicBlacklisted: node.isBlacklistedTopic,
+                    onTopicPreferenceChanged: {
+                        Task {
+                            await viewModel.syncTopicPreferences(using: authSession)
+                        }
+                    }
                 )
             }
         }
@@ -203,7 +227,7 @@ struct GraphFeedView: View {
                     isTopicPreferred: node.isPreferredTopic,
                     isTopicBlacklisted: node.isBlacklistedTopic,
                     onSkip: {
-                        previewedChoice = nil
+                        previewedChoiceID = nil
                         Task {
                             await viewModel.skipCurrentPost(using: authSession)
                         }

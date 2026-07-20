@@ -294,13 +294,13 @@ final class GraphFeedViewModel: ObservableObject {
 
             if let explicitNextNode {
                 await setCurrentNode(explicitNextNode, using: authSession)
-                if errorMessage == nil {
-                    statusMessage = statusMessage(for: explicitNextNode, defaultMessage: fallbackMessage)
+                if errorMessage == nil, let currentNode {
+                    statusMessage = statusMessage(for: currentNode, defaultMessage: fallbackMessage)
                 }
             } else if let nextNode = nextAutomaticNode(excluding: currentNode.id) {
                 await setCurrentNode(nextNode, using: authSession)
-                if errorMessage == nil {
-                    statusMessage = statusMessage(for: nextNode, defaultMessage: fallbackMessage)
+                if errorMessage == nil, let currentNode {
+                    statusMessage = statusMessage(for: currentNode, defaultMessage: fallbackMessage)
                 }
             } else {
                 await loadSession(
@@ -317,7 +317,9 @@ final class GraphFeedViewModel: ObservableObject {
     }
 
     private func setCurrentNode(_ node: GraphFeedNode, using authSession: AuthSession) async {
-        guard !node.isBlacklistedTopic else {
+        // Re-annotate from live preferences so a stale preview node can't carry old flags.
+        let annotated = makeNode(from: node.post)
+        guard !annotated.isBlacklistedTopic else {
             await loadSession(
                 using: authSession,
                 diversify: true,
@@ -326,11 +328,11 @@ final class GraphFeedViewModel: ObservableObject {
             return
         }
 
-        currentNode = node
+        currentNode = annotated
         currentPostStartedAt = Date()
 
         do {
-            nextChoices = try await loadChoices(for: node)
+            nextChoices = try await loadChoices(for: annotated)
 
             if nextChoices.isEmpty, sessionQueue.isEmpty {
                 statusMessage = "No connected posts were available, so the next action will pull a fresh session."
@@ -434,7 +436,7 @@ final class GraphFeedViewModel: ObservableObject {
             self.currentNode = makeNode(from: currentNode.post)
         }
 
-        nextChoices = nextChoices.map { makeNode(from: $0.post) }
+        nextChoices = rankedNodes(from: nextChoices.map(\.post))
         sessionQueue = sessionQueue.map { makeNode(from: $0.post) }
     }
 

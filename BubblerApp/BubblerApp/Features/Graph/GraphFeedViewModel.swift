@@ -294,12 +294,12 @@ final class GraphFeedViewModel: ObservableObject {
 
             if let explicitNextNode {
                 await setCurrentNode(explicitNextNode, using: authSession)
-                if errorMessage == nil, let currentNode {
+                if errorMessage == nil, let currentNode = self.currentNode {
                     statusMessage = statusMessage(for: currentNode, defaultMessage: fallbackMessage)
                 }
             } else if let nextNode = nextAutomaticNode(excluding: currentNode.id) {
                 await setCurrentNode(nextNode, using: authSession)
-                if errorMessage == nil, let currentNode {
+                if errorMessage == nil, let currentNode = self.currentNode {
                     statusMessage = statusMessage(for: currentNode, defaultMessage: fallbackMessage)
                 }
             } else {

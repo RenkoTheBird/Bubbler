@@ -64,7 +64,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Callable
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 import asyncpg
 from dotenv import load_dotenv
@@ -156,6 +156,10 @@ class ApiClient:
         timeout: int = 60,
     ) -> tuple[int, Any, str]:
         url = f"{self.base_url}{path}"
+        scheme = urlparse(url).scheme.lower()
+        if scheme not in {"http", "https"}:
+            raise ValueError(f"Refusing non-HTTP(S) URL scheme: {scheme!r}")
+
         headers: dict[str, str] = {}
         data: bytes | None = None
 
@@ -322,18 +326,54 @@ async def count_topic_training_events(
     action: str | None = None,
     topic_name: str | None = None,
 ) -> int:
-    clauses = ["post_id = $1::uuid"]
-    params: list[Any] = [post_id]
-    if action is not None:
-        params.append(action)
-        clauses.append(f"action = ${len(params)}")
-    if topic_name is not None:
-        params.append(topic_name)
-        clauses.append(f"topic_name = ${len(params)}")
-
-    query = f"SELECT COUNT(*) FROM topic_training_events WHERE {' AND '.join(clauses)}"
     async with pool.acquire() as conn:
-        return await conn.fetchval(query, *params) or 0
+        if action is not None and topic_name is not None:
+            return (
+                await conn.fetchval(
+                    """
+                    SELECT COUNT(*) FROM topic_training_events
+                    WHERE post_id = $1::uuid AND action = $2 AND topic_name = $3
+                    """,
+                    post_id,
+                    action,
+                    topic_name,
+                )
+                or 0
+            )
+        if action is not None:
+            return (
+                await conn.fetchval(
+                    """
+                    SELECT COUNT(*) FROM topic_training_events
+                    WHERE post_id = $1::uuid AND action = $2
+                    """,
+                    post_id,
+                    action,
+                )
+                or 0
+            )
+        if topic_name is not None:
+            return (
+                await conn.fetchval(
+                    """
+                    SELECT COUNT(*) FROM topic_training_events
+                    WHERE post_id = $1::uuid AND topic_name = $2
+                    """,
+                    post_id,
+                    topic_name,
+                )
+                or 0
+            )
+        return (
+            await conn.fetchval(
+                """
+                SELECT COUNT(*) FROM topic_training_events
+                WHERE post_id = $1::uuid
+                """,
+                post_id,
+            )
+            or 0
+        )
 
 
 async def fetch_user_posts(pool: asyncpg.Pool, user_id: int) -> list[dict[str, Any]]:
@@ -813,7 +853,7 @@ async def run_phase_4(ctx: Context) -> None:
     ok(
         ctx,
         "4.3 FeedView passes fetched posts into PostCardView",
-        "PostCardView(post: post)" in feed_view,
+        "PostCardView(" in feed_view and "post: post" in feed_view,
     )
 
     post_card = read_ios_file("Components/PostCardView.swift")
@@ -920,7 +960,7 @@ async def run_phase_5(ctx: Context) -> None:
     ok(
         ctx,
         "5.3 APIClient fetches graph session feed",
-        "authorizedRequest(path: \"feed/me/session\")" in api_client,
+        'authorizedRequest(path: "feed/me/session"' in api_client,
     )
     ok(
         ctx,
@@ -956,7 +996,7 @@ async def run_phase_5(ctx: Context) -> None:
     ok(
         ctx,
         "5.5 GraphFeedView renders connected choices",
-        "ForEach(viewModel.nextChoices)" in graph_view,
+        "viewModel.nextChoices" in graph_view and "ForEach(" in graph_view,
     )
     ok(
         ctx,

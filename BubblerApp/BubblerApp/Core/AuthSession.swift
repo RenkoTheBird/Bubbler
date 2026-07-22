@@ -36,7 +36,9 @@ final class AuthSession: ObservableObject {
             return
         }
 
-        _ = await performAuthAction {
+        _ = await performAuthAction(
+            unauthorizedErrorMessage: "Incorrect username or password."
+        ) {
             try await APIClient.login(
                 email: trimmedEmail,
                 password: password
@@ -112,7 +114,10 @@ final class AuthSession: ObservableObject {
         successMessage = message
     }
 
-    private func performAuthAction(_ action: () async throws -> AuthResponse) async -> Bool {
+    private func performAuthAction(
+        unauthorizedErrorMessage: String? = nil,
+        _ action: () async throws -> AuthResponse
+    ) async -> Bool {
         authError = nil
         successMessage = nil
         isWorking = true
@@ -124,6 +129,10 @@ final class AuthSession: ObservableObject {
             accessToken = response.accessToken
             userId = response.userId
             return true
+        } catch APIClientError.unauthorized {
+            authError = unauthorizedErrorMessage
+                ?? APIClientError.unauthorized.localizedDescription
+            return false
         } catch {
             authError = error.localizedDescription
             return false

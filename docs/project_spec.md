@@ -29,7 +29,7 @@ flowchart TB
         In --> Eval["Dev scripts · checkpoints<br/>preference-impact experiments"]
 
         Out --> Social["Follows · comments · block users<br/>media · bios · forgot password"]
-        Out --> Later["In-graph search · preference stats UI<br/>stronger topic ML · Roundabout<br/>bubble identity watermark"]
+        Out --> Later["In-graph search · preference stats UI<br/>stronger topic ML · Claim detection<br/>bubble identity watermark"]
     end
 
     User --> Graph

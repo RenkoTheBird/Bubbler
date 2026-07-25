@@ -1,5 +1,5 @@
 -- IMMEDIATE
-= add ability to reset/change password (done)
+Testing!
 
 -- BEFORE PRODUCTION
 add media support
@@ -7,11 +7,16 @@ add the ability to follow others
 add ability to add comments to posts
 add ability to block users
 forgot password functionality
+add a bio to user profile
+add search functionality in graph view (i.e. local restaurants are connected in graph for example)
+similarity not being topic based may not be what user expects
+it is easy to "say something" and be influenced easily (Roundabout fix?)
 
 -- IMPORTANT CHECKS
 folder structure
 
 -- FUTURE
+add a "watermark"/unique color/identifier to each person's bubbles
 add proper topic system (e.g. AI/ML based topic determination)
    -- NOTE: Continue from step 3.2
 provide a statistics system to show the user the real impact of their preferences.

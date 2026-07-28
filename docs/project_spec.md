@@ -53,4 +53,5 @@ flowchart TB
 - [`architecture.md`](architecture.md) — graph model, ranking, request flow
 - [`api_contracts.md`](api_contracts.md) — preference and feed/search payloads
 - [`moderation.md`](moderation.md) — safety floor, adaptive distribution, phased roadmap
+- [`privacy_legal.md`](privacy_legal.md) — US/EU privacy and legal launch requirements
 - [`TODO`](TODO) — immediate testing, pre-production, and future work

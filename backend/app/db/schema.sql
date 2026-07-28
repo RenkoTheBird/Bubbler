@@ -49,6 +49,26 @@ CREATE INDEX posts_search_vector_idx
 ON posts
 USING GIN (search_vector);
 
+-- MEDIA (post attachments; image-first, extensible for other types later)
+CREATE TABLE media (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    media_type TEXT NOT NULL DEFAULT 'image' CHECK (media_type IN ('image')),
+    storage_key TEXT NOT NULL UNIQUE,
+    mime_type TEXT NOT NULL,
+    byte_size INTEGER NOT NULL CHECK (byte_size > 0),
+    width INTEGER CHECK (width IS NULL OR width > 0),
+    height INTEGER CHECK (height IS NULL OR height > 0),
+    alt_text TEXT,
+    position INTEGER NOT NULL DEFAULT 0 CHECK (position >= 0),
+    created_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE (post_id, position)
+);
+
+CREATE INDEX media_post_id_idx ON media (post_id);
+CREATE INDEX media_user_id_idx ON media (user_id);
+
 -- POST-TOPICS (every post has >= 1 row; names resolve without joining topics)
 CREATE TABLE post_topics (
     post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,

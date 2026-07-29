@@ -4,7 +4,7 @@ Bubbler is a **constrained personalization system with a global safety floor**â€
 
 This document is a **roadmap**. Launch ships a thin safety floor plus the preference controls already in product; later phases deepen topic intelligence, risk-based visibility, and human governance. Do not treat every feature below as required on day one.
 
-Related: [`project_spec.md`](project_spec.md), [`architecture.md`](architecture.md), [`TODO`](TODO) (proper AI/ML topic system under FUTURE).
+Related: [`project_spec.md`](project_spec.md), [`architecture.md`](architecture.md), [`roadmap.md`](roadmap.md), [`TODO`](TODO) (proper AI/ML topic system under FUTURE).
 
 ```mermaid
 %%{init: {"flowchart": {"curve": "linear", "nodeSpacing": 24, "rankSpacing": 32}, "themeVariables": {"fontSize": "12px"}}}%%

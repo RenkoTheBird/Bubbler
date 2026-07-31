@@ -1,9 +1,30 @@
 from typing import Any, Sequence
+import logging
+import re
 
 from app.db.conn import acquire_conn
 from app.db.datetime_utils import ensure_utc
 from app.db.feed_sql import POSTS_BASE_FROM, POSTS_WITH_TOPIC_COLUMNS
 from app.db.vector import to_pgvector
+
+logger = logging.getLogger(__name__)
+
+# Simple alphanumeric tokens for prefix FTS (websearch_to_tsquery alone misses
+# partial words typed during live search, e.g. "proj" for "projects").
+_PREFIX_TOKEN_RE = re.compile(r"[a-z0-9]+", re.IGNORECASE)
+
+
+def _prefix_tsquery_string(query: str) -> str | None:
+    """Build ``token:* & token:*`` for prefix matching, or None if unusable."""
+    tokens = [
+        token.lower()
+        for token in _PREFIX_TOKEN_RE.findall(query)
+        if len(token) >= 2
+    ]
+    if not tokens:
+        return None
+    # Cap tokens so hostile input can't explode the tsquery.
+    return " & ".join(f"{token}:*" for token in tokens[:8])
 
 
 class SearchRepository:
@@ -37,6 +58,8 @@ class SearchRepository:
         if not trimmed:
             return []
 
+        prefix_tsq = _prefix_tsquery_string(trimmed)
+
         async with acquire_conn(self.pool, conn) as connection:
             try:
                 rows = await connection.fetch(
@@ -47,6 +70,13 @@ class SearchRepository:
                                 websearch_to_tsquery('english', $1),
                                 ''::tsquery
                             ) AS tsq,
+                            CASE
+                                WHEN $3::text IS NULL THEN NULL
+                                ELSE NULLIF(
+                                    to_tsquery('english', $3),
+                                    ''::tsquery
+                                )
+                            END AS prefix_tsq,
                             lower($1) AS q_lower
                     )
                     SELECT
@@ -57,6 +87,15 @@ class SearchRepository:
                                 THEN COALESCE(ts_rank_cd(p.search_vector, q.tsq), 0)
                                 ELSE 0
                             END
+                            + CASE
+                                WHEN q.prefix_tsq IS NOT NULL
+                                     AND p.search_vector @@ q.prefix_tsq
+                                THEN COALESCE(
+                                    ts_rank_cd(p.search_vector, q.prefix_tsq),
+                                    0
+                                ) * 0.85
+                                ELSE 0
+                              END
                             + CASE
                                 WHEN pwt.topic IS NOT NULL
                                      AND lower(pwt.topic) = q.q_lower
@@ -82,6 +121,10 @@ class SearchRepository:
                                 THEN 0.15
                                 ELSE 0
                               END
+                            + CASE
+                                WHEN p.content ILIKE '%' || $1 || '%' THEN 0.25
+                                ELSE 0
+                              END
                         ) AS rank
                     FROM posts p
                     JOIN posts_with_topic pwt ON pwt.id = p.id
@@ -89,6 +132,10 @@ class SearchRepository:
                     CROSS JOIN q
                     WHERE
                         (q.tsq IS NOT NULL AND p.search_vector @@ q.tsq)
+                        OR (
+                            q.prefix_tsq IS NOT NULL
+                            AND p.search_vector @@ q.prefix_tsq
+                        )
                         OR (
                             pwt.topic IS NOT NULL
                             AND lower(pwt.topic) = q.q_lower
@@ -101,14 +148,20 @@ class SearchRepository:
                         )
                         OR u.username_lower = q.q_lower
                         OR u.username_lower LIKE q.q_lower || '%'
+                        OR p.content ILIKE '%' || $1 || '%'
                     ORDER BY rank DESC, pwt.created_at DESC
                     LIMIT $2
                     """,
                     trimmed,
                     limit,
+                    prefix_tsq,
                 )
             except Exception:
-                # Fallback when websearch_to_tsquery rejects the input.
+                # Fallback when websearch_to_tsquery / to_tsquery rejects the input.
+                logger.exception(
+                    "keyword_search FTS failed for %r; using ILIKE fallback",
+                    trimmed,
+                )
                 rows = await connection.fetch(
                     f"""
                     SELECT
@@ -132,6 +185,10 @@ class SearchRepository:
                             + CASE
                                 WHEN u.username_lower = lower($1) THEN 0.8
                                 WHEN u.username_lower LIKE lower($1) || '%' THEN 0.4
+                                ELSE 0
+                              END
+                            + CASE
+                                WHEN p.content ILIKE '%' || $1 || '%' THEN 0.25
                                 ELSE 0
                               END
                         ) AS rank

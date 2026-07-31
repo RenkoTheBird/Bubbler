@@ -22,7 +22,7 @@ final class ProfileInformationViewModel: ObservableObject {
     }()
 
     var memberSinceText: String {
-        guard let createdAt = profile?.created_at else { return "—" }
+        guard let createdAt = profile?.createdAt else { return "—" }
         return Self.memberSinceFormatter.string(from: createdAt)
     }
 

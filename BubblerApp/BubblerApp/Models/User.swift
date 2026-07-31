@@ -4,13 +4,13 @@ struct User: Codable, Identifiable {
     let id: Int
     let username: String
     let email: String
-    let created_at: Date
+    let createdAt: Date
 
     enum CodingKeys: String, CodingKey {
-        case id  
+        case id
         case username
-        case email 
-        case created_at
+        case email
+        case createdAt = "created_at"
     }
 }
 

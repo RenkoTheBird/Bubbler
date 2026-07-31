@@ -55,7 +55,11 @@ final class ProfileViewModel: ObservableObject {
     func loadProfile(using authSession: AuthSession, force: Bool = false) async {
         guard force || !hasLoaded else { return }
 
-        isLoading = true
+        // Keep existing posts visible while refreshing so tab switches don't flash empty.
+        let showLoadingPlaceholder = posts.isEmpty
+        if showLoadingPlaceholder {
+            isLoading = true
+        }
         errorMessage = nil
 
         do {
@@ -92,6 +96,11 @@ final class ProfileViewModel: ObservableObject {
         }
 
         isLoading = false
+    }
+
+    /// Call after creating a post (or when returning to the Profile tab).
+    func refreshPosts(using authSession: AuthSession) async {
+        await loadProfile(using: authSession, force: true)
     }
 
     func removePost(id: String) {

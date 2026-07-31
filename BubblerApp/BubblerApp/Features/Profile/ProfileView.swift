@@ -170,9 +170,27 @@ struct ProfileView: View {
                     Spacer().frame(height: 40)
                 }
             }
+            .refreshable {
+                await viewModel.refreshPosts(using: authSession)
+            }
         }
-        .task {
-            await viewModel.loadProfile(using: authSession)
+        // TabView keeps Profile alive across tab switches, so always refresh on appear
+        // (and after publish) instead of caching the first empty load forever.
+        .onAppear {
+            Task {
+                await viewModel.refreshPosts(using: authSession)
+            }
+        }
+        .onChange(of: authSession.successMessage) { _, message in
+            guard viewModel.isOwnProfile,
+                  let message,
+                  message.localizedCaseInsensitiveContains("post published")
+                    || message.localizedCaseInsensitiveContains("post updated") else {
+                return
+            }
+            Task {
+                await viewModel.refreshPosts(using: authSession)
+            }
         }
     }
 }

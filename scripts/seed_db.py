@@ -209,6 +209,17 @@ async def ensure_schema(pool: asyncpg.Pool) -> None:
         await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
         await conn.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto")
 
+        if await _table_exists(conn, "users") and not await _column_exists(
+            conn, "users", "date_of_birth"
+        ):
+            await conn.execute("ALTER TABLE users ADD COLUMN date_of_birth DATE")
+            await conn.execute(
+                "UPDATE users SET date_of_birth = '1990-01-01' WHERE date_of_birth IS NULL"
+            )
+            await conn.execute(
+                "ALTER TABLE users ALTER COLUMN date_of_birth SET NOT NULL"
+            )
+
         if not await _column_exists(conn, "topics", "embedding"):
             await conn.execute("ALTER TABLE topics ADD COLUMN embedding vector(384)")
 
@@ -339,32 +350,46 @@ async def ensure_schema(pool: asyncpg.Pool) -> None:
             )
 
         # Allow bridge edges for cross-topic graph paths.
-        edge_checks = await conn.fetch(
+        # Constraint names come from pg_catalog; quote via format(%I) in SQL
+        # (no Python string-built DDL).
+        await conn.execute(
             """
-            SELECT conname, pg_get_constraintdef(oid) AS def
-            FROM pg_constraint
-            WHERE conrelid = 'edges'::regclass
-              AND contype = 'c'
-              AND pg_get_constraintdef(oid) LIKE '%edge_type%'
-            """
-        )
-        needs_bridge_constraint = True
-        for row in edge_checks:
-            if "bridge" in row["def"]:
-                needs_bridge_constraint = False
-            else:
-                await conn.execute(
-                    f'ALTER TABLE edges DROP CONSTRAINT IF EXISTS "{row["conname"]}"'
-                )
-                needs_bridge_constraint = True
-        if needs_bridge_constraint:
-            await conn.execute(
-                """
+            DO $migrate$
+            DECLARE
+              r RECORD;
+              needs_bridge BOOLEAN := TRUE;
+            BEGIN
+              IF to_regclass('public.edges') IS NULL THEN
+                RETURN;
+              END IF;
+
+              FOR r IN
+                SELECT c.conname, pg_get_constraintdef(c.oid) AS def
+                FROM pg_constraint c
+                WHERE c.conrelid = 'public.edges'::regclass
+                  AND c.contype = 'c'
+                  AND pg_get_constraintdef(c.oid) LIKE '%edge_type%'
+              LOOP
+                IF position('bridge' in r.def) > 0 THEN
+                  needs_bridge := FALSE;
+                ELSE
+                  EXECUTE format(
+                    'ALTER TABLE edges DROP CONSTRAINT IF EXISTS %I',
+                    r.conname
+                  );
+                  needs_bridge := TRUE;
+                END IF;
+              END LOOP;
+
+              IF needs_bridge THEN
                 ALTER TABLE edges
                 ADD CONSTRAINT edges_edge_type_check
-                CHECK (edge_type IN ('similar', 'opposite', 'topic', 'bridge'))
-                """
-            )
+                CHECK (edge_type IN ('similar', 'opposite', 'topic', 'bridge'));
+              END IF;
+            END
+            $migrate$;
+            """
+        )
 
 
 async def main():
@@ -375,9 +400,11 @@ async def main():
     async with pool.acquire() as conn:
         user_id = await conn.fetchval(
             """
-            INSERT INTO users (username, email, password)
-            VALUES ('demo', 'demo@bubbler.test', 'not-a-real-hash')
-            ON CONFLICT (email_lower) DO UPDATE SET username = EXCLUDED.username
+            INSERT INTO users (username, email, password, date_of_birth)
+            VALUES ('demo', 'demo@bubbler.test', 'not-a-real-hash', '1990-01-01')
+            ON CONFLICT (email_lower) DO UPDATE SET
+                username = EXCLUDED.username,
+                date_of_birth = COALESCE(users.date_of_birth, EXCLUDED.date_of_birth)
             RETURNING id
             """
         )

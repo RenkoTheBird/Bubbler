@@ -161,6 +161,44 @@ apply_schema() {
   fi
 }
 
+# Additive fixes for DBs that already have public.users from an older schema.sql.
+# Full rebuild remains the path for destructive/complex changes (--rebuild-db).
+migrate_schema() {
+  log "Applying additive schema migrations"
+  local migrate_sql
+  migrate_sql="$(cat <<'SQL'
+DO $$
+BEGIN
+  IF to_regclass('public.users') IS NULL THEN
+    RETURN;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'users'
+      AND column_name = 'date_of_birth'
+  ) THEN
+    ALTER TABLE users ADD COLUMN date_of_birth DATE;
+  END IF;
+
+  UPDATE users
+  SET date_of_birth = DATE '1990-01-01'
+  WHERE date_of_birth IS NULL;
+
+  ALTER TABLE users ALTER COLUMN date_of_birth SET NOT NULL;
+END
+$$;
+SQL
+)"
+  if $USE_DOCKER; then
+    docker exec -i "$CONTAINER_NAME" psql -U "$DB_USER" -d "$DATABASE" <<<"$migrate_sql"
+  else
+    PGPASSWORD="$DATABASE_PASSWORD" psql -h "$HOST" -p "$PORT" -U "$DB_USER" -d "$DATABASE" <<<"$migrate_sql"
+  fi
+}
+
 rebuild_database() {
   log "Rebuilding database (dropping public schema; all local data will be lost)"
   local reset_sql
@@ -304,6 +342,7 @@ main() {
     rebuild_database
   elif schema_is_applied; then
     log "Database schema already applied (use --rebuild-db after schema changes)"
+    migrate_schema
   else
     apply_schema
   fi

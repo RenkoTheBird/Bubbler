@@ -240,7 +240,7 @@ struct CreateAccountView: View {
         terms.link = URL(string: "bubbler://terms")
         terms.underlineStyle = .single
 
-        var connector = AttributedString(" and ")
+        let connector = AttributedString(" and ")
 
         var privacy = AttributedString("Privacy Policy")
         privacy.link = URL(string: "bubbler://privacy")

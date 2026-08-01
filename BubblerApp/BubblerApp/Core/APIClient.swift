@@ -25,6 +25,37 @@ private struct RegisterBody: Encodable {
     let username: String
     let email: String
     let password: String
+    let dateOfBirth: Date
+
+    enum CodingKeys: String, CodingKey {
+        case username
+        case email
+        case password
+        case dateOfBirth = "date_of_birth"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(username, forKey: .username)
+        try container.encode(email, forKey: .email)
+        try container.encode(password, forKey: .password)
+
+        // Encode the local calendar day, not a UTC instant, so the DOB does not shift.
+        let parts = Calendar.current.dateComponents([.year, .month, .day], from: dateOfBirth)
+        guard let year = parts.year, let month = parts.month, let day = parts.day else {
+            throw EncodingError.invalidValue(
+                dateOfBirth,
+                EncodingError.Context(
+                    codingPath: [CodingKeys.dateOfBirth],
+                    debugDescription: "Could not read date of birth components."
+                )
+            )
+        }
+        try container.encode(
+            String(format: "%04d-%02d-%02d", year, month, day),
+            forKey: .dateOfBirth
+        )
+    }
 }
 
 private struct CreatePostBody: Encodable {
@@ -91,12 +122,22 @@ enum APIClient {
         return try await perform(request)
     }
 
-    static func register(username: String, email: String, password: String) async throws -> AuthResponse {
+    static func register(
+        username: String,
+        email: String,
+        password: String,
+        dateOfBirth: Date
+    ) async throws -> AuthResponse {
         var request = URLRequest(url: APIConfig.baseURL.appending(path: "auth/register"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(
-            RegisterBody(username: username, email: email, password: password)
+            RegisterBody(
+                username: username,
+                email: email,
+                password: password,
+                dateOfBirth: dateOfBirth
+            )
         )
         return try await perform(request)
     }

@@ -16,15 +16,16 @@ class AuthRepository:
                 email_or_username,
             )
 
-    async def post_registration_info(self, username: str, email: str, password: str):
+    async def post_registration_info(self, username: str, email: str, password: str, date_of_birth):
         async with self.pool.acquire() as conn:
             return await conn.fetchval(
                 """
-                INSERT INTO users (username, email, password)
-                VALUES ($1, lower($2), $3)
+                INSERT INTO users (username, email, password, date_of_birth)
+                VALUES ($1, lower($2), $3, $4)
                 RETURNING id
                 """,
                 username,
                 email,
                 password,
+                date_of_birth,
             )

@@ -10,6 +10,7 @@ CREATE TABLE users (
     username VARCHAR(20) NOT NULL,
     email VARCHAR(80) NOT NULL,
     password VARCHAR(60) NOT NULL,
+    date_of_birth DATE NOT NULL,
     email_lower TEXT GENERATED ALWAYS AS (lower(email)) STORED,
     username_lower TEXT GENERATED ALWAYS AS (lower(username)) STORED,
     created_at TIMESTAMP DEFAULT NOW()

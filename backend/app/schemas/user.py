@@ -61,7 +61,8 @@ class PublicUserInfo(BaseModel):
 class CreateUser(BaseModel):
     username: str = Field(min_length=1, max_length=20)
     email: EmailStr = Field(max_length=80)
-    password: str = Field(min_length=5, max_length=40) ## logical limit at api side truly capped at 60 for hash at db 
+    password: str = Field(min_length=5, max_length=40) ## logical limit at api side truly capped at 60 for hash at db
+    date_of_birth: datetime.date
 
 
 class EmailUpdate(BaseModel):

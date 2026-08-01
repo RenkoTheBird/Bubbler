@@ -6,6 +6,23 @@
 import Combine
 import Foundation
 
+enum AgeGate {
+    /// Global floor (EU-friendly GDPR Art. 8).
+    static let minimumAge = 16
+
+    static func age(from birthDate: Date, on referenceDate: Date = Date()) -> Int {
+        Calendar.current.dateComponents([.year], from: birthDate, to: referenceDate).year ?? 0
+    }
+
+    static func isOldEnough(dateOfBirth: Date, on referenceDate: Date = Date()) -> Bool {
+        age(from: dateOfBirth, on: referenceDate) >= minimumAge
+    }
+
+    static var underageMessage: String {
+        "You must be at least \(minimumAge) years old to use Bubbler."
+    }
+}
+
 @MainActor
 final class AuthSession: ObservableObject {
     @Published private(set) var accessToken: String?
@@ -50,7 +67,8 @@ final class AuthSession: ObservableObject {
         username: String,
         email: String,
         password: String,
-        confirmPassword: String
+        confirmPassword: String,
+        dateOfBirth: Date
     ) async {
         let trimmedUsername = username.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedEmail = normalizedEmail(email)
@@ -67,6 +85,11 @@ final class AuthSession: ObservableObject {
 
         guard !trimmedEmail.isEmpty else {
             authError = "Enter your email address."
+            return
+        }
+
+        guard AgeGate.isOldEnough(dateOfBirth: dateOfBirth) else {
+            authError = AgeGate.underageMessage
             return
         }
 
@@ -89,7 +112,8 @@ final class AuthSession: ObservableObject {
             try await APIClient.register(
                 username: trimmedUsername,
                 email: trimmedEmail,
-                password: password
+                password: password,
+                dateOfBirth: dateOfBirth
             )
         }
 

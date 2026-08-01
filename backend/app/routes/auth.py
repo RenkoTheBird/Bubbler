@@ -15,7 +15,12 @@ def create_auth_router(auth_service: AuthService):
 
     @router.post("/register")
     async def post_registration_info(body: CreateUser):
-        result = await auth_service.post_registration_info(body.username, body.email, body.password)
+        result = await auth_service.post_registration_info(
+            body.username,
+            body.email,
+            body.password,
+            body.date_of_birth,
+        )
         return result
 
     return router

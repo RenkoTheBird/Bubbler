@@ -115,6 +115,13 @@ struct CreateAccountView: View {
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 6)
                 }
+
+                Text(agreementText)
+                    .font(.footnote)
+                    .foregroundColor(.white.opacity(0.8))
+                    .multilineTextAlignment(.center)
+                    .tint(.white)
+                    .padding(.top, 4)
                 
                 // Create account button
                 Button(action: {
@@ -171,6 +178,25 @@ struct CreateAccountView: View {
             }
             .padding(.horizontal, 28)
         }
+    }
+
+    private var agreementText: AttributedString {
+        var text = AttributedString("By signing up, I agree to Bubbler's ")
+
+        var terms = AttributedString("Terms of Use")
+        terms.link = URL(string: "bubbler://terms")
+        terms.underlineStyle = .single
+
+        var connector = AttributedString(" and ")
+
+        var privacy = AttributedString("Privacy Policy")
+        privacy.link = URL(string: "bubbler://privacy")
+        privacy.underlineStyle = .single
+
+        text.append(terms)
+        text.append(connector)
+        text.append(privacy)
+        return text
     }
 }
 

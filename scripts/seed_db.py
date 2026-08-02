@@ -391,6 +391,25 @@ async def ensure_schema(pool: asyncpg.Pool) -> None:
             """
         )
 
+        if not await _table_exists(conn, "user_blocks"):
+            await conn.execute(
+                """
+                CREATE TABLE user_blocks (
+                    blocker_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    blocked_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    PRIMARY KEY (blocker_id, blocked_id),
+                    CHECK (blocker_id <> blocked_id)
+                )
+                """
+            )
+            await conn.execute(
+                """
+                CREATE INDEX user_blocks_blocked_id_idx
+                ON user_blocks (blocked_id)
+                """
+            )
+
 
 async def main():
     pool = await asyncpg.create_pool(my_env_vars.db_url)

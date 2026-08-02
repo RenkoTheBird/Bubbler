@@ -8,9 +8,12 @@ import Combine
 
 @MainActor
 final class ProfileViewModel: ObservableObject {
+    @Published private(set) var userId: Int?
     @Published private(set) var username: String?
     @Published private(set) var posts: [Post] = []
+    @Published private(set) var isBlocked = false
     @Published private(set) var isLoading = false
+    @Published private(set) var isUpdatingBlock = false
     @Published var errorMessage: String?
 
     /// `nil` loads the signed-in user's profile (`/user/me/...`).
@@ -25,6 +28,16 @@ final class ProfileViewModel: ObservableObject {
 
     var isOwnProfile: Bool { targetUsername == nil }
 
+    func isOwnProfile(for authSession: AuthSession) -> Bool {
+        if isOwnProfile { return true }
+        guard let userId, let sessionUserId = authSession.userId else { return false }
+        return userId == sessionUserId
+    }
+
+    var canManageBlock: Bool {
+        !isOwnProfile && username != nil && !isLoading
+    }
+
     var displayUsername: String {
         if let username, !username.isEmpty {
             return "@\(username)"
@@ -33,7 +46,10 @@ final class ProfileViewModel: ObservableObject {
     }
 
     var profileSubtitle: String {
-        isOwnProfile ? "Your bubble profile 🫧" : "Bubble node in your network"
+        if isBlocked {
+            return "You blocked this user"
+        }
+        return isOwnProfile ? "Your bubble profile 🫧" : "Bubble node in your network"
     }
 
     var activeBubbleLabel: String {
@@ -70,7 +86,9 @@ final class ProfileViewModel: ObservableObject {
                 let profile = try await profileTask
                 let loadedPosts = try await postsTask
 
+                userId = profile.id
                 username = profile.username
+                isBlocked = profile.isBlocked
                 posts = loadedPosts
             } else {
                 async let profileTask = APIClient.getProfile()
@@ -79,7 +97,9 @@ final class ProfileViewModel: ObservableObject {
                 let profile = try await profileTask
                 let loadedPosts = try await postsTask
 
+                userId = profile.id
                 username = profile.username
+                isBlocked = false
                 posts = loadedPosts
             }
             hasLoaded = true
@@ -101,6 +121,54 @@ final class ProfileViewModel: ObservableObject {
     /// Call after creating a post (or when returning to the Profile tab).
     func refreshPosts(using authSession: AuthSession) async {
         await loadProfile(using: authSession, force: true)
+    }
+
+    func blockUser(using authSession: AuthSession) async {
+        guard let username, canManageBlock, !isUpdatingBlock else { return }
+
+        isUpdatingBlock = true
+        errorMessage = nil
+
+        do {
+            let profile = try await APIClient.blockUser(username: username)
+            userId = profile.id
+            self.username = profile.username
+            isBlocked = profile.isBlocked
+        } catch {
+            if case APIClientError.unauthorized = error {
+                authSession.signOut()
+            }
+            let description = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+            errorMessage = description.isEmpty
+                ? "We couldn't block this user."
+                : description
+        }
+
+        isUpdatingBlock = false
+    }
+
+    func unblockUser(using authSession: AuthSession) async {
+        guard let username, canManageBlock, !isUpdatingBlock else { return }
+
+        isUpdatingBlock = true
+        errorMessage = nil
+
+        do {
+            let profile = try await APIClient.unblockUser(username: username)
+            userId = profile.id
+            self.username = profile.username
+            isBlocked = profile.isBlocked
+        } catch {
+            if case APIClientError.unauthorized = error {
+                authSession.signOut()
+            }
+            let description = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+            errorMessage = description.isEmpty
+                ? "We couldn't unblock this user."
+                : description
+        }
+
+        isUpdatingBlock = false
     }
 
     func removePost(id: String) {

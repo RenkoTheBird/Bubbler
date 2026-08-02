@@ -27,6 +27,15 @@ def _normalize_topic(topic: str | None) -> str | None:
     return topic.strip().casefold()
 
 
+def _without_blocked_users(
+    posts: list[dict],
+    blocked_user_ids: set[int] | None,
+) -> list[dict]:
+    if not blocked_user_ids:
+        return posts
+    return [post for post in posts if post.get("user_id") not in blocked_user_ids]
+
+
 class PreferenceService:
     def view_time_topic_boosts(self, prefs, interactions) -> dict[str, float]:
         """Return bounded topic boosts from recent viewing behavior."""
@@ -77,13 +86,18 @@ class RankingService:
         posts: List[dict],
         *,
         view_time_boosts: dict[str, float] | None = None,
+        blocked_user_ids: set[int] | None = None,
     ):
         filtered = []
         preferred_topics, blacklisted_topics = _topic_sets(prefs.topic_preferences)
         use_recency = getattr(prefs, "use_recency", True)
         view_time_boosts = view_time_boosts or {}
+        blocked_user_ids = blocked_user_ids or set()
 
         for post in posts:
+            if post.get("user_id") in blocked_user_ids:
+                continue
+
             post_topic = post.get("topic")
             normalized_topic = _normalize_topic(post_topic)
 
@@ -209,6 +223,7 @@ class FeedService:
 
     async def get_feed(self, user_id: int, user_input: str):
         prefs = await self.user_repo.get_prefs(user_id)
+        blocked_user_ids = await self.user_repo.get_blocked_user_ids(user_id)
         interactions = await self.interaction_repo.get_recent_interactions(user_id)
         view_time_boosts = self.preference_service.view_time_topic_boosts(
             prefs, interactions
@@ -269,12 +284,14 @@ class FeedService:
             prefs,
             expanded_posts,
             view_time_boosts=view_time_boosts,
+            blocked_user_ids=blocked_user_ids,
         )
 
         return [with_utc_created_at(post) for post in ranked[:20]]
 
     async def get_new_session_posts(self, user_id: int, *, diversify: bool = False):
         prefs = await self.user_repo.get_prefs(user_id)
+        blocked_user_ids = await self.user_repo.get_blocked_user_ids(user_id)
         _, blacklisted = _topic_sets(prefs.topic_preferences)
         yesterday_post, liked_topic = await self._yesterday_liked_signal(user_id)
         interactions = await self.interaction_repo.get_recent_interactions(user_id)
@@ -302,6 +319,7 @@ class FeedService:
             prefs,
             candidates,
             view_time_boosts=view_time_boosts,
+            blocked_user_ids=blocked_user_ids,
         )
         selected = self._select_topic_diverse(
             ranked,
@@ -358,6 +376,7 @@ class FeedService:
 
     async def get_next_posts(self, user_id: int, post_id: str):
         prefs = await self.user_repo.get_prefs(user_id)
+        blocked_user_ids = await self.user_repo.get_blocked_user_ids(user_id)
         preferred_topics, blacklisted_topics = _topic_sets(prefs.topic_preferences)
         interactions = await self.interaction_repo.get_recent_interactions(user_id)
         view_time_boosts = self.preference_service.view_time_topic_boosts(
@@ -445,6 +464,7 @@ class FeedService:
             candidates.append(candidate)
             existing_ids.add(post["id"])
 
+        candidates = _without_blocked_users(candidates, blocked_user_ids)
         selected = self._select_next_quota(
             candidates,
             current_topic=current_topic,

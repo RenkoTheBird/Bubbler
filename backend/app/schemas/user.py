@@ -48,12 +48,28 @@ class PublicUserInfo(BaseModel):
     id: int
     username: str
     created_at: datetime.datetime
+    is_blocked: bool = False
 
     def model_post_init(self, __context) -> None:
         object.__setattr__(self, "created_at", ensure_utc(self.created_at))
 
     @field_serializer("created_at")
     def serialize_created_at(self, value: datetime.datetime) -> str:
+        return utc_iso_z(value)
+
+
+class BlockedUserInfo(BaseModel):
+    """A user the current account has blocked."""
+
+    id: int
+    username: str
+    blocked_at: datetime.datetime
+
+    def model_post_init(self, __context) -> None:
+        object.__setattr__(self, "blocked_at", ensure_utc(self.blocked_at))
+
+    @field_serializer("blocked_at")
+    def serialize_blocked_at(self, value: datetime.datetime) -> str:
         return utc_iso_z(value)
 
 

@@ -1,7 +1,7 @@
 from app.db.topics import normalize_known_topic
 from app.schemas.post import Post
 from app.schemas.search import SearchResponse
-from app.services.feed import _topic_sets
+from app.services.feed import _topic_sets, _without_blocked_users
 
 
 # Keyword hits first; semantic/related fill the rest.
@@ -43,6 +43,7 @@ class SearchService:
             return SearchResponse(query="", exact_matches=[], related=[])
 
         prefs = await self.user_repo.get_prefs(user_id)
+        blocked_user_ids = await self.user_repo.get_blocked_user_ids(user_id)
         _, blacklisted = _topic_sets(prefs.topic_preferences or [])
 
         known_topic = normalize_known_topic(trimmed)
@@ -52,6 +53,7 @@ class SearchService:
         )
         if known_topic:
             keyword_rows = self._boost_topic_matches(keyword_rows, known_topic)
+        keyword_rows = _without_blocked_users(keyword_rows, blocked_user_ids)
 
         exact_ids = {row["id"] for row in keyword_rows}
 
@@ -63,6 +65,7 @@ class SearchService:
             min_similarity=_MIN_SEMANTIC_SIMILARITY,
             limit=_SEMANTIC_LIMIT,
         )
+        semantic_rows = _without_blocked_users(semantic_rows, blocked_user_ids)
 
         related_rows = list(semantic_rows)
         related_ids = {row["id"] for row in related_rows} | exact_ids
@@ -80,6 +83,8 @@ class SearchService:
             if novel_ids:
                 graph_posts = await self.search_repo.get_posts_by_ids(novel_ids)
                 for post in graph_posts:
+                    if post.get("user_id") in blocked_user_ids:
+                        continue
                     topic = (post.get("topic") or "").strip().casefold()
                     if topic and topic in blacklisted:
                         continue

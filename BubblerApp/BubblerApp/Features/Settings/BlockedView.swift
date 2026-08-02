@@ -4,19 +4,12 @@
 //
 
 import SwiftUI
-
-struct BlockedUserItem: Identifiable, Equatable {
-    let id: Int
-    let username: String
-}
+import Combine
 
 struct BlockedView: View {
-    @State private var blockedUsers: [BlockedUserItem]
-    @State private var userPendingUnblock: BlockedUserItem?
-
-    init(blockedUsers: [BlockedUserItem] = []) {
-        _blockedUsers = State(initialValue: blockedUsers)
-    }
+    @EnvironmentObject private var authSession: AuthSession
+    @StateObject private var viewModel = BlockedViewModel()
+    @State private var userPendingUnblock: BlockedUser?
 
     var body: some View {
         ZStack {
@@ -35,7 +28,17 @@ struct BlockedView: View {
                 VStack(spacing: 20) {
                     headerSection
 
-                    if blockedUsers.isEmpty {
+                    if let errorMessage = viewModel.errorMessage {
+                        messageCard(
+                            title: viewModel.errorTitle,
+                            message: errorMessage,
+                            tint: .red
+                        )
+                    }
+
+                    if viewModel.isLoading && viewModel.blockedUsers.isEmpty {
+                        loadingCard
+                    } else if viewModel.blockedUsers.isEmpty {
                         emptyStateCard
                     } else {
                         blockedListCard
@@ -45,9 +48,15 @@ struct BlockedView: View {
                 .padding(.top, 20)
                 .padding(.bottom, 40)
             }
+            .refreshable {
+                await viewModel.loadBlockedUsers(using: authSession, force: true)
+            }
         }
         .navigationTitle("Blocked")
         .navigationBarTitleDisplayMode(.inline)
+        .task {
+            await viewModel.loadBlockedUsers(using: authSession)
+        }
         .confirmationDialog(
             unblockDialogTitle,
             isPresented: Binding(
@@ -58,14 +67,17 @@ struct BlockedView: View {
         ) {
             Button("Unblock", role: .destructive) {
                 if let user = userPendingUnblock {
-                    unblock(user)
+                    Task {
+                        await viewModel.unblock(user, using: authSession)
+                        userPendingUnblock = nil
+                    }
                 }
             }
             Button("Cancel", role: .cancel) {
                 userPendingUnblock = nil
             }
         } message: {
-            Text("They will be able to interact with you again once unblocked.")
+            Text("They will be able to appear in your feed again once unblocked.")
         }
     }
 
@@ -82,7 +94,7 @@ struct BlockedView: View {
                 .font(.system(size: 30, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
 
-            Text("People you block won’t appear in your feed or be able to interact with you.")
+            Text("People you block won’t appear in your feed or search results.")
                 .font(.subheadline)
                 .multilineTextAlignment(.center)
                 .foregroundColor(.white.opacity(0.72))
@@ -90,9 +102,24 @@ struct BlockedView: View {
         .padding(.bottom, 4)
     }
 
+    private var loadingCard: some View {
+        sectionCard(title: "Loading") {
+            HStack(spacing: 12) {
+                ProgressView()
+                    .tint(.white)
+
+                Text("Fetching your blocked users.")
+                    .foregroundColor(.white.opacity(0.9))
+                    .font(.subheadline)
+
+                Spacer()
+            }
+        }
+    }
+
     private var emptyStateCard: some View {
         sectionCard(title: "No blocked users") {
-            Text("When you block someone, they’ll show up here so you can unblock them anytime.")
+            Text("When you block someone from their profile, they’ll show up here so you can unblock them anytime.")
                 .font(.subheadline)
                 .foregroundColor(.white.opacity(0.85))
                 .fixedSize(horizontal: false, vertical: true)
@@ -102,15 +129,15 @@ struct BlockedView: View {
     private var blockedListCard: some View {
         sectionCard(
             title: "Blocked",
-            subtitle: blockedUsers.count == 1
+            subtitle: viewModel.blockedUsers.count == 1
                 ? "1 person"
-                : "\(blockedUsers.count) people"
+                : "\(viewModel.blockedUsers.count) people"
         ) {
             VStack(spacing: 0) {
-                ForEach(Array(blockedUsers.enumerated()), id: \.element.id) { index, user in
+                ForEach(Array(viewModel.blockedUsers.enumerated()), id: \.element.id) { index, user in
                     blockedUserRow(user)
 
-                    if index < blockedUsers.count - 1 {
+                    if index < viewModel.blockedUsers.count - 1 {
                         Divider()
                             .background(Color.white.opacity(0.12))
                     }
@@ -119,7 +146,7 @@ struct BlockedView: View {
         }
     }
 
-    private func blockedUserRow(_ user: BlockedUserItem) -> some View {
+    private func blockedUserRow(_ user: BlockedUser) -> some View {
         HStack(spacing: 12) {
             Image(systemName: "person.crop.circle.fill")
                 .font(.system(size: 28))
@@ -141,6 +168,8 @@ struct BlockedView: View {
             .background(Color.white.opacity(0.16))
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .buttonStyle(.plain)
+            .disabled(viewModel.isUpdating)
+            .opacity(viewModel.isUpdating ? 0.55 : 1)
         }
         .padding(.vertical, 10)
     }
@@ -177,23 +206,30 @@ struct BlockedView: View {
         )
     }
 
-    private func unblock(_ user: BlockedUserItem) {
-        blockedUsers.removeAll { $0.id == user.id }
-        userPendingUnblock = nil
+    private func messageCard(title: String, message: String, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.headline)
+                .foregroundColor(.white)
+
+            Text(message)
+                .font(.subheadline)
+                .foregroundColor(.white.opacity(0.85))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(tint.opacity(0.22))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(tint.opacity(0.4), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 }
 
-#Preview("Empty") {
+#Preview {
     NavigationStack {
         BlockedView()
-    }
-}
-
-#Preview("With blocked users") {
-    NavigationStack {
-        BlockedView(blockedUsers: [
-            BlockedUserItem(id: 1, username: "alex"),
-            BlockedUserItem(id: 2, username: "jordan"),
-        ])
+            .environmentObject(AuthSession())
     }
 }

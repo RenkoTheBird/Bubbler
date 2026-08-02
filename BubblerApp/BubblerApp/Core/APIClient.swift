@@ -364,6 +364,29 @@ enum APIClient {
         _ = try await authorizedRequest(path: "user/me", method: "DELETE")
     }
 
+    static func getBlockedUsers() async throws -> [BlockedUser] {
+        let data = try await authorizedRequest(path: "user/me/blocks")
+        return try apiJSONDecoder.decode([BlockedUser].self, from: data)
+    }
+
+    static func blockUser(username: String) async throws -> PublicUser {
+        let encoded = username.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? username
+        let data = try await authorizedRequest(
+            path: "user/me/blocks/\(encoded)",
+            method: "POST"
+        )
+        return try apiJSONDecoder.decode(PublicUser.self, from: data)
+    }
+
+    static func unblockUser(username: String) async throws -> PublicUser {
+        let encoded = username.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? username
+        let data = try await authorizedRequest(
+            path: "user/me/blocks/\(encoded)",
+            method: "DELETE"
+        )
+        return try apiJSONDecoder.decode(PublicUser.self, from: data)
+    }
+
     private static let apiJSONDecoder: JSONDecoder = {
         let decoder = JSONDecoder()
         let formatter = ISO8601DateFormatter()

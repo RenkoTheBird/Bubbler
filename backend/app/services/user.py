@@ -13,8 +13,11 @@ class UserService:
             raise HTTPException(status_code=404, detail="User not found")
         return profile
 
-    async def get_profile_by_username(self, username: str):
-        profile = await self.user_repo.get_profile_by_username(username)
+    async def get_profile_by_username(self, username: str, viewer_id: int | None = None):
+        profile = await self.user_repo.get_profile_by_username(
+            username,
+            viewer_id=viewer_id,
+        )
         if profile is None:
             raise HTTPException(status_code=404, detail="User not found")
         return profile
@@ -62,6 +65,29 @@ class UserService:
     
     async def put_prefs(self, user_id, body):
         return await self.user_repo.put_prefs(user_id, body)
+
+    async def list_blocked_users(self, user_id: int):
+        return await self.user_repo.list_blocked_users(user_id)
+
+    async def block_user(self, blocker_id: int, username: str):
+        blocked_id = await self.user_repo.resolve_user_id_by_username(username)
+        if blocked_id is None:
+            raise HTTPException(status_code=404, detail="User not found")
+        if blocked_id == blocker_id:
+            raise HTTPException(status_code=400, detail="You cannot block yourself")
+
+        await self.user_repo.block_user(blocker_id, blocked_id)
+        return await self.get_profile_by_username(username, viewer_id=blocker_id)
+
+    async def unblock_user(self, blocker_id: int, username: str):
+        blocked_id = await self.user_repo.resolve_user_id_by_username(username)
+        if blocked_id is None:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        removed = await self.user_repo.unblock_user(blocker_id, blocked_id)
+        if not removed:
+            raise HTTPException(status_code=404, detail="User is not blocked")
+        return await self.get_profile_by_username(username, viewer_id=blocker_id)
 
     async def delete_user(self, user_id):
         result = await self.user_repo.delete_user(user_id)

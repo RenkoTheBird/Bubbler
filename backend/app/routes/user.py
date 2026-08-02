@@ -99,20 +99,32 @@ def create_user_router(user_service: UserService, interaction_service: Interacti
     async def delete_user(user_id: int = Depends(get_current_user_id)):
         return await user_service.delete_user(user_id)
 
+    @router.get("/me/blocks")
+    async def list_blocked_users(user_id: int = Depends(get_current_user_id)):
+        return await user_service.list_blocked_users(user_id)
+
+    @router.post("/me/blocks/{username}")
+    async def block_user(username: str, user_id: int = Depends(get_current_user_id)):
+        return await user_service.block_user(user_id, username)
+
+    @router.delete("/me/blocks/{username}")
+    async def unblock_user(username: str, user_id: int = Depends(get_current_user_id)):
+        return await user_service.unblock_user(user_id, username)
+
     # Public profile lookup — registered after /me so literal "me" paths win.
     @router.get("/{username}/profile")
     async def get_profile_by_username(
         username: str,
-        _user_id: int = Depends(get_current_user_id),
+        user_id: int = Depends(get_current_user_id),
     ):
-        return await user_service.get_profile_by_username(username)
+        return await user_service.get_profile_by_username(username, viewer_id=user_id)
 
     @router.get("/{username}/posts")
     async def get_posts_by_username(
         username: str,
-        _user_id: int = Depends(get_current_user_id),
+        user_id: int = Depends(get_current_user_id),
     ):
-        profile = await user_service.get_profile_by_username(username)
+        profile = await user_service.get_profile_by_username(username, viewer_id=user_id)
         return await post_service.get_user_posts(profile.id)
 
     return router

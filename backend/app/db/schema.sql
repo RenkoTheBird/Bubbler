@@ -163,3 +163,14 @@ CREATE TABLE user_topic_prefs (
     preference_type TEXT NOT NULL CHECK (preference_type IN ('preferred', 'blacklisted')),
     PRIMARY KEY (user_id, topic_id)
 );
+
+-- USER BLOCKS (blocker hides blocked user's content from feeds/search)
+CREATE TABLE user_blocks (
+    blocker_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    blocked_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT NOW(),
+    PRIMARY KEY (blocker_id, blocked_id),
+    CHECK (blocker_id <> blocked_id)
+);
+
+CREATE INDEX user_blocks_blocked_id_idx ON user_blocks (blocked_id);

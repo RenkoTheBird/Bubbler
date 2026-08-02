@@ -188,6 +188,17 @@ BEGIN
   WHERE date_of_birth IS NULL;
 
   ALTER TABLE users ALTER COLUMN date_of_birth SET NOT NULL;
+
+  IF to_regclass('public.user_blocks') IS NULL THEN
+    CREATE TABLE user_blocks (
+      blocker_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      blocked_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TIMESTAMP DEFAULT NOW(),
+      PRIMARY KEY (blocker_id, blocked_id),
+      CHECK (blocker_id <> blocked_id)
+    );
+    CREATE INDEX user_blocks_blocked_id_idx ON user_blocks (blocked_id);
+  END IF;
 END
 $$;
 SQL

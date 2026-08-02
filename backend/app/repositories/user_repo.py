@@ -2,6 +2,7 @@ from app.db.jsonb import normalize_strategy_weights, to_jsonb
 from app.db.datetime_utils import ensure_utc
 from app.schemas.user import (
     DEFAULT_STRATEGY_WEIGHTS,
+    BlockedUserInfo,
     PublicUserInfo,
     TopicPreference,
     UserInfo,
@@ -38,11 +39,12 @@ class UserRepository:
             created_at=ensure_utc(row["created_at"]),
         )
 
-    def _row_to_public_user_info(self, row) -> PublicUserInfo:
+    def _row_to_public_user_info(self, row, *, is_blocked: bool = False) -> PublicUserInfo:
         return PublicUserInfo(
             id=row["id"],
             username=row["username"],
             created_at=ensure_utc(row["created_at"]),
+            is_blocked=is_blocked,
         )
 
     async def _fetch_topic_prefs(self, conn, user_id: int) -> list[TopicPreference]:
@@ -118,7 +120,12 @@ class UserRepository:
 
         return self._row_to_user_info(row)
 
-    async def get_profile_by_username(self, username: str) -> PublicUserInfo | None:
+    async def get_profile_by_username(
+        self,
+        username: str,
+        *,
+        viewer_id: int | None = None,
+    ) -> PublicUserInfo | None:
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow(
                 """
@@ -128,11 +135,95 @@ class UserRepository:
                 """,
                 username,
             )
+            if not row:
+                return None
 
-        if not row:
-            return None
+            is_blocked = False
+            if viewer_id is not None and viewer_id != row["id"]:
+                is_blocked = await conn.fetchval(
+                    """
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM user_blocks
+                        WHERE blocker_id = $1 AND blocked_id = $2
+                    )
+                    """,
+                    viewer_id,
+                    row["id"],
+                )
 
-        return self._row_to_public_user_info(row)
+        return self._row_to_public_user_info(row, is_blocked=bool(is_blocked))
+
+    async def get_blocked_user_ids(self, blocker_id: int) -> set[int]:
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT blocked_id
+                FROM user_blocks
+                WHERE blocker_id = $1
+                """,
+                blocker_id,
+            )
+        return {int(row["blocked_id"]) for row in rows}
+
+    async def list_blocked_users(self, blocker_id: int) -> list[BlockedUserInfo]:
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT u.id, u.username, b.created_at AS blocked_at
+                FROM user_blocks b
+                JOIN users u ON u.id = b.blocked_id
+                WHERE b.blocker_id = $1
+                ORDER BY b.created_at DESC, u.username_lower
+                """,
+                blocker_id,
+            )
+        return [
+            BlockedUserInfo(
+                id=row["id"],
+                username=row["username"],
+                blocked_at=ensure_utc(row["blocked_at"]),
+            )
+            for row in rows
+        ]
+
+    async def block_user(self, blocker_id: int, blocked_id: int) -> bool:
+        if blocker_id == blocked_id:
+            return False
+        async with self.pool.acquire() as conn:
+            result = await conn.execute(
+                """
+                INSERT INTO user_blocks (blocker_id, blocked_id)
+                VALUES ($1, $2)
+                ON CONFLICT (blocker_id, blocked_id) DO NOTHING
+                """,
+                blocker_id,
+                blocked_id,
+            )
+        return result in ("INSERT 0 1", "INSERT 0 0")
+
+    async def unblock_user(self, blocker_id: int, blocked_id: int) -> bool:
+        async with self.pool.acquire() as conn:
+            result = await conn.execute(
+                """
+                DELETE FROM user_blocks
+                WHERE blocker_id = $1 AND blocked_id = $2
+                """,
+                blocker_id,
+                blocked_id,
+            )
+        return result == "DELETE 1"
+
+    async def resolve_user_id_by_username(self, username: str) -> int | None:
+        async with self.pool.acquire() as conn:
+            return await conn.fetchval(
+                """
+                SELECT id
+                FROM users
+                WHERE username_lower = lower($1)
+                """,
+                username,
+            )
 
     async def put_email(self, email: str, user_id: int) -> UserInfo | None:
         async with self.pool.acquire() as conn:

@@ -11,10 +11,15 @@ import Combine
 struct ProfileView: View {
     @EnvironmentObject private var authSession: AuthSession
     @StateObject private var viewModel: ProfileViewModel
+    @State private var showBlockConfirmation = false
 
     /// `nil` shows the signed-in user's profile. Pass a username for another user.
     init(username: String? = nil) {
         _viewModel = StateObject(wrappedValue: ProfileViewModel(username: username))
+    }
+
+    private var showsBlockControls: Bool {
+        viewModel.canManageBlock && !viewModel.isOwnProfile(for: authSession)
     }
 
     var body: some View {
@@ -173,6 +178,42 @@ struct ProfileView: View {
             .refreshable {
                 await viewModel.refreshPosts(using: authSession)
             }
+        }
+        .toolbar {
+            if showsBlockControls {
+                ToolbarItem(placement: .topBarTrailing) {
+                    if viewModel.isUpdatingBlock {
+                        ProgressView()
+                            .tint(.white)
+                    } else if viewModel.isBlocked {
+                        Button("Unblock") {
+                            Task {
+                                await viewModel.unblockUser(using: authSession)
+                            }
+                        }
+                        .font(.subheadline.weight(.semibold))
+                    } else {
+                        Button("Block") {
+                            showBlockConfirmation = true
+                        }
+                        .font(.subheadline.weight(.semibold))
+                    }
+                }
+            }
+        }
+        .confirmationDialog(
+            "Block \(viewModel.displayUsername)?",
+            isPresented: $showBlockConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Block", role: .destructive) {
+                Task {
+                    await viewModel.blockUser(using: authSession)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Their posts won’t appear in your feed or search. You can unblock them later in Settings.")
         }
         // TabView keeps Profile alive across tab switches, so always refresh on appear
         // (and after publish) instead of caching the first empty load forever.

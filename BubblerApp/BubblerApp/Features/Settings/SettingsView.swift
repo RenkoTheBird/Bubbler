@@ -84,6 +84,16 @@ struct SettingsView: View {
                         }
                         .buttonStyle(.plain)
                     }
+
+                    // users
+                    settingsSection(title: "Users") {
+                        NavigationLink {
+                            BlockedView()
+                        } label: {
+                            settingsRow(icon: "person.slash.fill", title: "Blocked")
+                        }
+                        .buttonStyle(.plain)
+                    }
                     
                     // bubbler system
                     settingsSection(title: "Bubble System") {

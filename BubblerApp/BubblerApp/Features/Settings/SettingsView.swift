@@ -95,6 +95,30 @@ struct SettingsView: View {
                         .buttonStyle(.plain)
                     }
                     
+                    // about
+                    settingsSection(title: "About") {
+                        Button {
+                            // Privacy Policy link TBD
+                        } label: {
+                            settingsRow(icon: "hand.raised.fill", title: "Privacy Policy")
+                        }
+                        .buttonStyle(.plain)
+
+                        Button {
+                            // Terms of Service link TBD
+                        } label: {
+                            settingsRow(icon: "doc.text.fill", title: "Terms of Service")
+                        }
+                        .buttonStyle(.plain)
+
+                        Button {
+                            // Community Guidelines link TBD
+                        } label: {
+                            settingsRow(icon: "person.3.fill", title: "Community Guidelines")
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    
                     Spacer().frame(height: 30)
                 }
                 .padding(.horizontal)

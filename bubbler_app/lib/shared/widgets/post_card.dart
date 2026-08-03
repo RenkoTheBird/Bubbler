@@ -10,6 +10,7 @@ import '../../data/models/topics.dart';
 import '../../data/repositories/post_repository.dart';
 import '../../data/repositories/preferences_repository.dart';
 import '../../data/repositories/user_repository.dart';
+import '../../features/post/create_post_screen.dart';
 import '../theme/topic_style.dart';
 import '../platform/platform.dart';
 import 'relative_time.dart';
@@ -293,6 +294,31 @@ class _PostCardState extends State<PostCard> {
 
   Future<void> _editPost() async {
     final postRepo = widget.postRepository;
+    if (postRepo == null) {
+      // Preview / gallery: local content dialog without a network call.
+      await _editPostLocally();
+      return;
+    }
+
+    // Full create/edit form — Swift `PostCardView` → `CreatePostView(post:)`.
+    final result = await Navigator.of(context).push<String>(
+      adaptivePageRoute<String>(
+        context: context,
+        title: 'Edit Post',
+        builder: (_) => CreatePostScreen(
+          authSession: widget.authSession,
+          postRepository: postRepo,
+          post: _post,
+        ),
+      ),
+    );
+
+    if (!mounted || result == null || result.isEmpty) return;
+    setState(() => _actionError = null);
+    widget.onEdited?.call(result);
+  }
+
+  Future<void> _editPostLocally() async {
     final controller = TextEditingController(text: _post.content);
 
     final result = await showAdaptiveAlertDialog<String>(
@@ -342,23 +368,7 @@ class _PostCardState extends State<PostCard> {
       return;
     }
 
-    if (postRepo == null) {
-      // Preview / gallery: surface the edit locally without a network call.
-      widget.onEdited?.call(result);
-      return;
-    }
-
-    setState(() => _actionError = null);
-    try {
-      await postRepo.updatePost(id: _post.id, content: result);
-      widget.onEdited?.call(result);
-    } on ApiUnauthorized {
-      await widget.authSession.signOut();
-    } catch (error) {
-      if (mounted) {
-        setState(() => _actionError = error.toString());
-      }
-    }
+    widget.onEdited?.call(result);
   }
 
   Future<void> _showTopicMenu() async {

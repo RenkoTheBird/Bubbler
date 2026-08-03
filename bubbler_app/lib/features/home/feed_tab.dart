@@ -11,8 +11,11 @@ import '../../data/repositories/post_repository.dart';
 import '../../data/repositories/preferences_repository.dart';
 import '../../data/repositories/user_repository.dart';
 import '../../shared/platform/platform.dart';
+import '../feed/ranked_feed_controller.dart';
+import '../feed/ranked_feed_screen.dart';
 import '../graph/graph_feed_controller.dart';
 import '../graph/graph_feed_screen.dart';
+import '../post/create_post_screen.dart';
 
 /// Feed mode owned by the home Feed tab (Swift `MainTabView.FeedMode`).
 enum FeedMode {
@@ -48,6 +51,7 @@ class _FeedTabState extends State<FeedTab> {
   late final FeedRepository _feedRepository;
   late final GraphRepository _graphRepository;
   late final GraphFeedController _graphController;
+  late final RankedFeedController _rankedController;
 
   @override
   void initState() {
@@ -62,11 +66,16 @@ class _FeedTabState extends State<FeedTab> {
       userRepository: widget.userRepository,
       postRepository: widget.postRepository,
     );
+    _rankedController = RankedFeedController(
+      authSession: widget.authSession,
+      feedRepository: _feedRepository,
+    );
   }
 
   @override
   void dispose() {
     _graphController.dispose();
+    _rankedController.dispose();
     super.dispose();
   }
 
@@ -77,13 +86,23 @@ class _FeedTabState extends State<FeedTab> {
   }
 
   Future<void> _openCreatePost() async {
-    await Navigator.of(context).push<void>(
-      adaptivePageRoute<void>(
+    final content = await Navigator.of(context).push<String>(
+      adaptivePageRoute<String>(
         context: context,
         title: 'Create Post',
-        builder: (_) => const _CreatePostPlaceholderScreen(),
+        builder: (_) => CreatePostScreen(
+          authSession: widget.authSession,
+          postRepository: widget.postRepository,
+        ),
       ),
     );
+    if (!mounted || content == null) return;
+
+    // Refresh discovery surfaces so the new post can appear (Phase 5 exit).
+    await _rankedController.loadFeed();
+    if (_mode == FeedMode.graph) {
+      await _graphController.refreshSession();
+    }
   }
 
   @override
@@ -109,7 +128,14 @@ class _FeedTabState extends State<FeedTab> {
           postRepository: widget.postRepository,
           preferencesRepository: widget.preferencesRepository,
         ),
-      FeedMode.ranked => const _RankedFeedPlaceholder(),
+      FeedMode.ranked => RankedFeedScreen(
+          authSession: widget.authSession,
+          likedPosts: widget.likedPosts,
+          controller: _rankedController,
+          userRepository: widget.userRepository,
+          postRepository: widget.postRepository,
+          preferencesRepository: widget.preferencesRepository,
+        ),
     };
 
     final toggleControl = Semantics(
@@ -187,105 +213,6 @@ class _FeedTabState extends State<FeedTab> {
           ),
         ],
       ),
-      body: body,
-    );
-  }
-}
-
-/// Placeholder until Phase 5.4–5.5 ranked feed lands.
-class _RankedFeedPlaceholder extends StatelessWidget {
-  const _RankedFeedPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(gradient: BubblerTheme.feedGradient),
-      child: const SafeArea(
-        child: Center(
-          child: Padding(
-            padding: EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.list_alt, color: Colors.white70, size: 40),
-                SizedBox(height: 16),
-                Text(
-                  'Ranked feed',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'Coming in Phase 5.4–5.5',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white70, fontSize: 15),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Placeholder until Phase 5.6–5.7 create post lands.
-class _CreatePostPlaceholderScreen extends StatelessWidget {
-  const _CreatePostPlaceholderScreen();
-
-  @override
-  Widget build(BuildContext context) {
-    final cupertino = isCupertinoPlatform(context);
-    const body = DecoratedBox(
-      decoration: BoxDecoration(gradient: BubblerTheme.backgroundGradient),
-      child: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.edit_note, color: Colors.white70, size: 40),
-                SizedBox(height: 16),
-                Text(
-                  'Create Post',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'Coming in Phase 5.6–5.7',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white70, fontSize: 15),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-
-    if (cupertino) {
-      return const CupertinoPageScaffold(
-        backgroundColor: Colors.transparent,
-        navigationBar: CupertinoNavigationBar(
-          backgroundColor: Color(0xEB0D47A1),
-          border: null,
-          middle: Text('Create Post', style: TextStyle(color: Colors.white)),
-        ),
-        child: Material(type: MaterialType.transparency, child: body),
-      );
-    }
-
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(title: const Text('Create Post')),
       body: body,
     );
   }

@@ -200,29 +200,32 @@ void main() {
       await pumpFeed(tester);
 
       expect(find.text('Feed'), findsOneWidget);
-      expect(find.text('Ranked feed'), findsNothing);
+      expect(find.text('BUBBLER'), findsNothing);
 
       await tester.tap(find.text('Feed'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Ranked feed'), findsOneWidget);
-      expect(find.text('Coming in Phase 5.4–5.5'), findsOneWidget);
+      expect(find.text('BUBBLER'), findsOneWidget);
+      expect(find.text('your interest field is active'), findsOneWidget);
+      expect(find.text('All'), findsOneWidget);
       expect(find.text('Graph'), findsOneWidget);
 
       await tester.tap(find.text('Graph'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Ranked feed'), findsNothing);
+      expect(find.text('BUBBLER'), findsNothing);
       expect(find.text('Feed'), findsOneWidget);
     });
 
-    testWidgets('opens Create Post placeholder', (tester) async {
+    testWidgets('opens Create Post screen', (tester) async {
       await pumpFeed(tester);
 
       await tester.tap(find.byTooltip('Create Post'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Coming in Phase 5.6–5.7'), findsOneWidget);
+      expect(find.text('Share a Bubble'), findsOneWidget);
+      expect(find.text('Post to Bubbler'), findsOneWidget);
+      expect(find.text('Topic'), findsOneWidget);
     });
   });
 }

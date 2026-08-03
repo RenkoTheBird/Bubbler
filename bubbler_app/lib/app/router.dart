@@ -2,23 +2,36 @@ import 'package:flutter/material.dart';
 
 import '../core/api/api_client.dart';
 import '../core/auth/auth_session.dart';
+import '../core/storage/liked_posts_store.dart';
+import '../data/repositories/post_repository.dart';
+import '../data/repositories/preferences_repository.dart';
+import '../data/repositories/user_repository.dart';
 import '../features/auth/login_screen.dart';
 import '../features/auth/widgets/auth_form_fields.dart';
+import '../shared/widgets_gallery.dart';
 import 'theme.dart';
 
 /// Auth gate matching Swift `ContentView`: signed-in home vs login stack.
 ///
 /// Main tabs arrive in Phase 5; until then signed-in users see a temporary
-/// shell with sign-out (needed for Phase 1 exit criteria).
+/// shell with sign-out and the Phase 3 shared-widgets gallery.
 class AuthGate extends StatefulWidget {
   const AuthGate({
     super.key,
     required this.authSession,
     required this.apiClient,
+    required this.userRepository,
+    required this.postRepository,
+    required this.preferencesRepository,
+    required this.likedPosts,
   });
 
   final AuthSession authSession;
   final ApiClient apiClient;
+  final UserRepository userRepository;
+  final PostRepository postRepository;
+  final PreferencesRepository preferencesRepository;
+  final LikedPostsStore likedPosts;
 
   @override
   State<AuthGate> createState() => _AuthGateState();
@@ -26,13 +39,18 @@ class AuthGate extends StatefulWidget {
 
 class _AuthGateState extends State<AuthGate> {
   String? _pendingSuccessClear;
+  bool _wasSignedIn = false;
 
   AuthSession get _session => widget.authSession;
 
   @override
   void initState() {
     super.initState();
+    _wasSignedIn = _session.isSignedIn;
     _session.addListener(_onSessionChanged);
+    if (_session.isSignedIn) {
+      widget.likedPosts.refresh();
+    }
   }
 
   @override
@@ -54,6 +72,15 @@ class _AuthGateState extends State<AuthGate> {
     if (!mounted) {
       return;
     }
+
+    if (_session.isSignedIn && !_wasSignedIn) {
+      widget.likedPosts.refresh();
+    }
+    if (!_session.isSignedIn && _wasSignedIn) {
+      widget.likedPosts.clear();
+    }
+    _wasSignedIn = _session.isSignedIn;
+
     setState(() {});
 
     final message = _session.successMessage;
@@ -81,7 +108,13 @@ class _AuthGateState extends State<AuthGate> {
           // Reset navigation when auth flips (Swift `.id(isSignedIn)`).
           key: ValueKey(_session.isSignedIn),
           child: _session.isSignedIn
-              ? _SignedInPlaceholder(authSession: _session)
+              ? _SignedInPlaceholder(
+                  authSession: _session,
+                  userRepository: widget.userRepository,
+                  postRepository: widget.postRepository,
+                  preferencesRepository: widget.preferencesRepository,
+                  likedPosts: widget.likedPosts,
+                )
               : LoginScreen(
                   authSession: _session,
                   apiClient: widget.apiClient,
@@ -132,9 +165,19 @@ class _AuthGateState extends State<AuthGate> {
 
 /// Temporary post-auth home until Phase 5 `HomeShell` / main tabs.
 class _SignedInPlaceholder extends StatelessWidget {
-  const _SignedInPlaceholder({required this.authSession});
+  const _SignedInPlaceholder({
+    required this.authSession,
+    required this.userRepository,
+    required this.postRepository,
+    required this.preferencesRepository,
+    required this.likedPosts,
+  });
 
   final AuthSession authSession;
+  final UserRepository userRepository;
+  final PostRepository postRepository;
+  final PreferencesRepository preferencesRepository;
+  final LikedPostsStore likedPosts;
 
   @override
   Widget build(BuildContext context) {
@@ -173,7 +216,32 @@ class _SignedInPlaceholder extends StatelessWidget {
                 ),
               ),
             ],
-            const SizedBox(height: 36),
+            const SizedBox(height: 28),
+            OutlinedButton(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => SharedWidgetsGallery(
+                      authSession: authSession,
+                      likedPosts: likedPosts,
+                      userRepository: userRepository,
+                      postRepository: postRepository,
+                      preferencesRepository: preferencesRepository,
+                    ),
+                  ),
+                );
+              },
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.white,
+                side: BorderSide(color: Colors.white.withValues(alpha: 0.45)),
+                minimumSize: const Size.fromHeight(48),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: const Text('Shared UI gallery'),
+            ),
+            const SizedBox(height: 12),
             AuthSubmitButton(
               label: 'Sign Out',
               onPressed: () => authSession.signOut(),

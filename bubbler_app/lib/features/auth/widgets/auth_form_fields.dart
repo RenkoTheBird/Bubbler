@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../app/theme.dart';
+import '../../../shared/widgets/bubbler_logo.dart';
 
 /// Shared auth field chrome matching the Swift Login / Create Account screens.
 class AuthLabeledField extends StatelessWidget {
@@ -207,7 +208,7 @@ class AuthGradientScaffold extends StatelessWidget {
   }
 }
 
-/// Compact bubble cluster used on auth headers.
+/// Compact bubble cluster used on auth headers (wraps shared [BubblerLogo]).
 class AuthLogoMark extends StatelessWidget {
   const AuthLogoMark({super.key, this.size = 120});
 
@@ -215,59 +216,8 @@ class AuthLogoMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: size,
-      height: size,
-      child: CustomPaint(painter: _AuthLogoPainter()),
-    );
+    return BubblerLogo(size: size);
   }
-}
-
-class _AuthLogoPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final scale = size.width / 120;
-
-    void bubble(Offset offset, double diameter, double opacity) {
-      final rect = Rect.fromCenter(
-        center: center + offset * scale,
-        width: diameter * scale,
-        height: diameter * scale,
-      );
-      final paint = Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.white.withValues(alpha: opacity),
-            BubblerTheme.cyan.withValues(alpha: opacity * 0.6),
-            BubblerTheme.blue.withValues(alpha: opacity * 0.8),
-          ],
-        ).createShader(rect);
-      canvas.drawCircle(rect.center, rect.width / 2, paint);
-      canvas.drawCircle(
-        rect.center,
-        rect.width / 2,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1
-          ..color = Colors.white.withValues(alpha: 0.8),
-      );
-    }
-
-    bubble(const Offset(-25, -30), 38, 0.9);
-    bubble(const Offset(15, -45), 22, 0.7);
-    bubble(const Offset(35, -10), 26, 0.75);
-    bubble(const Offset(-35, 15), 30, 0.8);
-    bubble(const Offset(10, 25), 40, 0.85);
-    bubble(const Offset(45, 35), 20, 0.65);
-    bubble(const Offset(-10, 55), 24, 0.7);
-    bubble(const Offset(5, 5), 18, 1.0);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 /// Backend reachability chip (Login only; uses [ApiClient.health]).

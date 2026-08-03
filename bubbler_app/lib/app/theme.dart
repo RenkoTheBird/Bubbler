@@ -2,11 +2,24 @@ import 'package:flutter/material.dart';
 
 /// Brand colors and Material theme for Bubbler.
 ///
-/// Matches the blue/cyan gradient language used on the SwiftUI auth screens.
+/// Matches the blue/cyan gradient language used on the SwiftUI auth screens
+/// and shared glassmorphism cards (post card, banners, preference editors).
 abstract final class BubblerTheme {
   static const Color blue = Color(0xFF1565C0);
   static const Color cyan = Color(0xFF00BCD4);
   static const Color deepBlue = Color(0xFF0D47A1);
+
+  /// Feed / graph background (blue → cyan → indigo → black wash).
+  static final LinearGradient feedGradient = LinearGradient(
+    colors: [
+      Colors.blue.withValues(alpha: 0.9),
+      Colors.cyan.withValues(alpha: 0.55),
+      Colors.indigo.withValues(alpha: 0.9),
+      Colors.black.withValues(alpha: 0.3),
+    ],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 
   static const LinearGradient backgroundGradient = LinearGradient(
     colors: [
@@ -17,6 +30,12 @@ abstract final class BubblerTheme {
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
+
+  static Color glassFill([double alpha = 0.10]) =>
+      Colors.white.withValues(alpha: alpha);
+
+  static Color glassStroke([double alpha = 0.12]) =>
+      Colors.white.withValues(alpha: alpha);
 
   static ThemeData light() {
     final colorScheme = ColorScheme.fromSeed(

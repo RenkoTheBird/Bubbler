@@ -1,11 +1,49 @@
 import 'package:flutter/material.dart';
 
-import '../core/config.dart';
+import '../core/api/api_client.dart';
+import '../core/auth/auth_session.dart';
+import '../core/auth/token_store.dart';
+import '../data/repositories/auth_repository.dart';
+import 'router.dart';
 import 'theme.dart';
 
-/// Root [MaterialApp] shell. Auth gating and routes arrive in later phases.
-class BubblerApp extends StatelessWidget {
+/// Root app shell: DI, session restore, and auth gate (Swift `ContentView`).
+class BubblerApp extends StatefulWidget {
   const BubblerApp({super.key});
+
+  @override
+  State<BubblerApp> createState() => _BubblerAppState();
+}
+
+class _BubblerAppState extends State<BubblerApp> {
+  late final ApiClient _apiClient;
+  late final AuthSession _authSession;
+  late final Future<void> _restoreFuture;
+
+  @override
+  void initState() {
+    super.initState();
+
+    final tokenStore = TokenStore();
+    late final AuthSession session;
+    final apiClient = ApiClient(
+      accessTokenProvider: () => session.accessToken,
+    );
+    session = AuthSession(
+      authRepository: AuthRepository(apiClient),
+      tokenStore: tokenStore,
+    );
+
+    _apiClient = apiClient;
+    _authSession = session;
+    _restoreFuture = session.restore();
+  }
+
+  @override
+  void dispose() {
+    _authSession.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -13,72 +51,17 @@ class BubblerApp extends StatelessWidget {
       title: 'Bubbler',
       debugShowCheckedModeBanner: false,
       theme: BubblerTheme.light(),
-      home: const _PlaceholderHome(),
-    );
-  }
-}
-
-class _PlaceholderHome extends StatelessWidget {
-  const _PlaceholderHome();
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
-    return Scaffold(
-      body: DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: BubblerTheme.backgroundGradient,
-        ),
-        child: SafeArea(
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Bubbler',
-                    style: textTheme.displayMedium?.copyWith(
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 2,
-                      color: Colors.white,
-                      shadows: [
-                        Shadow(
-                          color: Colors.white.withValues(alpha: 0.3),
-                          blurRadius: 10,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'See what you actually care about',
-                    textAlign: TextAlign.center,
-                    style: textTheme.titleMedium?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.85),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  Text(
-                    'Flutter rewrite — Phase 0',
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.65),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    AppConfig.baseUrl,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.45),
-                      fontFamily: 'monospace',
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
+      home: FutureBuilder<void>(
+        future: _restoreFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const AuthRestoreSplash();
+          }
+          return AuthGate(
+            authSession: _authSession,
+            apiClient: _apiClient,
+          );
+        },
       ),
     );
   }

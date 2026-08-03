@@ -43,7 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bubbler.android.core.auth.AgeGate
 import com.bubbler.android.core.auth.AuthSession
-import com.bubbler.android.features.auth.components.AuthBrandMark
+import com.bubbler.android.ui.components.BubblerLogo
 import com.bubbler.android.features.auth.components.AuthErrorText
 import com.bubbler.android.features.auth.components.AuthFieldBg
 import com.bubbler.android.features.auth.components.AuthGradientBackground
@@ -89,7 +89,7 @@ fun CreateAccountScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Spacer(modifier = Modifier.height(36.dp))
-            AuthBrandMark(size = 100.dp)
+            BubblerLogo(size = 100.dp)
             Spacer(modifier = Modifier.height(18.dp))
             AuthTitle("Create Account", fontSizeSp = 36)
             Spacer(modifier = Modifier.height(8.dp))

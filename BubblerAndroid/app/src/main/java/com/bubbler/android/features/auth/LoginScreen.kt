@@ -33,7 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bubbler.android.core.auth.AuthSession
 import com.bubbler.android.core.network.ApiClient
-import com.bubbler.android.features.auth.components.AuthBrandMark
+import com.bubbler.android.ui.components.BubblerLogo
 import com.bubbler.android.features.auth.components.AuthErrorText
 import com.bubbler.android.features.auth.components.AuthGradientBackground
 import com.bubbler.android.features.auth.components.AuthLabeledField
@@ -84,7 +84,7 @@ fun LoginScreen(
         ) {
             Spacer(modifier = Modifier.height(48.dp))
 
-            AuthBrandMark(size = 120.dp)
+            BubblerLogo(size = 120.dp)
             Spacer(modifier = Modifier.height(18.dp))
             AuthTitle("Bubbler")
             Spacer(modifier = Modifier.height(8.dp))

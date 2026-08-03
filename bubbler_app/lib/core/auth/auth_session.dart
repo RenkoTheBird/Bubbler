@@ -158,12 +158,12 @@ class AuthSession extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
-    await _tokenStore.deleteAccessToken();
     _accessToken = null;
     _userId = null;
     authError = null;
     successMessage = null;
     notifyListeners();
+    await _tokenStore.deleteAccessToken();
   }
 
   void clearSuccessMessage() {

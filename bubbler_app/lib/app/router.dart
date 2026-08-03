@@ -3,18 +3,21 @@ import 'package:flutter/material.dart';
 import '../core/api/api_client.dart';
 import '../core/auth/auth_session.dart';
 import '../core/storage/liked_posts_store.dart';
+import '../data/repositories/feed_repository.dart';
+import '../data/repositories/graph_repository.dart';
 import '../data/repositories/post_repository.dart';
 import '../data/repositories/preferences_repository.dart';
 import '../data/repositories/user_repository.dart';
 import '../features/auth/login_screen.dart';
-import '../features/auth/widgets/auth_form_fields.dart';
+import '../features/graph/graph_feed_controller.dart';
+import '../features/graph/graph_feed_screen.dart';
 import '../shared/widgets_gallery.dart';
 import 'theme.dart';
 
 /// Auth gate matching Swift `ContentView`: signed-in home vs login stack.
 ///
-/// Main tabs arrive in Phase 5; until then signed-in users see a temporary
-/// shell with sign-out and the Phase 3 shared-widgets gallery.
+/// Phase 4 surfaces the graph feed as the signed-in home. Main tabs arrive in
+/// Phase 5.
 class AuthGate extends StatefulWidget {
   const AuthGate({
     super.key,
@@ -108,8 +111,9 @@ class _AuthGateState extends State<AuthGate> {
           // Reset navigation when auth flips (Swift `.id(isSignedIn)`).
           key: ValueKey(_session.isSignedIn),
           child: _session.isSignedIn
-              ? _SignedInPlaceholder(
+              ? _SignedInGraphHome(
                   authSession: _session,
+                  apiClient: widget.apiClient,
                   userRepository: widget.userRepository,
                   postRepository: widget.postRepository,
                   preferencesRepository: widget.preferencesRepository,
@@ -163,10 +167,11 @@ class _AuthGateState extends State<AuthGate> {
   }
 }
 
-/// Temporary post-auth home until Phase 5 `HomeShell` / main tabs.
-class _SignedInPlaceholder extends StatelessWidget {
-  const _SignedInPlaceholder({
+/// Signed-in graph home until Phase 5 `HomeShell` / main tabs.
+class _SignedInGraphHome extends StatefulWidget {
+  const _SignedInGraphHome({
     required this.authSession,
+    required this.apiClient,
     required this.userRepository,
     required this.postRepository,
     required this.preferencesRepository,
@@ -174,82 +179,84 @@ class _SignedInPlaceholder extends StatelessWidget {
   });
 
   final AuthSession authSession;
+  final ApiClient apiClient;
   final UserRepository userRepository;
   final PostRepository postRepository;
   final PreferencesRepository preferencesRepository;
   final LikedPostsStore likedPosts;
 
   @override
+  State<_SignedInGraphHome> createState() => _SignedInGraphHomeState();
+}
+
+class _SignedInGraphHomeState extends State<_SignedInGraphHome> {
+  late final FeedRepository _feedRepository;
+  late final GraphRepository _graphRepository;
+  late final GraphFeedController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _feedRepository = FeedRepository(widget.apiClient);
+    _graphRepository = GraphRepository(widget.apiClient);
+    _controller = GraphFeedController(
+      authSession: widget.authSession,
+      feedRepository: _feedRepository,
+      graphRepository: _graphRepository,
+      preferencesRepository: widget.preferencesRepository,
+      userRepository: widget.userRepository,
+      postRepository: widget.postRepository,
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return AuthGradientScaffold(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          children: [
-            const Spacer(),
-            const AuthLogoMark(size: 100),
-            const SizedBox(height: 18),
-            Text(
-              'Bubbler',
-              style: TextStyle(
-                fontSize: 42,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 2,
-                color: Colors.white,
-                shadows: [
-                  Shadow(
-                    color: Colors.white.withValues(alpha: 0.3),
-                    blurRadius: 10,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            const AuthSubtitle("You're signed in"),
-            if (authSession.userId != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                'User #${authSession.userId}',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.65),
-                  fontSize: 13,
-                ),
-              ),
-            ],
-            const SizedBox(height: 28),
-            OutlinedButton(
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Stack(
+        children: [
+          GraphFeedScreen(
+            authSession: widget.authSession,
+            likedPosts: widget.likedPosts,
+            controller: _controller,
+            userRepository: widget.userRepository,
+            postRepository: widget.postRepository,
+            preferencesRepository: widget.preferencesRepository,
+            onSignOut: () => widget.authSession.signOut(),
+          ),
+          Positioned(
+            left: 8,
+            bottom: MediaQuery.paddingOf(context).bottom + 8,
+            child: TextButton(
               onPressed: () {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => SharedWidgetsGallery(
-                      authSession: authSession,
-                      likedPosts: likedPosts,
-                      userRepository: userRepository,
-                      postRepository: postRepository,
-                      preferencesRepository: preferencesRepository,
+                      authSession: widget.authSession,
+                      likedPosts: widget.likedPosts,
+                      userRepository: widget.userRepository,
+                      postRepository: widget.postRepository,
+                      preferencesRepository: widget.preferencesRepository,
                     ),
                   ),
                 );
               },
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.white,
-                side: BorderSide(color: Colors.white.withValues(alpha: 0.45)),
-                minimumSize: const Size.fromHeight(48),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
+              child: Text(
+                'UI gallery',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.55),
+                  fontSize: 12,
                 ),
               ),
-              child: const Text('Shared UI gallery'),
             ),
-            const SizedBox(height: 12),
-            AuthSubmitButton(
-              label: 'Sign Out',
-              onPressed: () => authSession.signOut(),
-            ),
-            const Spacer(),
-            const AuthFooter('Main tabs arrive in a later phase'),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

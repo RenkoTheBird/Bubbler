@@ -16,7 +16,7 @@ import 'widgets/status_banner.dart';
 import 'widgets/topic_picker.dart';
 
 /// Phase 3 exit gallery: logo, topic picker, sample post card, and related
-/// shared primitives. Reachable from the signed-in placeholder shell.
+/// shared primitives. Reachable from the Settings tab for now.
 class SharedWidgetsGallery extends StatefulWidget {
   const SharedWidgetsGallery({
     super.key,

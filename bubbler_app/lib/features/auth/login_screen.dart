@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/auth/auth_session.dart';
+import '../../shared/platform/platform.dart';
 import 'register_screen.dart';
 import 'widgets/auth_form_fields.dart';
 
@@ -87,7 +88,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _openCreateAccount() {
     Navigator.of(context).push(
-      MaterialPageRoute<void>(
+      adaptivePageRoute<void>(
+        context: context,
         builder: (_) => RegisterScreen(authSession: _session),
       ),
     );

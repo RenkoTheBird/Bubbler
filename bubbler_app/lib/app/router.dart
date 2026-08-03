@@ -3,21 +3,17 @@ import 'package:flutter/material.dart';
 import '../core/api/api_client.dart';
 import '../core/auth/auth_session.dart';
 import '../core/storage/liked_posts_store.dart';
-import '../data/repositories/feed_repository.dart';
-import '../data/repositories/graph_repository.dart';
 import '../data/repositories/post_repository.dart';
 import '../data/repositories/preferences_repository.dart';
 import '../data/repositories/user_repository.dart';
 import '../features/auth/login_screen.dart';
-import '../features/graph/graph_feed_controller.dart';
-import '../features/graph/graph_feed_screen.dart';
-import '../shared/widgets_gallery.dart';
+import '../features/home/home_shell.dart';
+import '../shared/platform/platform.dart';
 import 'theme.dart';
 
 /// Auth gate matching Swift `ContentView`: signed-in home vs login stack.
 ///
-/// Phase 4 surfaces the graph feed as the signed-in home. Main tabs arrive in
-/// Phase 5.
+/// Signed-in users land on [HomeShell] (Swift `MainTabView`).
 class AuthGate extends StatefulWidget {
   const AuthGate({
     super.key,
@@ -111,7 +107,7 @@ class _AuthGateState extends State<AuthGate> {
           // Reset navigation when auth flips (Swift `.id(isSignedIn)`).
           key: ValueKey(_session.isSignedIn),
           child: _session.isSignedIn
-              ? _SignedInGraphHome(
+              ? HomeShell(
                   authSession: _session,
                   apiClient: widget.apiClient,
                   userRepository: widget.userRepository,
@@ -167,101 +163,6 @@ class _AuthGateState extends State<AuthGate> {
   }
 }
 
-/// Signed-in graph home until Phase 5 `HomeShell` / main tabs.
-class _SignedInGraphHome extends StatefulWidget {
-  const _SignedInGraphHome({
-    required this.authSession,
-    required this.apiClient,
-    required this.userRepository,
-    required this.postRepository,
-    required this.preferencesRepository,
-    required this.likedPosts,
-  });
-
-  final AuthSession authSession;
-  final ApiClient apiClient;
-  final UserRepository userRepository;
-  final PostRepository postRepository;
-  final PreferencesRepository preferencesRepository;
-  final LikedPostsStore likedPosts;
-
-  @override
-  State<_SignedInGraphHome> createState() => _SignedInGraphHomeState();
-}
-
-class _SignedInGraphHomeState extends State<_SignedInGraphHome> {
-  late final FeedRepository _feedRepository;
-  late final GraphRepository _graphRepository;
-  late final GraphFeedController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _feedRepository = FeedRepository(widget.apiClient);
-    _graphRepository = GraphRepository(widget.apiClient);
-    _controller = GraphFeedController(
-      authSession: widget.authSession,
-      feedRepository: _feedRepository,
-      graphRepository: _graphRepository,
-      preferencesRepository: widget.preferencesRepository,
-      userRepository: widget.userRepository,
-      postRepository: widget.postRepository,
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          GraphFeedScreen(
-            authSession: widget.authSession,
-            likedPosts: widget.likedPosts,
-            controller: _controller,
-            userRepository: widget.userRepository,
-            postRepository: widget.postRepository,
-            preferencesRepository: widget.preferencesRepository,
-            onSignOut: () => widget.authSession.signOut(),
-          ),
-          Positioned(
-            left: 8,
-            bottom: MediaQuery.paddingOf(context).bottom + 8,
-            child: TextButton(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => SharedWidgetsGallery(
-                      authSession: widget.authSession,
-                      likedPosts: widget.likedPosts,
-                      userRepository: widget.userRepository,
-                      postRepository: widget.postRepository,
-                      preferencesRepository: widget.preferencesRepository,
-                    ),
-                  ),
-                );
-              },
-              child: Text(
-                'UI gallery',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.55),
-                  fontSize: 12,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 /// Brief splash while [AuthSession.restore] runs.
 class AuthRestoreSplash extends StatelessWidget {
   const AuthRestoreSplash({super.key});
@@ -272,7 +173,10 @@ class AuthRestoreSplash extends StatelessWidget {
       body: DecoratedBox(
         decoration: BoxDecoration(gradient: BubblerTheme.backgroundGradient),
         child: Center(
-          child: CircularProgressIndicator(color: Colors.white),
+          child: AdaptiveProgressIndicator(
+            color: Colors.white,
+            radius: 14,
+          ),
         ),
       ),
     );

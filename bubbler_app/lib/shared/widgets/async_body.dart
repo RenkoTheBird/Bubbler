@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../platform/platform.dart';
+
 /// Loading / empty / error state card shared by graph, feed, and search —
 /// extracted from Swift `stateCard(title:message:showsProgress:)`.
 class AsyncBody extends StatelessWidget {
@@ -63,8 +65,9 @@ class AsyncBody extends StatelessWidget {
                 const SizedBox(
                   width: 18,
                   height: 18,
-                  child: CircularProgressIndicator(
+                  child: AdaptiveProgressIndicator(
                     strokeWidth: 2,
+                    radius: 9,
                     color: Colors.white,
                   ),
                 ),

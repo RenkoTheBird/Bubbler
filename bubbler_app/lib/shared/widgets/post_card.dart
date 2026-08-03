@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/api/api_exception.dart';
@@ -10,6 +11,7 @@ import '../../data/repositories/post_repository.dart';
 import '../../data/repositories/preferences_repository.dart';
 import '../../data/repositories/user_repository.dart';
 import '../theme/topic_style.dart';
+import '../platform/platform.dart';
 import 'relative_time.dart';
 
 part 'post_card_chrome.dart';
@@ -293,38 +295,45 @@ class _PostCardState extends State<PostCard> {
     final postRepo = widget.postRepository;
     final controller = TextEditingController(text: _post.content);
 
-    final result = await showDialog<String>(
+    final result = await showAdaptiveAlertDialog<String>(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF0D47A1),
-          title: const Text('Edit post', style: TextStyle(color: Colors.white)),
-          content: TextField(
-            controller: controller,
-            maxLines: 5,
-            autofocus: true,
-            style: const TextStyle(color: Colors.white),
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: Colors.white.withValues(alpha: 0.12),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
+      title: 'Edit post',
+      content: isCupertinoPlatform(context)
+          ? Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: CupertinoTextField(
+                controller: controller,
+                maxLines: 5,
+                autofocus: true,
+                placeholder: 'Post content',
+                padding: const EdgeInsets.all(12),
+              ),
+            )
+          : Material(
+              type: MaterialType.transparency,
+              child: TextField(
+                controller: controller,
+                maxLines: 5,
+                autofocus: true,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: Colors.white.withValues(alpha: 0.12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
               ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, controller.text.trim()),
-              child: const Text('Save'),
-            ),
-          ],
-        );
-      },
+      actions: [
+        const AdaptiveDialogAction(label: 'Cancel'),
+        AdaptiveDialogAction(
+          label: 'Save',
+          isDefaultAction: true,
+          resultBuilder: () => controller.text.trim(),
+        ),
+      ],
     );
 
     controller.dispose();
@@ -356,72 +365,28 @@ class _PostCardState extends State<PostCard> {
     final topic = _topicName;
     if (topic == null) return;
 
-    final action = await showModalBottomSheet<_TopicMenuAction>(
+    final action = await showAdaptiveActionSheet<_TopicMenuAction>(
       context: context,
-      backgroundColor: const Color(0xFF0D47A1),
-      builder: (context) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                title: Text(
-                  KnownTopics.displayName(topic),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                subtitle: Text(
-                  'Update how Bubbler treats ${KnownTopics.displayName(topic)}.',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.7),
-                  ),
-                ),
-              ),
-              ListTile(
-                leading: Icon(
-                  _currentlyPreferred ? Icons.star : Icons.star_border,
-                  color: Colors.white,
-                ),
-                title: Text(
-                  _currentlyPreferred ? 'Unprefer Topic' : 'Prefer Topic',
-                  style: const TextStyle(color: Colors.white),
-                ),
-                onTap: () =>
-                    Navigator.pop(context, _TopicMenuAction.prefer),
-              ),
-              ListTile(
-                leading: Icon(
-                  _currentlyBlacklisted
-                      ? Icons.visibility
-                      : Icons.visibility_off,
-                  color: _currentlyBlacklisted ? Colors.white : Colors.redAccent,
-                ),
-                title: Text(
-                  _currentlyBlacklisted
-                      ? 'Unblacklist Topic'
-                      : 'Blacklist Topic',
-                  style: TextStyle(
-                    color: _currentlyBlacklisted
-                        ? Colors.white
-                        : Colors.redAccent.shade100,
-                  ),
-                ),
-                onTap: () =>
-                    Navigator.pop(context, _TopicMenuAction.blacklist),
-              ),
-              ListTile(
-                title: const Text(
-                  'Cancel',
-                  style: TextStyle(color: Colors.white70),
-                ),
-                onTap: () => Navigator.pop(context),
-              ),
-            ],
-          ),
-        );
-      },
+      title: KnownTopics.displayName(topic),
+      message:
+          'Update how Bubbler treats ${KnownTopics.displayName(topic)}.',
+      actions: [
+        AdaptiveSheetAction(
+          label: _currentlyPreferred ? 'Unprefer Topic' : 'Prefer Topic',
+          value: _TopicMenuAction.prefer,
+          icon: _currentlyPreferred ? Icons.star : Icons.star_border,
+        ),
+        AdaptiveSheetAction(
+          label: _currentlyBlacklisted
+              ? 'Unblacklist Topic'
+              : 'Blacklist Topic',
+          value: _TopicMenuAction.blacklist,
+          isDestructive: !_currentlyBlacklisted,
+          icon: _currentlyBlacklisted
+              ? Icons.visibility
+              : Icons.visibility_off,
+        ),
+      ],
     );
 
     if (action == _TopicMenuAction.prefer) {

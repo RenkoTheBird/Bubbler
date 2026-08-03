@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../platform/platform.dart';
+
 /// Labeled 0…1 slider with percent readout — Swift `PreferenceSliderRow`.
 class PreferenceSlider extends StatelessWidget {
   const PreferenceSlider({
@@ -56,9 +58,10 @@ class PreferenceSlider extends StatelessWidget {
               thumbColor: tint,
               overlayColor: tint.withValues(alpha: 0.2),
             ),
-            child: Slider(
+            child: Slider.adaptive(
               value: value.clamp(0.0, 1.0),
               onChanged: isDisabled ? null : onChanged,
+              activeColor: isCupertinoPlatform(context) ? tint : null,
             ),
           ),
         ],

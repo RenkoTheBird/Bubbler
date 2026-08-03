@@ -158,8 +158,9 @@ class _ActionRow extends StatelessWidget {
                 const SizedBox(
                   width: 14,
                   height: 14,
-                  child: CircularProgressIndicator(
+                  child: AdaptiveProgressIndicator(
                     strokeWidth: 2,
+                    radius: 7,
                     color: Colors.white,
                   ),
                 )
@@ -254,8 +255,9 @@ class _OwnerActions extends StatelessWidget {
                 const SizedBox(
                   width: 14,
                   height: 14,
-                  child: CircularProgressIndicator(
+                  child: AdaptiveProgressIndicator(
                     strokeWidth: 2,
+                    radius: 7,
                     color: Colors.white,
                   ),
                 )

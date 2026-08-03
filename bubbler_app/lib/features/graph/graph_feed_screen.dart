@@ -7,6 +7,7 @@ import '../../data/models/graph.dart';
 import '../../data/repositories/post_repository.dart';
 import '../../data/repositories/preferences_repository.dart';
 import '../../data/repositories/user_repository.dart';
+import '../../shared/platform/platform.dart';
 import '../../shared/widgets/async_body.dart';
 import '../../shared/widgets/post_card.dart';
 import '../../shared/widgets/status_banner.dart';
@@ -33,7 +34,7 @@ class GraphFeedScreen extends StatefulWidget {
   final PostRepository postRepository;
   final PreferencesRepository preferencesRepository;
 
-  /// Temporary until Phase 5 tabs own account chrome.
+  /// Optional sign-out control; Settings owns this once Phase 7 lands.
   final VoidCallback? onSignOut;
 
   @override
@@ -289,8 +290,9 @@ class _TopChrome extends StatelessWidget {
           const SizedBox(
             width: 18,
             height: 18,
-            child: CircularProgressIndicator(
+            child: AdaptiveProgressIndicator(
               strokeWidth: 2,
+              radius: 9,
               color: Colors.white,
             ),
           ),

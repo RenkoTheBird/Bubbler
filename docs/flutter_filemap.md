@@ -68,7 +68,8 @@ lib/
 ├── app/
 │   ├── app.dart                     # MaterialApp / auth gate (ContentView role)
 │   ├── router.dart                  # GoRouter (or Navigator 2) tab + stack routes
-│   └── theme.dart                   # ColorScheme, text theme, gradient tokens
+│   └── theme.dart                   # ColorScheme, text theme, gradient tokens,
+│                                    # cupertinoOverrideTheme for nested Cupertino
 │
 ├── core/
 │   ├── config.dart                  # base URL, timeouts (APIConfig role)
@@ -154,6 +155,14 @@ lib/
 │           └── blocks_controller.dart
 │
 └── shared/
+    ├── platform/                    # selective system chrome (Material vs Cupertino)
+    │   ├── platform.dart            # barrel export
+    │   ├── is_cupertino.dart
+    │   ├── adaptive_dialogs.dart    # alert / action sheet / message
+    │   ├── adaptive_date_picker.dart
+    │   ├── adaptive_route.dart
+    │   ├── adaptive_progress.dart
+    │   └── adaptive_tabs.dart       # CupertinoTabScaffold / NavigationBar
     ├── widgets/
     │   ├── bubbler_logo.dart
     │   ├── post_card.dart           # like/skip/edit/delete/topic prefs
@@ -165,6 +174,12 @@ lib/
     └── theme/
         └── topic_style.dart         # topic colors + icon keys (no SF Symbols)
 ```
+
+**Platform chrome convention:** Keep branded glass UI shared. Route system
+surfaces (dialogs, action sheets, date pickers, page transitions, progress
+indicators, transient messages, tab bars) through `shared/platform/` so
+iOS/macOS get Cupertino and Android get Material. `HomeShell` uses
+`AdaptiveTabScaffold` from `adaptive_tabs.dart`.
 
 State management is intentionally not prescribed in filenames. Controllers above map to
 Swift `*ViewModel` types; implement with whatever the project standardizes on
@@ -192,7 +207,7 @@ Swift `*ViewModel` types; implement with whatever the project standardizes on
 | `Models/SearchResponse.swift` | `data/models/search.dart` |
 | `Models/KnownTopics.swift` + `TopicPreferenceList.swift` | `data/models/topics.dart` |
 | `Models/BlockedUser.swift` | `data/models/blocked_user.dart` |
-| `Components/*` | `shared/widgets/*` (+ `topic_style.dart`) |
+| `Components/*` | `shared/widgets/*` (+ `topic_style.dart`, `shared/platform/*`) |
 | `Features/Auth/*` | `features/auth/*` |
 | `Features/Graph/*` | `features/graph/*` |
 | `Features/Feed/*` | `features/feed/*` |

@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/auth/auth_session.dart';
+import '../../shared/platform/platform.dart';
 import 'widgets/auth_form_fields.dart';
 
 /// Registration surface — port of Swift `CreateAccountView`.
@@ -88,9 +89,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   void _showLegalStub(String title) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$title coming soon')),
-    );
+    showAdaptiveMessage(context, '$title coming soon', title: title);
   }
 
   Future<void> _submit() async {

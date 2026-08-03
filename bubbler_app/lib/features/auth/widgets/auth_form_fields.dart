@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../app/theme.dart';
+import '../../../shared/platform/platform.dart';
 import '../../../shared/widgets/bubbler_logo.dart';
 
 /// Shared auth field chrome matching the Swift Login / Create Account screens.
@@ -148,8 +149,9 @@ class AuthSubmitButton extends StatelessWidget {
             ? const SizedBox(
                 width: 22,
                 height: 22,
-                child: CircularProgressIndicator(
+                child: AdaptiveProgressIndicator(
                   strokeWidth: 2.5,
+                  radius: 11,
                   color: BubblerTheme.blue,
                 ),
               )
@@ -373,25 +375,12 @@ class AuthDateOfBirthField extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
           onTap: () async {
-            final picked = await showDatePicker(
+            final picked = await showAdaptiveDatePicker(
               context: context,
               initialDate: value,
               firstDate: firstDate,
               lastDate: lastDate,
               helpText: 'Date of birth',
-              builder: (context, child) {
-                return Theme(
-                  data: Theme.of(context).copyWith(
-                    colorScheme: const ColorScheme.dark(
-                      primary: BubblerTheme.cyan,
-                      onPrimary: Colors.white,
-                      surface: BubblerTheme.deepBlue,
-                      onSurface: Colors.white,
-                    ),
-                  ),
-                  child: child!,
-                );
-              },
             );
             if (picked != null) {
               // Keep a calendar day (no time-of-day / UTC shift).

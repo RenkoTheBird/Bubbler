@@ -1,9 +1,13 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 /// Brand colors and Material theme for Bubbler.
 ///
 /// Matches the blue/cyan gradient language used on the SwiftUI auth screens
 /// and shared glassmorphism cards (post card, banners, preference editors).
+///
+/// System chrome (dialogs, sheets, pickers) should go through
+/// `shared/platform/` so iOS/macOS get Cupertino and Android get Material.
 abstract final class BubblerTheme {
   static const Color blue = Color(0xFF1565C0);
   static const Color cyan = Color(0xFF00BCD4);
@@ -55,9 +59,16 @@ abstract final class BubblerTheme {
         elevation: 0,
         centerTitle: true,
       ),
-      textTheme: Typography.material2021(platform: TargetPlatform.iOS).white.apply(
+      textTheme: Typography.material2021().white.apply(
         bodyColor: Colors.white,
         displayColor: Colors.white,
+      ),
+      cupertinoOverrideTheme: const CupertinoThemeData(
+        brightness: Brightness.dark,
+        primaryColor: cyan,
+        primaryContrastingColor: Colors.white,
+        barBackgroundColor: deepBlue,
+        scaffoldBackgroundColor: deepBlue,
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(

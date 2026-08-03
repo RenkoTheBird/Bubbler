@@ -85,10 +85,28 @@ class ApiClient(
                     val message = parseErrorMessage(bytes) ?: "Request failed (${resp.code})."
                     throw ApiException.ServerError(resp.code, message)
                 }
-                bytes.isEmpty() -> throw ApiException.InvalidResponse
+                // 204 / empty success bodies are valid (delete like, delete post, delete account).
+                bytes.isEmpty() -> ""
                 else -> bytes.decodeToString()
             }
         }
+    }
+
+    /** Authenticated call that discards the body (204 or ignored JSON). */
+    suspend fun executeIgnoringBody(
+        path: String,
+        method: String,
+        token: String,
+        body: RequestBody? = null,
+        contentType: String? = null,
+    ) {
+        execute(
+            path = path,
+            method = method,
+            token = token,
+            body = body,
+            contentType = contentType,
+        )
     }
 
     fun parseErrorMessage(bytes: ByteArray): String? {

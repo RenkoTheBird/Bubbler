@@ -1,23 +1,24 @@
--- IMMEDIATE
-Testing!
-
 -- BEFORE PRODUCTION
-add media support
 add the ability to follow others
-add ability to add comments to posts
 add ability to block users
 forgot password functionality
+   -- NOTE: figure out how to send emails
 add a bio to user profile
+add media support
+similarity not being topic based may not be what user expects (fix pref settings)
 add search functionality in graph view (i.e. local restaurants are connected in graph for example)
-similarity not being topic based may not be what user expects
-it is easy to "say something" and be influenced easily (Roundabout fix?)
+add proper topic system (e.g. AI/ML based topic determination)
+add moderation 
+fix legal issues
 
--- IMPORTANT CHECKS
-folder structure
+"This sort of stuff seems harmless at first, but people interpret it in ways you could never imagine."
+ - likes
+ - comments
+ - careful with statistics.
 
 -- FUTURE
 add a "watermark"/unique color/identifier to each person's bubbles
-add proper topic system (e.g. AI/ML based topic determination)
    -- NOTE: Continue from step 3.2
 provide a statistics system to show the user the real impact of their preferences.
 incorporate Roundabout
+   -- it is easy to "say something" and be influenced easily (Roundabout fix?)

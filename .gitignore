@@ -11,4 +11,16 @@ __pycache__/
 
 docs/TODO
 
+# Android
+BubblerAndroid/local.properties
+BubblerAndroid/.gradle/
+BubblerAndroid/**/build/
+BubblerAndroid/.idea/
+BubblerAndroid/*.iml
+BubblerAndroid/captures/
+*.apk
+*.aab
+*.dex
+*.class
+
 

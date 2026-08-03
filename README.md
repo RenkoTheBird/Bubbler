@@ -15,7 +15,7 @@ A new GraphFeedView makes browsing exciting again and makes discovery real.
 Bubbler is a new app designed to change the way people interact with social media. 
 Instead of a traditional FeedView with linear scrolling that does not require any
 deliberate action on the user's part, Bubbler presents a GraphFeedView that allows
-the user to explore social media in a unique "path", where "Bubbles" are presented based on their topic. Selecting a "Bubble" pulls up a new post; the user can select it and repeat the path process or go backn and select another Bubble. They can also refresh Bubbles entirely. 
+the user to explore social media in a unique "path", where "Bubbles" are presented based on their topic. Selecting a "Bubble" pulls up a new post; the user can select it and repeat the path process or go back and select another Bubble. They can also refresh Bubbles entirely. 
 
 The user can prefer post topics (to see them more often) and blacklist them 
 (to not see them at all). They can also adjust diversity + randomness of every Bubble, or identify whether they want new candidate Bubbles to be selected based on similarity, oppositeness, graph (generated neighbors, see Technical Details), or randomness (after candidates are selected instead).

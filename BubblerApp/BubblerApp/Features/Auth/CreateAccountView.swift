@@ -234,7 +234,7 @@ struct CreateAccountView: View {
     }
 
     private var agreementText: AttributedString {
-        var text = AttributedString("By signing up, I agree to Bubbler's ")
+        var text = AttributedString("By signing up, you agree to Bubbler's ")
 
         var terms = AttributedString("Terms of Use")
         terms.link = URL(string: "bubbler://terms")

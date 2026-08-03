@@ -181,7 +181,7 @@ Use this as a pre-production gate. Unchecked items block public launch under the
 
 - [ ] L1 Privacy Policy + Terms of Service
 - [ ] L2 Community Guidelines
-- [ ] L3 Signup acceptance + Settings legal links
+- [x] L3 Signup acceptance + Settings legal links
 - [x] L4 Age gate
 - [ ] L5 Apple App Privacy labels + Privacy Manifest
 - [ ] L6 In-app report → review queue
@@ -193,7 +193,7 @@ Use this as a pre-production gate. Unchecked items block public launch under the
 - [ ] L9 Data export + erasure completeness
 - [ ] L10 Retention schedule + breach playbook
 - [ ] L11 DMCA agent + CSAM / LE runbooks
-- [ ] L12 Block users
+- [x] L12 Block users
 - [ ] L13 Preference / similarity clarity
 
 **EU**

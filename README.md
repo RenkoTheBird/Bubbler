@@ -156,6 +156,137 @@ Bubbler/
 │       │       └── SettingsView.swift
 │       └── Assets.xcassets/
 │
+├── BubblerAndroid/               # Kotlin + Jetpack Compose Android client
+│   ├── README.md
+│   ├── settings.gradle.kts
+│   ├── build.gradle.kts
+│   ├── gradle.properties
+│   ├── gradlew
+│   ├── app/
+│   │   ├── build.gradle.kts
+│   │   ├── proguard-rules.pro
+│   │   └── src/
+│   │       ├── debug/res/xml/
+│   │       │   └── network_security_config.xml
+│   │       ├── main/
+│   │       │   ├── AndroidManifest.xml
+│   │       │   ├── java/com/bubbler/android/
+│   │       │   │   ├── MainActivity.kt
+│   │       │   │   ├── app/
+│   │       │   │   │   ├── BubblerApp.kt
+│   │       │   │   │   ├── navigation/
+│   │       │   │   │   │   ├── BubblerNavHost.kt
+│   │       │   │   │   │   └── Routes.kt
+│   │       │   │   │   └── theme/
+│   │       │   │   │       ├── Color.kt
+│   │       │   │   │       ├── Theme.kt
+│   │       │   │   │       └── Type.kt
+│   │       │   │   ├── core/
+│   │       │   │   │   ├── auth/
+│   │       │   │   │   │   ├── AuthSession.kt
+│   │       │   │   │   │   └── TokenStore.kt
+│   │       │   │   │   ├── config/
+│   │       │   │   │   │   └── ApiConfig.kt
+│   │       │   │   │   ├── network/
+│   │       │   │   │   │   ├── ApiClient.kt
+│   │       │   │   │   │   ├── ApiException.kt
+│   │       │   │   │   │   └── Endpoints.kt
+│   │       │   │   │   └── storage/
+│   │       │   │   │       └── LikedPostsStore.kt
+│   │       │   │   ├── data/
+│   │       │   │   │   ├── model/
+│   │       │   │   │   │   ├── BlockedUser.kt
+│   │       │   │   │   │   ├── Graph.kt
+│   │       │   │   │   │   ├── InstantIsoSerializer.kt
+│   │       │   │   │   │   ├── Interaction.kt
+│   │       │   │   │   │   ├── Post.kt
+│   │       │   │   │   │   ├── Preferences.kt
+│   │       │   │   │   │   ├── Search.kt
+│   │       │   │   │   │   ├── Topics.kt
+│   │       │   │   │   │   └── User.kt
+│   │       │   │   │   └── repository/
+│   │       │   │   │       ├── AuthRepository.kt
+│   │       │   │   │       ├── BlocksRepository.kt
+│   │       │   │   │       ├── FeedRepository.kt
+│   │       │   │   │       ├── GraphRepository.kt
+│   │       │   │   │       ├── PostRepository.kt
+│   │       │   │   │       ├── PreferencesRepository.kt
+│   │       │   │   │       ├── RepositoryAuth.kt
+│   │       │   │   │       ├── SearchRepository.kt
+│   │       │   │   │       └── UserRepository.kt
+│   │       │   │   ├── features/
+│   │       │   │   │   ├── auth/
+│   │       │   │   │   │   ├── CreateAccountScreen.kt
+│   │       │   │   │   │   ├── LoginScreen.kt
+│   │       │   │   │   │   └── components/
+│   │       │   │   │   │       └── AuthFormFields.kt
+│   │       │   │   │   ├── feed/
+│   │       │   │   │   │   ├── RankedFeedScreen.kt
+│   │       │   │   │   │   ├── RankedFeedViewModel.kt
+│   │       │   │   │   │   └── RankedFeedViewModelFactory.kt
+│   │       │   │   │   ├── graph/
+│   │       │   │   │   │   ├── GraphFeedRanking.kt
+│   │       │   │   │   │   ├── GraphFeedScreen.kt
+│   │       │   │   │   │   ├── GraphFeedViewModel.kt
+│   │       │   │   │   │   ├── GraphFeedViewModelFactory.kt
+│   │       │   │   │   │   └── components/
+│   │       │   │   │   │       ├── BubbleField.kt
+│   │       │   │   │   │       └── NeighborBubble.kt
+│   │       │   │   │   ├── home/
+│   │       │   │   │   │   ├── FeedTabScreen.kt
+│   │       │   │   │   │   └── MainTabScreen.kt
+│   │       │   │   │   ├── post/
+│   │       │   │   │   │   ├── CreatePostScreen.kt
+│   │       │   │   │   │   ├── CreatePostViewModel.kt
+│   │       │   │   │   │   └── CreatePostViewModelFactory.kt
+│   │       │   │   │   ├── profile/
+│   │       │   │   │   │   ├── BubbleTrail.kt
+│   │       │   │   │   │   ├── BubbleTrailViewModel.kt
+│   │       │   │   │   │   ├── BubbleTrailViewModelFactory.kt
+│   │       │   │   │   │   ├── MyProfileScreen.kt
+│   │       │   │   │   │   ├── ProfileTabScreen.kt
+│   │       │   │   │   │   ├── ProfileViewModel.kt
+│   │       │   │   │   │   ├── ProfileViewModelFactory.kt
+│   │       │   │   │   │   └── UserProfileScreen.kt
+│   │       │   │   │   ├── search/
+│   │       │   │   │   │   ├── SearchScreen.kt
+│   │       │   │   │   │   ├── SearchViewModel.kt
+│   │       │   │   │   │   └── SearchViewModelFactory.kt
+│   │       │   │   │   └── settings/
+│   │       │   │   │       ├── SettingsChrome.kt
+│   │       │   │   │       ├── SettingsScreen.kt
+│   │       │   │   │       ├── SettingsTabScreen.kt
+│   │       │   │   │       ├── account/
+│   │       │   │   │       │   ├── AccountSettingsComponents.kt
+│   │       │   │   │       │   ├── AccountViewModel.kt
+│   │       │   │   │       │   ├── AccountViewModelFactory.kt
+│   │       │   │   │       │   ├── DeleteAccountScreen.kt
+│   │       │   │   │       │   ├── EmailSettingsScreen.kt
+│   │       │   │   │       │   ├── PasswordSecurityScreen.kt
+│   │       │   │   │       │   └── ProfileInfoScreen.kt
+│   │       │   │   │       ├── blocks/
+│   │       │   │   │       │   ├── BlockedUsersScreen.kt
+│   │       │   │   │       │   ├── BlocksViewModel.kt
+│   │       │   │   │       │   └── BlocksViewModelFactory.kt
+│   │       │   │   │       └── preferences/
+│   │       │   │   │           ├── PreferencesScreen.kt
+│   │       │   │   │           ├── PreferencesViewModel.kt
+│   │       │   │   │           └── PreferencesViewModelFactory.kt
+│   │       │   │   └── ui/
+│   │       │   │       ├── components/
+│   │       │   │       │   ├── AsyncStateCard.kt
+│   │       │   │       │   ├── BubblerLogo.kt
+│   │       │   │       │   ├── PostCard.kt
+│   │       │   │       │   ├── PreferenceSliderRow.kt
+│   │       │   │       │   ├── PreferenceTopicsEditor.kt
+│   │       │   │       │   ├── StatusBanner.kt
+│   │       │   │       │   └── TopicPicker.kt
+│   │       │   │       └── theme/
+│   │       │   │           └── TopicStyle.kt
+│   │       │   └── res/
+│   │       └── test/java/com/bubbler/android/   # Unit tests mirroring main packages
+│   └── gradle/wrapper/
+│
 ├── backend/                      # FastAPI backend
 │   ├── main.py                   # FastAPI entrypoint
 │   ├── config.py

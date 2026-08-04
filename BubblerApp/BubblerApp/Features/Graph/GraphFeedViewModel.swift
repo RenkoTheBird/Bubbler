@@ -70,73 +70,6 @@ final class GraphFeedViewModel: ObservableObject {
         )
     }
 
-    func togglePreferCurrentTopic(using authSession: AuthSession) async {
-        guard let topic = currentNode?.topicName else { return }
-
-        isSubmitting = true
-        errorMessage = nil
-
-        do {
-            var updated = preferences
-            if contains(normalizedTopicName(from: topic), in: updated.preferredTopics) {
-                updated.unpreferTopic(topic)
-                statusMessage = "Removed \(topic) from preferred topics."
-            } else {
-                updated.preferTopic(topic)
-                statusMessage = "Preferred topic: \(topic)."
-            }
-
-            preferences = try await APIClient.updatePreferences(updated.sanitized().updatePayload).sanitized()
-            refreshPreferenceFlags()
-        } catch {
-            handle(error, using: authSession, fallbackMessage: "We couldn't update topic preferences.")
-        }
-
-        isSubmitting = false
-    }
-
-    func toggleBlacklistCurrentTopic(using authSession: AuthSession) async {
-        guard let currentNode,
-              let topic = currentNode.topicName else {
-            return
-        }
-
-        isSubmitting = true
-        errorMessage = nil
-
-        do {
-            var updated = preferences
-            let wasBlacklisted = contains(
-                normalizedTopicName(from: topic),
-                in: updated.blacklistedTopics
-            )
-
-            if wasBlacklisted {
-                updated.unblacklistTopic(topic)
-                preferences = try await APIClient.updatePreferences(updated.sanitized().updatePayload).sanitized()
-                refreshPreferenceFlags()
-                statusMessage = "Removed \(topic) from blacklist."
-            } else {
-                updated.blacklistTopic(topic)
-                preferences = try await APIClient.updatePreferences(updated.sanitized().updatePayload).sanitized()
-                nextChoices = []
-                sessionQueue = []
-
-                try await recordInteraction(for: currentNode, type: .skip)
-
-                await loadSession(
-                    using: authSession,
-                    diversify: true,
-                    message: "Blacklisted \(topic). Exploring other bubbles."
-                )
-            }
-        } catch {
-            handle(error, using: authSession, fallbackMessage: "We couldn't update topic preferences.")
-        }
-
-        isSubmitting = false
-    }
-
     func updateCurrentPostContent(_ content: String) {
         guard let currentNode else { return }
         let existing = currentNode.post
@@ -226,11 +159,6 @@ final class GraphFeedViewModel: ObservableObject {
                 message: "Deleted your post. Exploring other bubbles."
             )
         }
-    }
-
-    func viewTimeText(at date: Date) -> String {
-        let elapsedSeconds = Int(viewTime(at: date).rounded(.down))
-        return "\(elapsedSeconds)s tracked"
     }
 
     private func loadSession(

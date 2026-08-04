@@ -2,7 +2,6 @@ package com.bubbler.android.data.model
 
 import com.bubbler.android.core.network.ApiClient
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -42,11 +41,10 @@ class SearchTest {
         assertEquals("exact-1", response.exactMatches[0].id)
         assertEquals(1, response.related.size)
         assertEquals("rel-1", response.related[0].id)
-        assertFalse(response.isEmpty)
     }
 
     @Test
-    fun emptyWhenBothListsEmpty() {
+    fun emptyListsDecode() {
         val response = json.decodeFromString<SearchResponse>(
             """
             {
@@ -56,6 +54,8 @@ class SearchTest {
             }
             """.trimIndent(),
         )
-        assertTrue(response.isEmpty)
+        assertEquals("zzzz", response.query)
+        assertTrue(response.exactMatches.isEmpty())
+        assertTrue(response.related.isEmpty())
     }
 }

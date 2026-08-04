@@ -142,12 +142,12 @@ enum APIClient {
         return try await perform(request)
     }
 
-    static func get<T: Decodable>(_ path: String, token: String) async throws -> T {
-        var request = URLRequest(url: APIConfig.baseURL.appending(path: path))
-        request.httpMethod = "GET"
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    /// Unauthenticated health probe for login connectivity UI.
+    static func health() async throws -> BackendHealth {
+        var request = URLRequest(url: APIConfig.baseURL.appending(path: "health"))
+        request.timeoutInterval = 5
         let data = try await performData(request)
-        return try apiJSONDecoder.decode(T.self, from: data)
+        return try apiJSONDecoder.decode(BackendHealth.self, from: data)
     }
 
     static func authorizedRequest(

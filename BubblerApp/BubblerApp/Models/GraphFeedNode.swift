@@ -7,9 +7,6 @@ struct GraphFeedNode: Identifiable {
     let isBlacklistedTopic: Bool
 
     var id: String { post.id }
-    var content: String { post.content }
-    var userId: Int { post.userId }
-    var createdAt: Date { post.createdAt }
 
     var topicName: String? {
         guard let topic = post.topic?.trimmingCharacters(in: .whitespacesAndNewlines),

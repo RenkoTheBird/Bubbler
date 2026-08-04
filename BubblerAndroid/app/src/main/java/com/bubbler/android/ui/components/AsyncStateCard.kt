@@ -23,52 +23,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.bubbler.android.app.theme.BubblerTheme
 
-/**
- * Loading / empty / error shell used across feed, graph, search, and profile.
- * Card chrome matches Swift `GraphFeedView.stateCard`.
- */
-@Composable
-fun AsyncBody(
-    isLoading: Boolean,
-    hasContent: Boolean,
-    emptyTitle: String,
-    emptyMessage: String,
-    modifier: Modifier = Modifier,
-    errorMessage: String? = null,
-    loadingTitle: String = "Loading",
-    loadingMessage: String = "",
-    errorTitle: String = "Something went wrong",
-    content: @Composable () -> Unit,
-) {
-    when {
-        isLoading && !hasContent -> {
-            AsyncStateCard(
-                title = loadingTitle,
-                message = loadingMessage,
-                showsProgress = true,
-                modifier = modifier,
-            )
-        }
-        !hasContent && errorMessage != null -> {
-            AsyncStateCard(
-                title = errorTitle,
-                message = errorMessage,
-                showsProgress = false,
-                modifier = modifier,
-            )
-        }
-        !hasContent -> {
-            AsyncStateCard(
-                title = emptyTitle,
-                message = emptyMessage,
-                showsProgress = false,
-                modifier = modifier,
-            )
-        }
-        else -> content()
-    }
-}
-
 /** Standalone loading / empty / error card (Swift `stateCard`). */
 @Composable
 fun AsyncStateCard(
@@ -116,30 +70,25 @@ fun AsyncStateCard(
 
 @Preview(showBackground = true, backgroundColor = 0xFF0D47A1)
 @Composable
-private fun AsyncBodyLoadingPreview() {
+private fun AsyncStateCardLoadingPreview() {
     BubblerTheme {
-        AsyncBody(
-            isLoading = true,
-            hasContent = false,
-            emptyTitle = "No posts",
-            emptyMessage = "Nothing here yet.",
-            loadingTitle = "Loading graph feed",
-            loadingMessage = "Pulling your initial session from Bubbler.",
+        AsyncStateCard(
+            title = "Loading graph feed",
+            message = "Pulling your initial session from Bubbler.",
+            showsProgress = true,
             modifier = Modifier.padding(16.dp),
-        ) {}
+        )
     }
 }
 
 @Preview(showBackground = true, backgroundColor = 0xFF0D47A1)
 @Composable
-private fun AsyncBodyEmptyPreview() {
+private fun AsyncStateCardEmptyPreview() {
     BubblerTheme {
-        AsyncBody(
-            isLoading = false,
-            hasContent = false,
-            emptyTitle = "No connected bubbles",
-            emptyMessage = "Like, skip, or explore to keep walking the graph.",
+        AsyncStateCard(
+            title = "No connected bubbles",
+            message = "Like, skip, or explore to keep walking the graph.",
             modifier = Modifier.padding(16.dp),
-        ) {}
+        )
     }
 }

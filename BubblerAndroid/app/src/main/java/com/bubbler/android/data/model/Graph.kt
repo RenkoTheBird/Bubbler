@@ -13,9 +13,6 @@ data class GraphFeedNode(
     val isBlacklistedTopic: Boolean = false,
 ) {
     val id: String get() = post.id
-    val content: String get() = post.content
-    val userId: Int get() = post.userId
-    val createdAt get() = post.createdAt
 
     val topicName: String?
         get() {

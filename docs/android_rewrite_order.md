@@ -6,7 +6,7 @@ Jetpack Compose) inside this monorepo. **Backend is unchanged**; share
 
 File layout target: [`android_filemap.md`](android_filemap.md).
 
-Port from the **working iOS client**, not from any prior Flutter experiment. Match
+Port from the **working iOS client**. Match
 behavior first; Compose visuals can converge toward Material 3 while preserving
 Bubbler graph/bubble UX.
 
@@ -107,14 +107,13 @@ against `ApiClient`. Prefer model tests here—graph UI comes next.
 | 3.4 | `ui/components/PreferenceSliderRow.kt` | `PreferenceSliderRow.swift` |
 | 3.5 | `ui/components/PreferenceTopicsEditor.kt` | `PreferenceTopicsEditor.swift` |
 | 3.6 | `ui/components/StatusBanner.kt` | Inline banners in `GraphFeedView` |
-| 3.7 | `ui/components/AsyncBody.kt` | Repeated loading/empty/error cards |
+| 3.7 | `ui/components/AsyncStateCard.kt` | Repeated loading/empty/error cards |
 | 3.8 | `ui/components/PostCard.kt` | `PostCardView.swift` |
 
 Wire `PostCard` to repositories for like/skip/edit/delete only as far as needed for
 compile; full interaction paths land with graph/feed.
 
-**Exit:** A debug gallery screen (or Compose Preview group) can show logo, topic
-picker, and a sample post card.
+**Exit:** Compose Previews can show logo, topic picker, and a sample post card.
 
 ---
 
@@ -202,17 +201,61 @@ Normalize strategy weights the same way as iOS before `PUT` preferences.
 
 ## Phase 8 — Hardening (keep iOS)
 
-| Order | Work |
-| --- | --- |
-| 8.1 | End-to-end checklist vs Swift on same backend seed |
-| 8.2 | Release network config (no cleartext); Play Data Safety form |
-| 8.3 | ProGuard/R8 keep rules for kotlinx.serialization (if used) |
-| 8.4 | Document emulator vs device base URL in `BubblerAndroid/README.md` |
+**Goal:** Android is release-shaped against the same seeded backend as Swift: networking,
+shrink rules, store data disclosures, and an E2E parity checklist. Product/legal launch
+items in [`roadmap.md`](roadmap.md) still apply to **both** clients afterward.
+
+| Order | Work | Notes |
+| --- | --- | --- |
+| 8.1 | End-to-end checklist vs Swift on same backend seed | Same seed DB; walk the checklist below on emulator (or device) and iOS Simulator |
+| 8.2 | Release network config (no cleartext) | `app/src/main/res/xml/network_security_config.xml` → `cleartextTrafficPermitted="false"`; cleartext only in `src/debug/` |
+| 8.3 | Play Data Safety inventory | Match real collection (account, UGC, interactions/view-time, blocks); mirror iOS App Privacy answers from [`privacy_legal.md`](privacy_legal.md) §18 |
+| 8.4 | ProGuard/R8 + kotlinx.serialization keeps | Enable minify/shrink on `release`; keep `@Serializable` generated serializers |
+| 8.5 | Production base URL path | Debug stays emulator/LAN HTTP; release builds must point `ApiConfig` at HTTPS (BuildConfig / product flavor)—never ship `10.0.2.2` |
+| 8.6 | Refresh `BubblerAndroid/README.md` | Emulator vs device URL, debug cleartext, release HTTPS, how to run unit tests |
+| 8.7 | Strip port scaffolding | Remove Phase 3-only gallery / unused placeholders left from the rewrite |
+
+### E2E parity checklist (8.1)
+
+Run against a seeded local backend (`scripts/` seed). Compare Android and iOS on each step.
+
+**Auth**
+
+- [ ] Register with DOB age gate; reject under-floor ages
+- [ ] Login with email + password
+- [ ] Kill process → cold start still authenticated
+- [ ] Sign out clears token storage; login screen returns
+
+**Discovery**
+
+- [ ] Graph walk: explore → select neighbor → skip; ≤4 bubbles
+- [ ] Empty-neighbor / blacklist escape forces diversify; session queue fallback
+- [ ] Ranked feed loads; topic filter works
+- [ ] Create post appears in ranked feed / graph after refresh
+- [ ] Hybrid search: exact + related
+
+**Identity & settings**
+
+- [ ] Own profile posts + bubble trail
+- [ ] Public profile from post author; block / unblock round-trip
+- [ ] Preferences: strategy weights normalize before `PUT`; prefer / blacklist topics
+- [ ] Account: profile info, email, password; delete account signs out
+- [ ] Signup acceptance + Settings legal links resolve
+
+**Hardening smoke**
+
+- [ ] Debug build reaches local HTTP backend; release networking rejects cleartext
+- [ ] `./gradlew :app:testDebugUnitTest` passes
+- [ ] Release assemble with minify succeeds (`assembleRelease`)
+
+**Exit:** Checklist passes on Android and matches Swift behavior on the same seed;
+release build uses HTTPS-only networking + R8; README documents emulator/device/release
+URLs; Play Data Safety answers drafted from the real inventory (submit at store upload).
 
 Unlike a cross-platform rewrite that retires Swift, **keep `BubblerApp/`**. Android
 is a parallel client. Launch/legal items in [`roadmap.md`](roadmap.md) (report flow,
-privacy labels, etc.) remain product work on both clients—not a substitute for these
-phases.
+privacy labels / Play Data Safety, etc.) remain product work on both clients—not a
+substitute for these phases.
 
 ---
 
@@ -227,7 +270,7 @@ phases.
 5 Home shell + ranked feed + create post
 6 Search + profile
 7 Settings (account consolidated, prefs, blocks)
-8 Hardening (Play / release networking)
+8 Hardening (Play / R8 / E2E checklist / strip scaffolding)
 ```
 
 ---

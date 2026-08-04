@@ -10,7 +10,4 @@ data class SearchResponse(
     @SerialName("exact_matches")
     val exactMatches: List<Post> = emptyList(),
     val related: List<Post> = emptyList(),
-) {
-    val isEmpty: Boolean
-        get() = exactMatches.isEmpty() && related.isEmpty()
-}
+)

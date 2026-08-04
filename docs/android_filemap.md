@@ -184,7 +184,7 @@ com/bubbler/android/
     │   ├── PreferenceSliderRow.kt
     │   ├── PreferenceTopicsEditor.kt
     │   ├── StatusBanner.kt          # graph/feed error & status chips
-    │   └── AsyncBody.kt             # loading / empty / error shell
+    │   └── AsyncStateCard.kt        # loading / empty / error card
     └── theme/
         └── TopicStyle.kt            # topic colors + Material icon keys
 ```

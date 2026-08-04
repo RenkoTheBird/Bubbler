@@ -11,8 +11,4 @@ struct SearchResponse: Codable {
         case exactMatches = "exact_matches"
         case related
     }
-
-    var isEmpty: Bool {
-        exactMatches.isEmpty && related.isEmpty
-    }
 }

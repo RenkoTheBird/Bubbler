@@ -92,8 +92,8 @@ class GraphTest {
         )
 
         assertEquals("n1", node.id)
-        assertEquals("body", node.content)
-        assertEquals(3, node.userId)
+        assertEquals("body", node.post.content)
+        assertEquals(3, node.post.userId)
         assertEquals("sports", node.topicName)
         assertTrue(node.isPreferredTopic)
         assertFalse(node.isBlacklistedTopic)

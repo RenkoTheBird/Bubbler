@@ -163,7 +163,7 @@ fun RankedFeedScreenContent(
                 .padding(bottom = 40.dp),
             verticalArrangement = Arrangement.spacedBy(28.dp),
         ) {
-            FeedHeader(modifier = Modifier.padding(top = 8.dp))
+            FeedHeader(modifier = Modifier.padding(top = 2.dp))
 
             Row(
                 modifier = Modifier

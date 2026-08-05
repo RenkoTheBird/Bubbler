@@ -111,6 +111,10 @@ def create_user_router(user_service: UserService, interaction_service: Interacti
     async def unblock_user(username: str, user_id: int = Depends(get_current_user_id)):
         return await user_service.unblock_user(user_id, username)
 
+    @router.get("/me/export")
+    async def export_user_data(user_id: int = Depends(get_current_user_id)):
+        return await user_service.export_user_data(user_id)
+
     # Public profile lookup — registered after /me so literal "me" paths win.
     @router.get("/{username}/profile")
     async def get_profile_by_username(

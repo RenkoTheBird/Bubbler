@@ -1,5 +1,7 @@
+from datetime import datetime, timezone
+
 from app.db.jsonb import normalize_strategy_weights, to_jsonb
-from app.db.datetime_utils import ensure_utc
+from app.db.datetime_utils import ensure_utc, utc_iso_z
 from app.schemas.user import (
     DEFAULT_STRATEGY_WEIGHTS,
     BlockedUserInfo,
@@ -332,3 +334,168 @@ class UserRepository:
         async with self.pool.acquire() as conn:
             result = await conn.execute("DELETE FROM users WHERE id = $1", user_id)
         return result == "DELETE 1"
+
+    async def export_user_data(self, user_id: int) -> dict | None:
+        """Machine-readable account export (no password, no embeddings)."""
+        async with self.pool.acquire() as conn:
+            profile_row = await conn.fetchrow(
+                """
+                SELECT username, email, date_of_birth, created_at
+                FROM users
+                WHERE id = $1
+                """,
+                user_id,
+            )
+            if not profile_row:
+                return None
+
+            post_rows = await conn.fetch(
+                """
+                SELECT id, content, created_at
+                FROM posts
+                WHERE user_id = $1
+                ORDER BY created_at DESC, id
+                """,
+                user_id,
+            )
+            topic_rows = await conn.fetch(
+                """
+                SELECT pt.post_id, pt.topic_name, pt.source, pt.confidence, pt.weight
+                FROM post_topics pt
+                JOIN posts p ON p.id = pt.post_id
+                WHERE p.user_id = $1
+                ORDER BY pt.weight DESC, pt.topic_name
+                """,
+                user_id,
+            )
+            interaction_rows = await conn.fetch(
+                """
+                SELECT id, post_id, type, view_time, created_at
+                FROM interactions
+                WHERE user_id = $1
+                ORDER BY created_at DESC, id
+                """,
+                user_id,
+            )
+            prefs_row = await conn.fetchrow(
+                "SELECT * FROM user_profiles WHERE user_id = $1",
+                user_id,
+            )
+            topic_preferences = await self._fetch_topic_prefs(conn, user_id)
+            training_rows = await conn.fetch(
+                """
+                SELECT id, post_id, topic_name, action, created_at
+                FROM topic_training_events
+                WHERE user_id = $1
+                ORDER BY created_at DESC, id
+                """,
+                user_id,
+            )
+            block_rows = await conn.fetch(
+                """
+                SELECT u.username, b.created_at AS blocked_at
+                FROM user_blocks b
+                JOIN users u ON u.id = b.blocked_id
+                WHERE b.blocker_id = $1
+                ORDER BY b.created_at DESC, u.username_lower
+                """,
+                user_id,
+            )
+            media_rows = await conn.fetch(
+                """
+                SELECT
+                    id,
+                    post_id,
+                    media_type,
+                    mime_type,
+                    byte_size,
+                    width,
+                    height,
+                    alt_text,
+                    position,
+                    created_at
+                FROM media
+                WHERE user_id = $1
+                ORDER BY created_at DESC, position, id
+                """,
+                user_id,
+            )
+
+        topics_by_post: dict[str, list[dict]] = {}
+        for row in topic_rows:
+            post_key = str(row["post_id"])
+            topics_by_post.setdefault(post_key, []).append(
+                {
+                    "topic_name": row["topic_name"],
+                    "source": row["source"],
+                    "confidence": float(row["confidence"]),
+                    "weight": float(row["weight"]),
+                }
+            )
+
+        if prefs_row:
+            preferences = self._build_user_profile(prefs_row, topic_preferences).model_dump()
+        else:
+            preferences = default_user_prefs(user_id).model_dump()
+
+        return {
+            "exported_at": utc_iso_z(datetime.now(timezone.utc)),
+            "profile": {
+                "username": profile_row["username"],
+                "email": profile_row["email"],
+                "date_of_birth": profile_row["date_of_birth"].isoformat(),
+                "created_at": utc_iso_z(profile_row["created_at"]),
+            },
+            "posts": [
+                {
+                    "id": str(row["id"]),
+                    "content": row["content"],
+                    "created_at": utc_iso_z(row["created_at"]),
+                    "topics": topics_by_post.get(str(row["id"]), []),
+                }
+                for row in post_rows
+            ],
+            "interactions": [
+                {
+                    "id": str(row["id"]),
+                    "post_id": str(row["post_id"]),
+                    "type": row["type"],
+                    "view_time": float(row["view_time"] or 0.0),
+                    "created_at": utc_iso_z(row["created_at"]),
+                }
+                for row in interaction_rows
+            ],
+            "preferences": preferences,
+            "topic_training_events": [
+                {
+                    "id": str(row["id"]),
+                    "post_id": str(row["post_id"]),
+                    "topic_name": row["topic_name"],
+                    "action": row["action"],
+                    "created_at": utc_iso_z(row["created_at"]),
+                }
+                for row in training_rows
+            ],
+            "blocks": [
+                {
+                    "username": row["username"],
+                    "blocked_at": utc_iso_z(row["blocked_at"]),
+                }
+                for row in block_rows
+            ],
+            "media": [
+                {
+                    "id": str(row["id"]),
+                    "post_id": str(row["post_id"]),
+                    "media_type": row["media_type"],
+                    "mime_type": row["mime_type"],
+                    "byte_size": int(row["byte_size"]),
+                    "width": row["width"],
+                    "height": row["height"],
+                    "alt_text": row["alt_text"],
+                    "position": int(row["position"]),
+                    "created_at": utc_iso_z(row["created_at"]),
+                }
+                for row in media_rows
+            ],
+        }

@@ -94,3 +94,9 @@ class UserService:
         if not result:
             raise HTTPException(status_code=404, detail="User not found")
         return result
+
+    async def export_user_data(self, user_id: int):
+        export = await self.user_repo.export_user_data(user_id)
+        if export is None:
+            raise HTTPException(status_code=404, detail="User not found")
+        return export

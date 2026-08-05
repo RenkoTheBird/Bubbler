@@ -106,6 +106,15 @@ open class UserRepository(
             token = tokenStore.requireAccessToken(),
         )
     }
+
+    /** Fetches the account export payload. Callers own file presentation later. */
+    open suspend fun exportUserData() {
+        apiClient.executeIgnoringBody(
+            path = Endpoints.USER_ME_EXPORT,
+            method = "GET",
+            token = tokenStore.requireAccessToken(),
+        )
+    }
 }
 
 @Serializable

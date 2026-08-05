@@ -22,6 +22,7 @@ object Endpoints {
     const val USER_ME_LIKES = "user/me/likes"
     const val USER_ME_INTERACTIONS = "user/me/interactions"
     const val USER_ME_BLOCKS = "user/me/blocks"
+    const val USER_ME_EXPORT = "user/me/export"
 
     fun graphNextPosts(postId: String): String =
         "graph/posts/${encodePathSegment(postId)}/next"

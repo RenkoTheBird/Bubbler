@@ -68,6 +68,15 @@ struct SettingsView: View {
                         .buttonStyle(.plain)
 
                         Button {
+                            Task {
+                                try? await APIClient.exportUserData()
+                            }
+                        } label: {
+                            settingsRow(icon: "square.and.arrow.up", title: "Export Data")
+                        }
+                        .buttonStyle(.plain)
+
+                        Button {
                             authSession.signOut()
                         } label: {
                             settingsRow(icon: "rectangle.portrait.and.arrow.right", title: "Log Out")

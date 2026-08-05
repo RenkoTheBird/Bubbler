@@ -23,6 +23,7 @@ import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Lock
@@ -59,6 +60,7 @@ import com.bubbler.android.app.theme.BubblerTheme
 fun SettingsScreen(
     onNavigate: (SettingsDestination) -> Unit,
     onSignOut: () -> Unit,
+    onExportData: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -119,6 +121,11 @@ fun SettingsScreen(
                     icon = Icons.Filled.Lock,
                     title = "Password & Security",
                     onClick = { onNavigate(SettingsDestination.Password) },
+                )
+                SettingsRow(
+                    icon = Icons.Filled.Download,
+                    title = "Export Data",
+                    onClick = onExportData,
                 )
                 SettingsRow(
                     icon = Icons.AutoMirrored.Filled.Logout,
@@ -256,6 +263,7 @@ private fun SettingsScreenPreview() {
         SettingsScreen(
             onNavigate = {},
             onSignOut = {},
+            onExportData = {},
         )
     }
 }

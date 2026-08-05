@@ -2,20 +2,26 @@ package com.bubbler.android.features.settings
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.bubbler.android.app.navigation.Routes
 import com.bubbler.android.core.auth.AuthSession
+import com.bubbler.android.core.auth.TokenStore
 import com.bubbler.android.core.network.ApiClient
+import com.bubbler.android.data.repository.UserRepository
 import com.bubbler.android.features.settings.account.DeleteAccountScreen
 import com.bubbler.android.features.settings.account.EmailSettingsScreen
 import com.bubbler.android.features.settings.account.PasswordSecurityScreen
 import com.bubbler.android.features.settings.account.ProfileInfoScreen
 import com.bubbler.android.features.settings.blocks.BlockedUsersScreen
 import com.bubbler.android.features.settings.preferences.PreferencesScreen
+import kotlinx.coroutines.launch
 
 /**
  * Settings tab shell — hub list plus nested destinations (Phase 7 complete).
@@ -27,6 +33,12 @@ fun SettingsTabScreen(
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val userRepository = remember(apiClient, context) {
+        UserRepository(apiClient, TokenStore(context.applicationContext))
+    }
+
     NavHost(
         navController = navController,
         startDestination = Routes.SETTINGS_HOME,
@@ -38,6 +50,11 @@ fun SettingsTabScreen(
                     navController.navigate(destination.route)
                 },
                 onSignOut = { authSession.signOut() },
+                onExportData = {
+                    scope.launch {
+                        runCatching { userRepository.exportUserData() }
+                    }
+                },
             )
         }
         composable(Routes.SETTINGS_PROFILE_INFO) {

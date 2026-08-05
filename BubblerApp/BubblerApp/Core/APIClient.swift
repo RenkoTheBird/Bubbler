@@ -364,6 +364,11 @@ enum APIClient {
         _ = try await authorizedRequest(path: "user/me", method: "DELETE")
     }
 
+    /// Fetches the account export payload. Callers own file presentation later.
+    static func exportUserData() async throws {
+        _ = try await authorizedRequest(path: "user/me/export")
+    }
+
     static func getBlockedUsers() async throws -> [BlockedUser] {
         let data = try await authorizedRequest(path: "user/me/blocks")
         return try apiJSONDecoder.decode([BlockedUser].self, from: data)

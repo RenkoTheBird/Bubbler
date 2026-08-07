@@ -364,7 +364,8 @@ enum APIClient {
         _ = try await authorizedRequest(path: "user/me", method: "DELETE")
     }
 
-    /// Fetches the account export payload. Callers own file presentation later.
+    /// Fetches the account export payload (JSON today).
+    /// Replace with a binary zip download when wiring `DataExportViewModel.prepareExportFile`.
     static func exportUserData() async throws {
         _ = try await authorizedRequest(path: "user/me/export")
     }

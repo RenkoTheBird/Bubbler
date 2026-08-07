@@ -9,7 +9,8 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject private var authSession: AuthSession
-    
+    @StateObject private var dataExport = DataExportViewModel()
+
     var body: some View {
         
         ZStack {
@@ -69,12 +70,17 @@ struct SettingsView: View {
 
                         Button {
                             Task {
-                                try? await APIClient.exportUserData()
+                                await dataExport.startExport(using: authSession)
                             }
                         } label: {
-                            settingsRow(icon: "square.and.arrow.up", title: "Export Data")
+                            settingsRow(
+                                icon: "square.and.arrow.up",
+                                title: dataExport.isExporting ? "Preparing Export…" : "Export Data"
+                            )
                         }
                         .buttonStyle(.plain)
+                        .disabled(dataExport.isExporting)
+                        .opacity(dataExport.isExporting ? 0.55 : 1)
 
                         Button {
                             authSession.signOut()
@@ -142,6 +148,40 @@ struct SettingsView: View {
                 }
                 .padding(.horizontal)
             }
+
+            if dataExport.isExporting {
+                Color.black.opacity(0.35)
+                    .ignoresSafeArea()
+
+                ProgressView("Preparing your data export…")
+                    .padding(20)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color.black.opacity(0.75))
+                    )
+                    .foregroundColor(.white)
+                    .tint(.white)
+            }
+        }
+        .sheet(item: $dataExport.shareItem, onDismiss: {
+            dataExport.finishSharing()
+        }) { item in
+            ShareSheet(activityItems: [item.url])
+        }
+        .alert(
+            dataExport.errorTitle,
+            isPresented: Binding(
+                get: { dataExport.errorMessage != nil },
+                set: { if !$0 { dataExport.errorMessage = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(dataExport.errorMessage ?? "")
+        }
+        .onDisappear {
+            dataExport.finishSharing()
+            DataExportFileStore.removeAllExports()
         }
     }
     

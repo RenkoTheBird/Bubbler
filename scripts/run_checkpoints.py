@@ -1129,7 +1129,7 @@ async def run_phase_6(ctx: Context) -> None:
                 f"topic={candidate_topic}, matches={len(blacklisted_posts)}",
             )
 
-    settings_view_model = read_ios_file("Features/Settings/PreferencesSettingsViewModel.swift")
+    settings_view_model = read_ios_file("Features/Settings/Preferences/PreferencesSettingsViewModel.swift")
     ok(ctx, "6.4 PreferencesSettingsViewModel.swift exists", bool(settings_view_model))
     ok(
         ctx,
@@ -1142,7 +1142,7 @@ async def run_phase_6(ctx: Context) -> None:
         "APIClient.updatePreferences" in settings_view_model,
     )
 
-    settings_view = read_ios_file("Features/Settings/PreferencesSettingsView.swift")
+    settings_view = read_ios_file("Features/Settings/Preferences/PreferencesSettingsView.swift")
     ok(ctx, "6.5 PreferencesSettingsView.swift exists", bool(settings_view))
     ok(
         ctx,

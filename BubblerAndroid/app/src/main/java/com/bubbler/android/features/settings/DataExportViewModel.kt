@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.bubbler.android.core.auth.AuthSession
 import com.bubbler.android.core.network.ApiException
 import com.bubbler.android.core.storage.DataExportWriter
+import com.bubbler.android.data.repository.UserRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,11 +20,12 @@ import kotlinx.coroutines.withContext
 
 /**
  * Account data export — mirrors iOS `DataExportViewModel`.
- * Uses SAF Create Document for the save location; zip download is not wired yet.
+ * Fetches pretty-printed JSON, then saves via SAF Create Document.
  */
 class DataExportViewModel(
     private val authSession: AuthSession,
     private val contentResolver: ContentResolver,
+    private val userRepository: UserRepository,
 ) : ViewModel() {
     private val _isExporting = MutableStateFlow(false)
     val isExporting: StateFlow<Boolean> = _isExporting.asStateFlow()
@@ -38,28 +40,24 @@ class DataExportViewModel(
     private val _createDocumentRequests = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val createDocumentRequests: SharedFlow<String> = _createDocumentRequests.asSharedFlow()
 
-    private var pendingZipBytes: ByteArray? = null
+    private var pendingJsonBytes: ByteArray? = null
 
-    /**
-     * Starts export → SAF create document → write.
-     * No-op until zip download is wired ([IS_DOWNLOAD_WIRED]).
-     */
+    /** Fetches pretty-printed JSON, then launches the SAF save picker. */
     fun startExport() {
         if (_isExporting.value) return
-        if (!IS_DOWNLOAD_WIRED) return
 
         viewModelScope.launch {
             _isExporting.value = true
             _errorTitle.value = "Couldn't export data"
             _errorMessage.value = null
-            pendingZipBytes = null
+            pendingJsonBytes = null
 
             try {
-                val bytes = prepareExportBytes()
-                pendingZipBytes = bytes
+                val bytes = userRepository.exportUserData()
+                pendingJsonBytes = bytes
                 _createDocumentRequests.emit(DataExportWriter.suggestedFileName())
             } catch (e: Exception) {
-                pendingZipBytes = null
+                pendingJsonBytes = null
                 _isExporting.value = false
                 handleSessionError(
                     e,
@@ -76,7 +74,7 @@ class DataExportViewModel(
             return
         }
 
-        val bytes = pendingZipBytes
+        val bytes = pendingJsonBytes
         if (bytes == null) {
             _isExporting.value = false
             return
@@ -85,9 +83,9 @@ class DataExportViewModel(
         viewModelScope.launch {
             try {
                 withContext(Dispatchers.IO) {
-                    DataExportWriter.writeZip(contentResolver, uri, bytes)
+                    DataExportWriter.writeJson(contentResolver, uri, bytes)
                 }
-                pendingZipBytes = null
+                pendingJsonBytes = null
             } catch (e: Exception) {
                 handleSessionError(
                     e,
@@ -104,16 +102,8 @@ class DataExportViewModel(
     }
 
     private fun cancelPendingSave() {
-        pendingZipBytes = null
+        pendingJsonBytes = null
         _isExporting.value = false
-    }
-
-    /**
-     * Downloads the account export zip bytes.
-     * Not wired yet — replace with a binary fetch from the user export API.
-     */
-    private suspend fun prepareExportBytes(): ByteArray {
-        throw DataExportException.DownloadNotWired
     }
 
     private fun handleSessionError(error: Exception, fallbackMessage: String) {
@@ -123,13 +113,4 @@ class DataExportViewModel(
         val description = error.message?.trim().orEmpty()
         _errorMessage.value = description.ifEmpty { fallbackMessage }
     }
-
-    companion object {
-        /** Flip when [prepareExportBytes] fetches zip bytes from the API. */
-        const val IS_DOWNLOAD_WIRED = false
-    }
-}
-
-sealed class DataExportException(message: String) : Exception(message) {
-    data object DownloadNotWired : DataExportException("Export download is not wired yet.")
 }

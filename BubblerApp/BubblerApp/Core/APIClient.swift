@@ -364,10 +364,10 @@ enum APIClient {
         _ = try await authorizedRequest(path: "user/me", method: "DELETE")
     }
 
-    /// Fetches the account export payload (JSON today).
-    /// Replace with a binary zip download when wiring `DataExportViewModel.prepareExportFile`.
-    static func exportUserData() async throws {
-        _ = try await authorizedRequest(path: "user/me/export")
+    /// Fetches the account export as pretty-printed JSON ready to save/share.
+    static func exportUserData() async throws -> Data {
+        let data = try await authorizedRequest(path: "user/me/export")
+        return try prettyPrintedJSON(from: data)
     }
 
     static func getBlockedUsers() async throws -> [BlockedUser] {
@@ -414,6 +414,14 @@ enum APIClient {
         }
         return decoder
     }()
+
+    private static func prettyPrintedJSON(from data: Data) throws -> Data {
+        let object = try JSONSerialization.jsonObject(with: data, options: [])
+        return try JSONSerialization.data(
+            withJSONObject: object,
+            options: [.prettyPrinted, .sortedKeys]
+        )
+    }
 
     private static func perform(_ request: URLRequest) async throws -> AuthResponse {
         let data = try await performData(request)

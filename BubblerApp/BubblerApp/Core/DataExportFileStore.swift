@@ -5,7 +5,7 @@
 
 import Foundation
 
-/// Temp-file helpers for account data exports (zip). Keeps sensitive archives
+/// Temp-file helpers for account data exports (JSON). Keeps sensitive files
 /// out of permanent storage and makes cleanup explicit after sharing.
 enum DataExportFileStore {
     private static let directoryName = "data-exports"
@@ -15,8 +15,8 @@ enum DataExportFileStore {
             .appendingPathComponent(directoryName, isDirectory: true)
     }
 
-    /// Writes zip bytes to a uniquely named file under the temp exports directory.
-    static func writeExportZip(_ data: Data, createdAt: Date = Date()) throws -> URL {
+    /// Writes JSON bytes to a uniquely named file under the temp exports directory.
+    static func writeExportJSON(_ data: Data, createdAt: Date = Date()) throws -> URL {
         try FileManager.default.createDirectory(
             at: exportsDirectory,
             withIntermediateDirectories: true
@@ -43,6 +43,6 @@ enum DataExportFileStore {
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = TimeZone(secondsFromGMT: 0)
         formatter.dateFormat = "yyyy-MM-dd'T'HHmmss'Z'"
-        return "bubbler-export-\(formatter.string(from: createdAt)).zip"
+        return "bubbler-export-\(formatter.string(from: createdAt)).json"
     }
 }

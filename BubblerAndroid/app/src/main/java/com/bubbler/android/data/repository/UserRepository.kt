@@ -3,6 +3,7 @@ package com.bubbler.android.data.repository
 import com.bubbler.android.core.auth.TokenStore
 import com.bubbler.android.core.network.ApiClient
 import com.bubbler.android.core.network.Endpoints
+import com.bubbler.android.core.storage.DataExportWriter
 import com.bubbler.android.data.model.GraphInteractionPayload
 import com.bubbler.android.data.model.Interaction
 import com.bubbler.android.data.model.Post
@@ -108,15 +109,15 @@ open class UserRepository(
     }
 
     /**
-     * Fetches the account export payload (JSON today).
-     * Replace with a binary zip download when wiring [com.bubbler.android.features.settings.DataExportViewModel].
+     * Fetches the account export as pretty-printed JSON bytes ready for SAF save.
      */
-    open suspend fun exportUserData() {
-        apiClient.executeIgnoringBody(
+    open suspend fun exportUserData(): ByteArray {
+        val raw = apiClient.execute(
             path = Endpoints.USER_ME_EXPORT,
             method = "GET",
             token = tokenStore.requireAccessToken(),
         )
+        return DataExportWriter.prettyPrintJson(raw)
     }
 }
 

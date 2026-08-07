@@ -2,25 +2,38 @@ package com.bubbler.android.core.storage
 
 import android.content.ContentResolver
 import android.net.Uri
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import java.io.IOException
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 /**
- * Writes account export zip bytes to a user-chosen SAF document URI.
- * Mirrors iOS [DataExportFileStore] filename conventions; Android saves via
- * Create Document instead of a temp file + share sheet.
+ * Pretty-prints account export JSON and writes it to a user-chosen SAF document URI.
+ * Mirrors iOS [DataExportFileStore] filename conventions.
  */
 object DataExportWriter {
     private val fileNameFormatter: DateTimeFormatter =
         DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HHmmss'Z'")
             .withZone(ZoneOffset.UTC)
 
-    fun suggestedFileName(createdAt: Instant = Instant.now()): String =
-        "bubbler-export-${fileNameFormatter.format(createdAt)}.zip"
+    private val prettyJson = Json {
+        prettyPrint = true
+        prettyPrintIndent = "  "
+    }
 
-    fun writeZip(contentResolver: ContentResolver, uri: Uri, data: ByteArray) {
+    fun suggestedFileName(createdAt: Instant = Instant.now()): String =
+        "bubbler-export-${fileNameFormatter.format(createdAt)}.json"
+
+    /** Re-encodes compact API JSON as pretty-printed UTF-8 bytes. */
+    fun prettyPrintJson(raw: String): ByteArray {
+        val element = Json.parseToJsonElement(raw)
+        return prettyJson.encodeToString(JsonElement.serializer(), element)
+            .toByteArray(Charsets.UTF_8)
+    }
+
+    fun writeJson(contentResolver: ContentResolver, uri: Uri, data: ByteArray) {
         val stream = contentResolver.openOutputStream(uri)
             ?: throw IOException("Could not open the chosen save location.")
         stream.use { output ->

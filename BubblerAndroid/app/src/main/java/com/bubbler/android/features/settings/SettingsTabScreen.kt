@@ -17,7 +17,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.bubbler.android.app.navigation.Routes
 import com.bubbler.android.core.auth.AuthSession
+import com.bubbler.android.core.auth.TokenStore
 import com.bubbler.android.core.network.ApiClient
+import com.bubbler.android.data.repository.UserRepository
 import com.bubbler.android.features.settings.account.DeleteAccountScreen
 import com.bubbler.android.features.settings.account.EmailSettingsScreen
 import com.bubbler.android.features.settings.account.PasswordSecurityScreen
@@ -36,10 +38,14 @@ fun SettingsTabScreen(
     navController: NavHostController = rememberNavController(),
 ) {
     val context = LocalContext.current
-    val dataExportFactory = remember(authSession, context) {
+    val userRepository = remember(apiClient, context) {
+        UserRepository(apiClient, TokenStore(context.applicationContext))
+    }
+    val dataExportFactory = remember(authSession, context, userRepository) {
         DataExportViewModelFactory(
             authSession = authSession,
             contentResolver = context.applicationContext.contentResolver,
+            userRepository = userRepository,
         )
     }
     val dataExportViewModel: DataExportViewModel = viewModel(factory = dataExportFactory)
@@ -48,7 +54,7 @@ fun SettingsTabScreen(
     val exportErrorMessage by dataExportViewModel.errorMessage.collectAsStateWithLifecycle()
 
     val createDocumentLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/zip"),
+        contract = ActivityResultContracts.CreateDocument("application/json"),
     ) { uri ->
         dataExportViewModel.onSaveLocationChosen(uri)
     }

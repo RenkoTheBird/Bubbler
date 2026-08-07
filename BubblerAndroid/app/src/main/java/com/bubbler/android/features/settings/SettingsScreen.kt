@@ -30,9 +30,12 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,7 +65,24 @@ fun SettingsScreen(
     onSignOut: () -> Unit,
     onExportData: () -> Unit,
     modifier: Modifier = Modifier,
+    isExporting: Boolean = false,
+    exportErrorTitle: String = "Couldn't export data",
+    exportErrorMessage: String? = null,
+    onDismissExportError: () -> Unit = {},
 ) {
+    if (exportErrorMessage != null) {
+        AlertDialog(
+            onDismissRequest = onDismissExportError,
+            title = { Text(exportErrorTitle) },
+            text = { Text(exportErrorMessage) },
+            confirmButton = {
+                TextButton(onClick = onDismissExportError) {
+                    Text("OK")
+                }
+            },
+        )
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -124,8 +144,9 @@ fun SettingsScreen(
                 )
                 SettingsRow(
                     icon = Icons.Filled.Download,
-                    title = "Export Data",
+                    title = if (isExporting) "Preparing Export…" else "Export Data",
                     onClick = onExportData,
+                    enabled = !isExporting,
                 )
                 SettingsRow(
                     icon = Icons.AutoMirrored.Filled.Logout,
@@ -175,6 +196,30 @@ fun SettingsScreen(
                 )
             }
         }
+
+        if (isExporting) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.35f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .background(Color.Black.copy(alpha = 0.75f), RoundedCornerShape(16.dp))
+                        .padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    CircularProgressIndicator(color = Color.White)
+                    Text(
+                        text = "Preparing your data export…",
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -222,7 +267,9 @@ private fun SettingsRow(
     title: String,
     onClick: () -> Unit,
     tint: Color = Color.White.copy(alpha = 0.9f),
+    enabled: Boolean = true,
 ) {
+    val rowAlpha = if (enabled) 1f else 0.55f
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -230,27 +277,27 @@ private fun SettingsRow(
                 role = Role.Button
                 contentDescription = title
             }
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = tint.copy(alpha = 0.9f),
+            tint = tint.copy(alpha = 0.9f * rowAlpha),
             modifier = Modifier.size(22.dp),
         )
         Spacer(modifier = Modifier.width(12.dp))
         Text(
             text = title,
-            color = tint,
+            color = tint.copy(alpha = tint.alpha * rowAlpha),
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.weight(1f),
         )
         Icon(
             imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
             contentDescription = null,
-            tint = Color.White.copy(alpha = 0.4f),
+            tint = Color.White.copy(alpha = 0.4f * rowAlpha),
             modifier = Modifier.size(20.dp),
         )
     }

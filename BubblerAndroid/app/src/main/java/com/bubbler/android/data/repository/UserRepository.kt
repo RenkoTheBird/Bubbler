@@ -107,7 +107,10 @@ open class UserRepository(
         )
     }
 
-    /** Fetches the account export payload. Callers own file presentation later. */
+    /**
+     * Fetches the account export payload (JSON today).
+     * Replace with a binary zip download when wiring [com.bubbler.android.features.settings.DataExportViewModel].
+     */
     open suspend fun exportUserData() {
         apiClient.executeIgnoringBody(
             path = Endpoints.USER_ME_EXPORT,

@@ -1,5 +1,6 @@
 from fastapi import HTTPException
 
+from app.repositories.user_repo import DataExportRateLimited
 from app.services.auth import check_password, hash_password
 
 
@@ -96,7 +97,13 @@ class UserService:
         return result
 
     async def export_user_data(self, user_id: int):
-        export = await self.user_repo.export_user_data(user_id)
+        try:
+            export = await self.user_repo.export_user_data(user_id)
+        except DataExportRateLimited:
+            raise HTTPException(
+                status_code=429,
+                detail="You can export your data up to twice per day. Try again tomorrow.",
+            ) from None
         if export is None:
             raise HTTPException(status_code=404, detail="User not found")
         return export

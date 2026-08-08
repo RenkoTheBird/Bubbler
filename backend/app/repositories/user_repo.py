@@ -12,6 +12,13 @@ from app.schemas.user import (
     default_user_prefs,
 )
 
+# UTC calendar-day cap for GET /user/me/export.
+DATA_EXPORTS_PER_DAY = 2
+
+
+class DataExportRateLimited(Exception):
+    """Raised when the caller has used all data-export slots for the UTC day."""
+
 
 class UserRepository:
     def __init__(self, pool):
@@ -335,8 +342,33 @@ class UserRepository:
             result = await conn.execute("DELETE FROM users WHERE id = $1", user_id)
         return result == "DELETE 1"
 
+    async def _consume_data_export_quota(self, conn, user_id: int) -> bool:
+        """Atomically consume one export slot for the current UTC day.
+
+        Returns False when the user is already at DATA_EXPORTS_PER_DAY.
+        """
+        utc_day = datetime.now(timezone.utc).date()
+        row = await conn.fetchrow(
+            """
+            INSERT INTO user_data_export_limits (user_id, day, export_count)
+            VALUES ($1, $2, 1)
+            ON CONFLICT (user_id, day)
+            DO UPDATE SET export_count = user_data_export_limits.export_count + 1
+            WHERE user_data_export_limits.export_count < $3
+            RETURNING export_count
+            """,
+            user_id,
+            utc_day,
+            DATA_EXPORTS_PER_DAY,
+        )
+        return row is not None
+
     async def export_user_data(self, user_id: int) -> dict | None:
-        """Machine-readable account export (no password, no embeddings)."""
+        """Machine-readable account export (no password, no embeddings).
+
+        Enforces DATA_EXPORTS_PER_DAY per UTC calendar day.
+        Raises DataExportRateLimited when the quota is exhausted.
+        """
         async with self.pool.acquire() as conn:
             profile_row = await conn.fetchrow(
                 """
@@ -348,6 +380,9 @@ class UserRepository:
             )
             if not profile_row:
                 return None
+
+            if not await self._consume_data_export_quota(conn, user_id):
+                raise DataExportRateLimited()
 
             post_rows = await conn.fetch(
                 """

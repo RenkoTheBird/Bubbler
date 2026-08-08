@@ -174,3 +174,12 @@ CREATE TABLE user_blocks (
 );
 
 CREATE INDEX user_blocks_blocked_id_idx ON user_blocks (blocked_id);
+
+-- DATA EXPORT LIMITS (UTC calendar day; max 2 exports per user per day)
+CREATE TABLE user_data_export_limits (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    day DATE NOT NULL,
+    export_count INTEGER NOT NULL DEFAULT 0 CHECK (export_count >= 0),
+    PRIMARY KEY (user_id, day)
+);
+

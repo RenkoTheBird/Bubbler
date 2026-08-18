@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -19,6 +20,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -26,6 +28,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -48,6 +51,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bubbler.android.app.theme.BubblerTheme
 import com.bubbler.android.core.network.ApiException
@@ -58,6 +63,7 @@ import com.bubbler.android.data.model.Post
 import com.bubbler.android.data.repository.PostRepository
 import com.bubbler.android.data.repository.PreferencesRepository
 import com.bubbler.android.data.repository.UserRepository
+import com.bubbler.android.features.report.ReportPostScreen
 import com.bubbler.android.ui.theme.TopicStyle
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -100,7 +106,8 @@ fun PostCard(
         ).collectAsStateWithLifecycle(emptySet())
 
     var showDeleteConfirmation by remember { mutableStateOf(false) }
-    var showTopicMenu by remember { mutableStateOf(false) }
+    var showOverflowMenu by remember { mutableStateOf(false) }
+    var showReportForm by remember { mutableStateOf(false) }
     var isDeleting by remember { mutableStateOf(false) }
     var isTogglingLike by remember { mutableStateOf(false) }
     var isUpdatingTopicPreference by remember { mutableStateOf(false) }
@@ -120,6 +127,7 @@ fun PostCard(
 
     val isOwned = currentUserId != null && currentUserId == post.userId
     val topicName = post.topic?.trim()?.takeIf { it.isNotEmpty() }
+    val showsOverflowMenu = topicName != null || !isOwned
     val accentColor = topicName?.let { TopicStyle.color(it) } ?: Color.White
     val currentlyLiked = post.id in likedIds
     val currentlyPreferred = preferredLocally ?: isTopicPreferred
@@ -192,16 +200,16 @@ fun PostCard(
                 style = MaterialTheme.typography.bodySmall,
             )
 
-            if (topicName != null) {
+            if (showsOverflowMenu) {
                 Box {
                     IconButton(
-                        onClick = { showTopicMenu = true },
+                        onClick = { showOverflowMenu = true },
                         enabled = !isUpdatingTopicPreference,
                         modifier = Modifier.size(36.dp),
                     ) {
                         Icon(
                             imageVector = Icons.Filled.MoreHoriz,
-                            contentDescription = "Topic options",
+                            contentDescription = "Post options",
                             tint = Color.White.copy(alpha = 0.85f),
                             modifier = Modifier
                                 .size(28.dp)
@@ -211,61 +219,81 @@ fun PostCard(
                         )
                     }
                     DropdownMenu(
-                        expanded = showTopicMenu,
-                        onDismissRequest = { showTopicMenu = false },
+                        expanded = showOverflowMenu,
+                        onDismissRequest = { showOverflowMenu = false },
                     ) {
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    if (currentlyPreferred) "Unprefer Topic" else "Prefer Topic",
-                                )
-                            },
-                            onClick = {
-                                showTopicMenu = false
-                                scope.launch {
-                                    togglePreferTopic(
-                                        topic = topicName,
-                                        currentlyPreferred = currentlyPreferred,
-                                        preferencesRepository = preferencesRepository,
-                                        onPreferred = { preferredLocally = it },
-                                        onBlacklisted = { blacklistedLocally = it },
-                                        onClearPreferred = { preferredLocally = null },
-                                        onError = { actionError = it },
-                                        onUnauthorized = onUnauthorized,
-                                        onTopicPreferenceChanged = onTopicPreferenceChanged,
-                                        setBusy = { isUpdatingTopicPreference = it },
+                        if (topicName != null) {
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        if (currentlyPreferred) "Unprefer Topic" else "Prefer Topic",
                                     )
-                                }
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    if (currentlyBlacklisted) {
-                                        "Unblacklist Topic"
-                                    } else {
-                                        "Blacklist Topic"
-                                    },
-                                )
-                            },
-                            onClick = {
-                                showTopicMenu = false
-                                scope.launch {
-                                    toggleBlacklistTopic(
-                                        topic = topicName,
-                                        currentlyBlacklisted = currentlyBlacklisted,
-                                        preferencesRepository = preferencesRepository,
-                                        onBlacklisted = { blacklistedLocally = it },
-                                        onPreferred = { preferredLocally = it },
-                                        onClearBlacklisted = { blacklistedLocally = null },
-                                        onError = { actionError = it },
-                                        onUnauthorized = onUnauthorized,
-                                        onTopicPreferenceChanged = onTopicPreferenceChanged,
-                                        setBusy = { isUpdatingTopicPreference = it },
+                                },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    scope.launch {
+                                        togglePreferTopic(
+                                            topic = topicName,
+                                            currentlyPreferred = currentlyPreferred,
+                                            preferencesRepository = preferencesRepository,
+                                            onPreferred = { preferredLocally = it },
+                                            onBlacklisted = { blacklistedLocally = it },
+                                            onClearPreferred = { preferredLocally = null },
+                                            onError = { actionError = it },
+                                            onUnauthorized = onUnauthorized,
+                                            onTopicPreferenceChanged = onTopicPreferenceChanged,
+                                            setBusy = { isUpdatingTopicPreference = it },
+                                        )
+                                    }
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        if (currentlyBlacklisted) {
+                                            "Unblacklist Topic"
+                                        } else {
+                                            "Blacklist Topic"
+                                        },
                                     )
-                                }
-                            },
-                        )
+                                },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    scope.launch {
+                                        toggleBlacklistTopic(
+                                            topic = topicName,
+                                            currentlyBlacklisted = currentlyBlacklisted,
+                                            preferencesRepository = preferencesRepository,
+                                            onBlacklisted = { blacklistedLocally = it },
+                                            onPreferred = { preferredLocally = it },
+                                            onClearBlacklisted = { blacklistedLocally = null },
+                                            onError = { actionError = it },
+                                            onUnauthorized = onUnauthorized,
+                                            onTopicPreferenceChanged = onTopicPreferenceChanged,
+                                            setBusy = { isUpdatingTopicPreference = it },
+                                        )
+                                    }
+                                },
+                            )
+                        }
+                        if (!isOwned) {
+                            if (topicName != null) {
+                                HorizontalDivider()
+                            }
+                            DropdownMenuItem(
+                                text = { Text("Report Post") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Filled.Flag,
+                                        contentDescription = null,
+                                    )
+                                },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    showReportForm = true
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -438,6 +466,24 @@ fun PostCard(
                 }
             },
         )
+    }
+
+    if (showReportForm) {
+        Dialog(
+            onDismissRequest = { showReportForm = false },
+            properties = DialogProperties(
+                dismissOnBackPress = true,
+                dismissOnClickOutside = false,
+                usePlatformDefaultWidth = false,
+            ),
+        ) {
+            ReportPostScreen(
+                post = post,
+                onBack = { showReportForm = false },
+                onSubmitted = { showReportForm = false },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
     }
 }
 

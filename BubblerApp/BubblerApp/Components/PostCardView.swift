@@ -15,7 +15,8 @@ struct PostCardView: View {
     @EnvironmentObject private var authSession: AuthSession
     @EnvironmentObject private var likedPosts: LikedPostsStore
     @State private var showDeleteConfirmation = false
-    @State private var showTopicMenu = false
+    @State private var showOverflowMenu = false
+    @State private var showReportForm = false
     @State private var isDeleting = false
     @State private var isTogglingLike = false
     @State private var isUpdatingTopicPreference = false
@@ -58,6 +59,10 @@ struct PostCardView: View {
         isCompact ? 3 : nil
     }
 
+    private var showsOverflowMenu: Bool {
+        topicName != nil || !isOwned
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: isCompact ? 10 : 12) {
             HStack(alignment: .center) {
@@ -91,9 +96,9 @@ struct PostCardView: View {
                     .font(.caption)
                     .foregroundColor(.white.opacity(0.65))
 
-                if topicName != nil {
+                if showsOverflowMenu {
                     Button {
-                        showTopicMenu = true
+                        showOverflowMenu = true
                     } label: {
                         Image(systemName: "ellipsis")
                             .font(.body.weight(.semibold))
@@ -104,7 +109,7 @@ struct PostCardView: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(isUpdatingTopicPreference)
-                    .accessibilityLabel("Topic options")
+                    .accessibilityLabel("Post options")
                 }
             }
 
@@ -172,8 +177,8 @@ struct PostCardView: View {
             Text("This permanently removes your post.")
         }
         .confirmationDialog(
-            topicMenuTitle,
-            isPresented: $showTopicMenu,
+            overflowMenuTitle,
+            isPresented: $showOverflowMenu,
             titleVisibility: .visible
         ) {
             if let topicName {
@@ -187,16 +192,26 @@ struct PostCardView: View {
                     Task { await toggleBlacklistTopic(topicName) }
                 }
             }
+            if !isOwned {
+                Button("Report Post", role: .destructive) {
+                    showReportForm = true
+                }
+            }
             Button("Cancel", role: .cancel) {}
         } message: {
             if let topicName {
                 Text("Update how Bubbler treats \(KnownTopics.displayName(for: topicName)).")
+            } else {
+                Text("Report this post to Bubbler.")
             }
+        }
+        .navigationDestination(isPresented: $showReportForm) {
+            ReportPostView(post: post)
         }
     }
 
-    private var topicMenuTitle: String {
-        guard let topicName else { return "Topic options" }
+    private var overflowMenuTitle: String {
+        guard let topicName else { return "Post options" }
         return KnownTopics.displayName(for: topicName)
     }
 

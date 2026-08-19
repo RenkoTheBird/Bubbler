@@ -481,6 +481,7 @@ fun PostCard(
                 post = post,
                 onBack = { showReportForm = false },
                 onSubmitted = { showReportForm = false },
+                onUnauthorized = onUnauthorized,
                 modifier = Modifier.fillMaxSize(),
             )
         }

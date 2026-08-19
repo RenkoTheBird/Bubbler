@@ -4,7 +4,16 @@ struct ReportPostView: View {
     let post: Post
 
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var authSession: AuthSession
     @StateObject private var viewModel = ReportPostViewModel()
+
+    private var blockableUsername: String? {
+        guard let username = post.username?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !username.isEmpty else {
+            return nil
+        }
+        return username
+    }
 
     var body: some View {
         ZStack {
@@ -25,6 +34,10 @@ struct ReportPostView: View {
                     postPreview
                     reasonSection
                     commentsSection
+                    if blockableUsername != nil {
+                        blockUserSection
+                    }
+                    privacyPolicyLink
 
                     if let errorMessage = viewModel.errorMessage {
                         messageCard(errorMessage)
@@ -150,25 +163,94 @@ struct ReportPostView: View {
         }
     }
 
+    private var blockUserSection: some View {
+        Button {
+            viewModel.alsoBlockUser.toggle()
+        } label: {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: viewModel.alsoBlockUser ? "checkmark.square.fill" : "square")
+                    .font(.title3)
+                    .foregroundColor(.white)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Block this user too")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.white)
+
+                    Text("Hide their posts from your feed.")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.7))
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.white.opacity(0.08))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                    )
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(viewModel.isSubmitting)
+        .accessibilityLabel("Block this user too")
+        .accessibilityAddTraits(viewModel.alsoBlockUser ? [.isToggleButton, .isSelected] : [.isToggleButton])
+        .accessibilityValue(viewModel.alsoBlockUser ? "On" : "Off")
+    }
+
+    private var privacyPolicyLink: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("How we handle the information in this report")
+                .font(.subheadline)
+                .foregroundColor(.white.opacity(0.75))
+
+            NavigationLink {
+                PrivacyPolicyStubView()
+            } label: {
+                Text("Privacy Policy")
+                    .font(.subheadline.weight(.semibold))
+                    .underline()
+                    .foregroundColor(.white)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Privacy Policy")
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private var submitButton: some View {
         Button {
-            if viewModel.submit() {
-                dismiss()
+            Task {
+                if await viewModel.submit(blockUsername: blockableUsername, using: authSession) {
+                    dismiss()
+                }
             }
         } label: {
-            Text("Submit Report")
-                .font(.headline)
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(
-                    RoundedRectangle(cornerRadius: 18)
-                        .fill(viewModel.canSubmit ? Color.red.opacity(0.85) : Color.white.opacity(0.15))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18)
-                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                )
+            Group {
+                if viewModel.isSubmitting {
+                    ProgressView()
+                        .tint(.white)
+                } else {
+                    Text("Submit Report")
+                }
+            }
+            .font(.headline)
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(viewModel.canSubmit ? Color.red.opacity(0.85) : Color.white.opacity(0.15))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
+            )
         }
         .disabled(!viewModel.canSubmit)
         .buttonStyle(.plain)
@@ -205,5 +287,6 @@ struct ReportPostView: View {
                 embedding: nil
             )
         )
+        .environmentObject(AuthSession())
     }
 }

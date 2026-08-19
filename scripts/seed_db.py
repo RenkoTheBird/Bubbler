@@ -410,6 +410,56 @@ async def ensure_schema(pool: asyncpg.Pool) -> None:
                 """
             )
 
+        if not await _table_exists(conn, "content_reports"):
+            await conn.execute(
+                """
+                CREATE TABLE content_reports (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    reporter_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                    post_id UUID REFERENCES posts(id) ON DELETE SET NULL,
+                    reported_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                    reason TEXT NOT NULL CHECK (reason IN (
+                        'illegal_content',
+                        'severe_violence',
+                        'non_consensual_sexual_content',
+                        'harassment',
+                        'spam',
+                        'other'
+                    )),
+                    details TEXT,
+                    status TEXT NOT NULL DEFAULT 'open' CHECK (status IN (
+                        'open',
+                        'in_review',
+                        'resolved',
+                        'dismissed'
+                    )),
+                    content_snapshot TEXT NOT NULL,
+                    topic_snapshot TEXT,
+                    author_username_snapshot TEXT,
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+                """
+            )
+            await conn.execute(
+                """
+                CREATE UNIQUE INDEX content_reports_open_reporter_post_uidx
+                ON content_reports (reporter_id, post_id)
+                WHERE status = 'open'
+                """
+            )
+            await conn.execute(
+                """
+                CREATE INDEX content_reports_status_created_at_idx
+                ON content_reports (status, created_at DESC)
+                """
+            )
+            await conn.execute(
+                """
+                CREATE INDEX content_reports_post_id_idx
+                ON content_reports (post_id)
+                """
+            )
+
 
 async def main():
     pool = await asyncpg.create_pool(my_env_vars.db_url)

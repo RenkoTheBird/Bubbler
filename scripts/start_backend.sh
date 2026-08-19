@@ -199,6 +199,41 @@ BEGIN
     );
     CREATE INDEX user_blocks_blocked_id_idx ON user_blocks (blocked_id);
   END IF;
+
+  IF to_regclass('public.content_reports') IS NULL THEN
+    CREATE TABLE content_reports (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      reporter_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      post_id UUID REFERENCES posts(id) ON DELETE SET NULL,
+      reported_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      reason TEXT NOT NULL CHECK (reason IN (
+        'illegal_content',
+        'severe_violence',
+        'non_consensual_sexual_content',
+        'harassment',
+        'spam',
+        'other'
+      )),
+      details TEXT,
+      status TEXT NOT NULL DEFAULT 'open' CHECK (status IN (
+        'open',
+        'in_review',
+        'resolved',
+        'dismissed'
+      )),
+      content_snapshot TEXT NOT NULL,
+      topic_snapshot TEXT,
+      author_username_snapshot TEXT,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+    CREATE UNIQUE INDEX content_reports_open_reporter_post_uidx
+    ON content_reports (reporter_id, post_id)
+    WHERE status = 'open';
+    CREATE INDEX content_reports_status_created_at_idx
+    ON content_reports (status, created_at DESC);
+    CREATE INDEX content_reports_post_id_idx
+    ON content_reports (post_id);
+  END IF;
 END
 $$;
 SQL

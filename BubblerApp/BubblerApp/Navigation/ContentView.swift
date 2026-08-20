@@ -29,6 +29,7 @@ struct ContentView: View {
         .task(id: authSession.accessToken) {
             if authSession.isSignedIn {
                 await likedPosts.refresh()
+                await authSession.refreshStaffAccess()
             } else {
                 likedPosts.clear()
             }

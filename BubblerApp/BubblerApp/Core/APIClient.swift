@@ -89,6 +89,10 @@ private struct PasswordUpdateBody: Encodable {
     }
 }
 
+private struct StaffReportStatusUpdateBody: Encodable {
+    let status: String
+}
+
 private struct APIErrorBody: Decodable {
     let detail: String
 }
@@ -391,6 +395,33 @@ enum APIClient {
             method: "DELETE"
         )
         return try apiJSONDecoder.decode(PublicUser.self, from: data)
+    }
+
+    static func listStaffReports(status: StaffReportStatus = .open) async throws -> [StaffReport] {
+        let data = try await authorizedRequest(
+            path: "admin/reports",
+            queryItems: [URLQueryItem(name: "status", value: status.rawValue)]
+        )
+        return try apiJSONDecoder.decode([StaffReport].self, from: data)
+    }
+
+    static func getStaffReport(id: String) async throws -> StaffReport {
+        let data = try await authorizedRequest(path: "admin/reports/\(id)")
+        return try apiJSONDecoder.decode(StaffReport.self, from: data)
+    }
+
+    static func updateStaffReportStatus(
+        id: String,
+        status: StaffReportStatus
+    ) async throws -> StaffReport {
+        let body = try JSONEncoder().encode(StaffReportStatusUpdateBody(status: status.rawValue))
+        let data = try await authorizedRequest(
+            path: "admin/reports/\(id)",
+            method: "PATCH",
+            body: body,
+            contentType: "application/json"
+        )
+        return try apiJSONDecoder.decode(StaffReport.self, from: data)
     }
 
     private static let apiJSONDecoder: JSONDecoder = {

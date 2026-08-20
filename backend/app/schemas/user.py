@@ -5,6 +5,10 @@ from pydantic import BaseModel, EmailStr, Field, field_serializer, model_validat
 
 from app.db.datetime_utils import ensure_utc, utc_iso_z
 
+UserRole = Literal["user", "staff"]
+DEFAULT_USER_ROLE: UserRole = "user"
+STAFF_ROLE: UserRole = "staff"
+
 DEFAULT_STRATEGY_WEIGHTS: dict[str, float] = {
     "similar": 0.4,
     "graph": 0.25,
@@ -32,6 +36,7 @@ class UserInfo(BaseModel):
     id: int
     username: str
     email: EmailStr
+    role: UserRole = DEFAULT_USER_ROLE
     created_at: datetime.datetime
 
     def model_post_init(self, __context) -> None:

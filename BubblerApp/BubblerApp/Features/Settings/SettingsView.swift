@@ -109,6 +109,17 @@ struct SettingsView: View {
                         }
                         .buttonStyle(.plain)
                     }
+
+                    if authSession.isStaff {
+                        settingsSection(title: "Staff") {
+                            NavigationLink {
+                                StaffReportsView()
+                            } label: {
+                                settingsRow(icon: "flag.fill", title: "Reports")
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
                     
                     // bubbler system
                     settingsSection(title: "Bubble System") {
@@ -182,6 +193,9 @@ struct SettingsView: View {
         .onDisappear {
             dataExport.finishSharing()
             DataExportFileStore.removeAllExports()
+        }
+        .task {
+            await authSession.refreshStaffAccess()
         }
     }
     

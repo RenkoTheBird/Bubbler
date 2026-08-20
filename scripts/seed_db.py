@@ -220,6 +220,24 @@ async def ensure_schema(pool: asyncpg.Pool) -> None:
                 "ALTER TABLE users ALTER COLUMN date_of_birth SET NOT NULL"
             )
 
+        if await _table_exists(conn, "users") and not await _column_exists(
+            conn, "users", "role"
+        ):
+            await conn.execute(
+                "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'"
+            )
+
+        if await _table_exists(conn, "users") and not await _constraint_exists(
+            conn, "users_role_check"
+        ):
+            await conn.execute(
+                """
+                ALTER TABLE users
+                ADD CONSTRAINT users_role_check
+                CHECK (role IN ('user', 'staff'))
+                """
+            )
+
         if not await _column_exists(conn, "topics", "embedding"):
             await conn.execute("ALTER TABLE topics ADD COLUMN embedding vector(384)")
 

@@ -4,6 +4,7 @@ from app.db.jsonb import normalize_strategy_weights, to_jsonb
 from app.db.datetime_utils import ensure_utc, utc_iso_z
 from app.schemas.user import (
     DEFAULT_STRATEGY_WEIGHTS,
+    STAFF_ROLE,
     BlockedUserInfo,
     PublicUserInfo,
     TopicPreference,
@@ -45,6 +46,7 @@ class UserRepository:
             id=row["id"],
             username=row["username"],
             email=row["email"],
+            role=row["role"],
             created_at=ensure_utc(row["created_at"]),
         )
 
@@ -113,11 +115,19 @@ class UserRepository:
                 pref.preference_type,
             )
 
+    async def is_staff(self, user_id: int) -> bool:
+        async with self.pool.acquire() as conn:
+            role = await conn.fetchval(
+                "SELECT role FROM users WHERE id = $1",
+                user_id,
+            )
+        return role == STAFF_ROLE
+
     async def get_profile_info(self, user_id: int) -> UserInfo | None:
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow(
                 """
-                SELECT id, username, email, created_at
+                SELECT id, username, email, role, created_at
                 FROM users
                 WHERE id = $1
                 """,
@@ -241,7 +251,7 @@ class UserRepository:
                 UPDATE users
                 SET email = lower($1)
                 WHERE id = $2
-                RETURNING id, username, email, created_at
+                RETURNING id, username, email, role, created_at
                 """,
                 email,
                 user_id,

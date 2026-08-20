@@ -27,6 +27,7 @@ enum AgeGate {
 final class AuthSession: ObservableObject {
     @Published private(set) var accessToken: String?
     @Published private(set) var userId: Int?
+    @Published private(set) var isStaff = false
     @Published var authError: String?
     @Published var successMessage: String?
     @Published var isWorking = false
@@ -38,6 +39,22 @@ final class AuthSession: ObservableObject {
     init() {
         accessToken = KeychainStore.loadAccessToken()
         userId = Self.restoredUserId(from: accessToken)
+    }
+
+    func refreshStaffAccess() async {
+        guard isSignedIn else {
+            isStaff = false
+            return
+        }
+
+        do {
+            let profile = try await APIClient.getProfile()
+            isStaff = profile.isStaff
+        } catch APIClientError.unauthorized {
+            signOut()
+        } catch {
+            // Keep the last known staff flag on transient failures.
+        }
     }
 
     func signIn(email: String, password: String) async {
@@ -126,6 +143,7 @@ final class AuthSession: ObservableObject {
         KeychainStore.deleteAccessToken()
         accessToken = nil
         userId = nil
+        isStaff = false
         authError = nil
         successMessage = nil
     }
@@ -152,6 +170,7 @@ final class AuthSession: ObservableObject {
             try KeychainStore.saveAccessToken(response.accessToken)
             accessToken = response.accessToken
             userId = response.userId
+            await refreshStaffAccess()
             return true
         } catch APIClientError.unauthorized {
             authError = unauthorizedErrorMessage

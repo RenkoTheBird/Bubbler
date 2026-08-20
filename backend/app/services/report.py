@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from fastapi import HTTPException
 
 from app.repositories.report_repo import (
@@ -5,7 +7,12 @@ from app.repositories.report_repo import (
     DuplicateOpenReport,
     ReportRateLimited,
 )
-from app.schemas.report import Report, ReportCreate
+from app.schemas.report import (
+    Report,
+    ReportCreate,
+    ReportStatus,
+    StaffReport,
+)
 
 
 class ReportService:
@@ -37,4 +44,26 @@ class ReportService:
             ) from None
         if report is None:
             raise HTTPException(status_code=404, detail="Post not found")
+        return report
+
+    async def list_staff_reports(
+        self,
+        status: ReportStatus | None = None,
+    ) -> list[StaffReport]:
+        return await self.report_repo.list_staff_reports(status=status)
+
+    async def get_staff_report(self, report_id: UUID) -> StaffReport:
+        report = await self.report_repo.get_staff_report(report_id)
+        if report is None:
+            raise HTTPException(status_code=404, detail="Report not found")
+        return report
+
+    async def update_staff_report_status(
+        self,
+        report_id: UUID,
+        status: ReportStatus,
+    ) -> StaffReport:
+        report = await self.report_repo.update_staff_report_status(report_id, status)
+        if report is None:
+            raise HTTPException(status_code=404, detail="Report not found")
         return report

@@ -60,3 +60,32 @@ class Report(BaseModel):
     @field_serializer("created_at")
     def serialize_created_at(self, value: datetime.datetime) -> str:
         return utc_iso_z(value)
+
+
+class StaffReport(BaseModel):
+    """Staff review ticket with frozen snapshots and identity fields."""
+
+    id: str
+    reporter_id: Optional[int] = None
+    post_id: Optional[str] = None
+    reported_user_id: Optional[int] = None
+    reason: ReportReason
+    details: Optional[str] = None
+    status: ReportStatus
+    content_snapshot: str
+    topic_snapshot: Optional[str] = None
+    author_username_snapshot: Optional[str] = None
+    created_at: datetime.datetime
+
+    def model_post_init(self, __context) -> None:
+        object.__setattr__(self, "created_at", ensure_utc(self.created_at))
+
+    @field_serializer("created_at")
+    def serialize_created_at(self, value: datetime.datetime) -> str:
+        return utc_iso_z(value)
+
+
+class StaffReportStatusUpdate(BaseModel):
+    """Triage / close a ticket without enforcement actions (those stay L7)."""
+
+    status: ReportStatus

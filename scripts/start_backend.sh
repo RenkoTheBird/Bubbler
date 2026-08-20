@@ -189,6 +189,24 @@ BEGIN
 
   ALTER TABLE users ALTER COLUMN date_of_birth SET NOT NULL;
 
+  IF NOT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'users'
+      AND column_name = 'role'
+  ) THEN
+    ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'users_role_check'
+  ) THEN
+    ALTER TABLE users
+    ADD CONSTRAINT users_role_check
+    CHECK (role IN ('user', 'staff'));
+  END IF;
+
   IF to_regclass('public.user_blocks') IS NULL THEN
     CREATE TABLE user_blocks (
       blocker_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

@@ -1,3 +1,6 @@
+from app.schemas.user import DEFAULT_USER_ROLE
+
+
 class AuthRepository:
 
     def __init__(self, pool):
@@ -20,12 +23,13 @@ class AuthRepository:
         async with self.pool.acquire() as conn:
             return await conn.fetchval(
                 """
-                INSERT INTO users (username, email, password, date_of_birth)
-                VALUES ($1, lower($2), $3, $4)
+                INSERT INTO users (username, email, password, date_of_birth, role)
+                VALUES ($1, lower($2), $3, $4, $5)
                 RETURNING id
                 """,
                 username,
                 email,
                 password,
                 date_of_birth,
+                DEFAULT_USER_ROLE,
             )

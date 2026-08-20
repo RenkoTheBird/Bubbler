@@ -1,10 +1,25 @@
 from datetime import datetime, timezone
+from uuid import UUID
 
 from asyncpg.exceptions import UniqueViolationError
 
 from app.db.datetime_utils import ensure_utc
 from app.db.feed_sql import POSTS_WITH_TOPIC_VIEW
-from app.schemas.report import Report
+from app.schemas.report import Report, ReportStatus, StaffReport
+
+_STAFF_REPORT_COLUMNS = """
+    id,
+    reporter_id,
+    post_id,
+    reported_user_id,
+    reason,
+    details,
+    status,
+    content_snapshot,
+    topic_snapshot,
+    author_username_snapshot,
+    created_at
+"""
 
 
 # UTC calendar-day cap: one report per reporter per reported user.
@@ -144,3 +159,77 @@ class ReportRepository:
                     raise ReportRateLimited()
 
                 return self._row_to_report(row)
+
+    def _row_to_staff_report(self, row) -> StaffReport:
+        return StaffReport(
+            id=str(row["id"]),
+            reporter_id=row["reporter_id"],
+            post_id=str(row["post_id"]) if row["post_id"] is not None else None,
+            reported_user_id=row["reported_user_id"],
+            reason=row["reason"],
+            details=row["details"],
+            status=row["status"],
+            content_snapshot=row["content_snapshot"],
+            topic_snapshot=row["topic_snapshot"],
+            author_username_snapshot=row["author_username_snapshot"],
+            created_at=ensure_utc(row["created_at"]),
+        )
+
+    async def list_staff_reports(
+        self,
+        status: ReportStatus | None = None,
+    ) -> list[StaffReport]:
+        async with self.pool.acquire() as conn:
+            if status is None:
+                rows = await conn.fetch(
+                    f"""
+                    SELECT {_STAFF_REPORT_COLUMNS}
+                    FROM content_reports
+                    ORDER BY created_at DESC, id DESC
+                    """
+                )
+            else:
+                rows = await conn.fetch(
+                    f"""
+                    SELECT {_STAFF_REPORT_COLUMNS}
+                    FROM content_reports
+                    WHERE status = $1
+                    ORDER BY created_at DESC, id DESC
+                    """,
+                    status,
+                )
+        return [self._row_to_staff_report(row) for row in rows]
+
+    async def get_staff_report(self, report_id: UUID) -> StaffReport | None:
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                f"""
+                SELECT {_STAFF_REPORT_COLUMNS}
+                FROM content_reports
+                WHERE id = $1
+                """,
+                report_id,
+            )
+        if row is None:
+            return None
+        return self._row_to_staff_report(row)
+
+    async def update_staff_report_status(
+        self,
+        report_id: UUID,
+        status: ReportStatus,
+    ) -> StaffReport | None:
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                f"""
+                UPDATE content_reports
+                SET status = $2
+                WHERE id = $1
+                RETURNING {_STAFF_REPORT_COLUMNS}
+                """,
+                report_id,
+                status,
+            )
+        if row is None:
+            return None
+        return self._row_to_staff_report(row)

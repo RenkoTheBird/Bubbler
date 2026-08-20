@@ -5,6 +5,7 @@ import asyncpg
 import logging
 
 # Routes
+from app.routes.admin import create_admin_router
 from app.routes.auth import create_auth_router
 from app.routes.feed import create_feed_router
 from app.routes.graph import create_graph_router
@@ -38,7 +39,7 @@ from .repositories.search_repo import SearchRepository
 from .repositories.user_repo import UserRepository
 
 # Dependencies
-from app.deps import get_current_user_id
+from app.deps import create_require_staff, get_current_user_id
 
 # grab logger
 logger = logging.getLogger(__name__)
@@ -91,7 +92,9 @@ async def lifespan(fastapi: FastAPI):
     )
 
     # start routers
+    require_staff = create_require_staff(user_repo)
     auth_router = create_auth_router(auth_service)
+    admin_router = create_admin_router(report_service, require_staff)
     feed_router = create_feed_router(feed_service, get_current_user_id)
     graph_router = create_graph_router(feed_service, get_current_user_id)  # graph routes use feed service
     search_router = create_search_router(search_service, get_current_user_id)
@@ -102,6 +105,7 @@ async def lifespan(fastapi: FastAPI):
 
     # register routers
     fastapi.include_router(auth_router, prefix="/auth", tags=["auth"])
+    fastapi.include_router(admin_router, prefix="/admin", tags=["admin"])
     fastapi.include_router(feed_router, prefix="/feed", tags=["feed"])
     fastapi.include_router(graph_router, prefix="/graph", tags=["graph"])
     fastapi.include_router(search_router, tags=["search"])

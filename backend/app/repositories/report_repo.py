@@ -5,7 +5,7 @@ from asyncpg.exceptions import UniqueViolationError
 
 from app.db.datetime_utils import ensure_utc
 from app.db.feed_sql import POSTS_WITH_TOPIC_VIEW
-from app.schemas.report import Report, ReportStatus, StaffReport
+from app.schemas.report import Report, ReportReason, ReportStatus, StaffReport
 
 _STAFF_REPORT_COLUMNS = """
     id,
@@ -22,7 +22,8 @@ _STAFF_REPORT_COLUMNS = """
 """
 
 
-# UTC calendar-day cap: one report per reporter per reported user.
+# UTC calendar-day caps: global flood control + per-target harassment control.
+REPORTS_PER_REPORTER_PER_DAY = 20
 REPORTS_PER_REPORTED_USER_PER_DAY = 1
 
 
@@ -35,7 +36,7 @@ class DuplicateOpenReport(Exception):
 
 
 class ReportRateLimited(Exception):
-    """Raised when the caller has already reported this user today (UTC)."""
+    """Raised when the caller has exhausted their report quota for today (UTC)."""
 
 
 class ReportRepository:
@@ -51,6 +52,27 @@ class ReportRepository:
             status=row["status"],
             created_at=ensure_utc(row["created_at"]),
         )
+
+    async def _consume_reporter_daily_quota(self, conn, reporter_id: int) -> bool:
+        """Atomically consume one global report slot for this reporter on the UTC day.
+
+        Returns False when the reporter is already at REPORTS_PER_REPORTER_PER_DAY.
+        """
+        utc_day = datetime.now(timezone.utc).date()
+        row = await conn.fetchrow(
+            """
+            INSERT INTO reporter_daily_limits (reporter_id, day, report_count)
+            VALUES ($1, $2, 1)
+            ON CONFLICT (reporter_id, day)
+            DO UPDATE SET report_count = reporter_daily_limits.report_count + 1
+            WHERE reporter_daily_limits.report_count < $3
+            RETURNING report_count
+            """,
+            reporter_id,
+            utc_day,
+            REPORTS_PER_REPORTER_PER_DAY,
+        )
+        return row is not None
 
     async def _consume_report_quota(self, conn, reporter_id: int, reported_user_id: int) -> bool:
         """Atomically consume one report slot for this reported user on the UTC day.
@@ -86,7 +108,8 @@ class ReportRepository:
     ) -> Report | None:
         """Create an open report with a frozen post snapshot.
 
-        Does not touch blocks, feeds, or notify the author.
+        Does not hide/delete the post, touch feeds, or notify the author.
+        Reporter-facing responses never include other reporters' tickets.
 
         Returns None when the post is missing.
         Raises CannotReportOwnPost, DuplicateOpenReport, or ReportRateLimited.
@@ -153,6 +176,8 @@ class ReportRepository:
                 if row is None:
                     raise DuplicateOpenReport()
 
+                if not await self._consume_reporter_daily_quota(conn, reporter_id):
+                    raise ReportRateLimited()
                 if not await self._consume_report_quota(
                     conn, reporter_id, post["user_id"]
                 ):
@@ -178,9 +203,10 @@ class ReportRepository:
     async def list_staff_reports(
         self,
         status: ReportStatus | None = None,
+        reason: ReportReason | None = None,
     ) -> list[StaffReport]:
         async with self.pool.acquire() as conn:
-            if status is None:
+            if status is None and reason is None:
                 rows = await conn.fetch(
                     f"""
                     SELECT {_STAFF_REPORT_COLUMNS}
@@ -188,7 +214,7 @@ class ReportRepository:
                     ORDER BY created_at DESC, id DESC
                     """
                 )
-            else:
+            elif status is not None and reason is None:
                 rows = await conn.fetch(
                     f"""
                     SELECT {_STAFF_REPORT_COLUMNS}
@@ -197,6 +223,27 @@ class ReportRepository:
                     ORDER BY created_at DESC, id DESC
                     """,
                     status,
+                )
+            elif status is None and reason is not None:
+                rows = await conn.fetch(
+                    f"""
+                    SELECT {_STAFF_REPORT_COLUMNS}
+                    FROM content_reports
+                    WHERE reason = $1
+                    ORDER BY created_at DESC, id DESC
+                    """,
+                    reason,
+                )
+            else:
+                rows = await conn.fetch(
+                    f"""
+                    SELECT {_STAFF_REPORT_COLUMNS}
+                    FROM content_reports
+                    WHERE status = $1 AND reason = $2
+                    ORDER BY created_at DESC, id DESC
+                    """,
+                    status,
+                    reason,
                 )
         return [self._row_to_staff_report(row) for row in rows]
 

@@ -13,6 +13,15 @@ final class ReportPostViewModel: ObservableObject {
         selectedReason != nil && !isSubmitting
     }
 
+    /// Cap and treat notes as untrusted plain text (backend enforces the same limit).
+    func updateComments(_ value: String) {
+        if value.count <= ReportDetailsLimits.maxLength {
+            comments = value
+        } else {
+            comments = String(value.prefix(ReportDetailsLimits.maxLength))
+        }
+    }
+
     /// Report submit is UI-only until the review-queue API lands.
     /// When [alsoBlockUser] is on, the existing block endpoint is called immediately.
     func submit(blockUsername: String?, using authSession: AuthSession) async -> Bool {

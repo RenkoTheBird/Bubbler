@@ -479,12 +479,38 @@ async def ensure_schema(pool: asyncpg.Pool) -> None:
                 ON content_reports (post_id)
                 """
             )
-        elif not await _constraint_exists(conn, "content_reports_details_length_check"):
             await conn.execute(
                 """
-                ALTER TABLE content_reports
-                ADD CONSTRAINT content_reports_details_length_check
-                CHECK (details IS NULL OR char_length(details) <= 2000)
+                CREATE INDEX content_reports_reason_status_created_at_idx
+                ON content_reports (reason, status, created_at DESC)
+                """
+            )
+        else:
+            if not await _constraint_exists(conn, "content_reports_details_length_check"):
+                await conn.execute(
+                    """
+                    ALTER TABLE content_reports
+                    ADD CONSTRAINT content_reports_details_length_check
+                    CHECK (details IS NULL OR char_length(details) <= 2000)
+                    """
+                )
+            if not await _index_exists(conn, "content_reports_reason_status_created_at_idx"):
+                await conn.execute(
+                    """
+                    CREATE INDEX content_reports_reason_status_created_at_idx
+                    ON content_reports (reason, status, created_at DESC)
+                    """
+                )
+
+        if not await _table_exists(conn, "reporter_daily_limits"):
+            await conn.execute(
+                """
+                CREATE TABLE reporter_daily_limits (
+                    reporter_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    day DATE NOT NULL,
+                    report_count INTEGER NOT NULL DEFAULT 0 CHECK (report_count >= 0),
+                    PRIMARY KEY (reporter_id, day)
+                )
                 """
             )
 

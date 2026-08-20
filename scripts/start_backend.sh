@@ -253,12 +253,33 @@ BEGIN
     ON content_reports (status, created_at DESC);
     CREATE INDEX content_reports_post_id_idx
     ON content_reports (post_id);
-  ELSIF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'content_reports_details_length_check'
-  ) THEN
-    ALTER TABLE content_reports
-    ADD CONSTRAINT content_reports_details_length_check
-    CHECK (details IS NULL OR char_length(details) <= 2000);
+    CREATE INDEX content_reports_reason_status_created_at_idx
+    ON content_reports (reason, status, created_at DESC);
+  ELSE
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_constraint WHERE conname = 'content_reports_details_length_check'
+    ) THEN
+      ALTER TABLE content_reports
+      ADD CONSTRAINT content_reports_details_length_check
+      CHECK (details IS NULL OR char_length(details) <= 2000);
+    END IF;
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_indexes
+      WHERE schemaname = 'public'
+        AND indexname = 'content_reports_reason_status_created_at_idx'
+    ) THEN
+      CREATE INDEX content_reports_reason_status_created_at_idx
+      ON content_reports (reason, status, created_at DESC);
+    END IF;
+  END IF;
+
+  IF to_regclass('public.reporter_daily_limits') IS NULL THEN
+    CREATE TABLE reporter_daily_limits (
+      reporter_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      day DATE NOT NULL,
+      report_count INTEGER NOT NULL DEFAULT 0 CHECK (report_count >= 0),
+      PRIMARY KEY (reporter_id, day)
+    );
   END IF;
 
   IF to_regclass('public.user_report_limits') IS NULL THEN

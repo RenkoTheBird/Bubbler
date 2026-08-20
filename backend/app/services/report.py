@@ -10,6 +10,7 @@ from app.repositories.report_repo import (
 from app.schemas.report import (
     Report,
     ReportCreate,
+    ReportReason,
     ReportStatus,
     StaffReport,
 )
@@ -33,6 +34,7 @@ class ReportService:
                 detail="You cannot report your own post",
             ) from None
         except DuplicateOpenReport:
+            # Own open ticket only — never reveal whether others reported this post.
             raise HTTPException(
                 status_code=409,
                 detail="You already have an open report for this post",
@@ -40,7 +42,7 @@ class ReportService:
         except ReportRateLimited:
             raise HTTPException(
                 status_code=429,
-                detail="You can only report this user once per day. Try again tomorrow.",
+                detail="Report limit reached. Try again tomorrow.",
             ) from None
         if report is None:
             raise HTTPException(status_code=404, detail="Post not found")
@@ -49,8 +51,9 @@ class ReportService:
     async def list_staff_reports(
         self,
         status: ReportStatus | None = None,
+        reason: ReportReason | None = None,
     ) -> list[StaffReport]:
-        return await self.report_repo.list_staff_reports(status=status)
+        return await self.report_repo.list_staff_reports(status=status, reason=reason)
 
     async def get_staff_report(self, report_id: UUID) -> StaffReport:
         report = await self.report_repo.get_staff_report(report_id)

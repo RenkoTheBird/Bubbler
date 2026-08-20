@@ -9,6 +9,9 @@ from app.db.datetime_utils import ensure_utc, utc_iso_z
 # Cap for untrusted reporter notes; matches content_reports_details_length_check.
 DETAILS_MAX_LENGTH = 2000
 
+# Severe-illegal bucket for CSAM / hard-illegal isolation (L11 escalation; not auto-action).
+SEVERE_ILLEGAL_REASON = "illegal_content"
+
 REPORT_REASONS = (
     "illegal_content",
     "severe_violence",
@@ -30,6 +33,25 @@ ReportReason = Literal[
 ReportStatus = Literal["open", "in_review", "resolved", "dismissed"]
 
 
+def sanitize_report_details(value: str | None) -> str | None:
+    """Normalize untrusted reporter notes: strip, drop controls, enforce emptiness → None."""
+    if value is None:
+        return None
+
+    def _keep(ch: str) -> bool:
+        if ch in "\n\t":
+            return True
+        code = ord(ch)
+        # Drop C0/C1 controls and DEL; keep printable ASCII + Unicode.
+        if code < 32 or code == 127 or 128 <= code <= 159:
+            return False
+        return True
+
+    cleaned = "".join(ch for ch in value if _keep(ch))
+    stripped = cleaned.strip()
+    return stripped or None
+
+
 class ReportCreate(BaseModel):
     post_id: UUID
     reason: ReportReason
@@ -38,10 +60,7 @@ class ReportCreate(BaseModel):
     @field_validator("details")
     @classmethod
     def normalize_details(cls, value: str | None) -> str | None:
-        if value is None:
-            return None
-        stripped = value.strip()
-        return stripped or None
+        return sanitize_report_details(value)
 
 
 class Report(BaseModel):

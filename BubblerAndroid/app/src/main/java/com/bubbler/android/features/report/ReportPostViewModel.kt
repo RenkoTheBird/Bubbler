@@ -2,6 +2,7 @@ package com.bubbler.android.features.report
 
 import com.bubbler.android.core.network.ApiException
 import com.bubbler.android.data.model.ReportReason
+import com.bubbler.android.data.model.ReportDetailsLimits
 import com.bubbler.android.data.repository.BlocksRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -38,7 +39,11 @@ class ReportPostViewModel {
     }
 
     fun updateComments(value: String) {
-        _comments.value = value
+        _comments.value = if (value.length <= ReportDetailsLimits.MAX_LENGTH) {
+            value
+        } else {
+            value.take(ReportDetailsLimits.MAX_LENGTH)
+        }
     }
 
     fun setAlsoBlockUser(value: Boolean) {

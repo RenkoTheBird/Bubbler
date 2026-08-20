@@ -397,10 +397,17 @@ enum APIClient {
         return try apiJSONDecoder.decode(PublicUser.self, from: data)
     }
 
-    static func listStaffReports(status: StaffReportStatus = .open) async throws -> [StaffReport] {
+    static func listStaffReports(
+        status: StaffReportStatus = .open,
+        reason: String? = nil
+    ) async throws -> [StaffReport] {
+        var queryItems = [URLQueryItem(name: "status", value: status.rawValue)]
+        if let reason, !reason.isEmpty {
+            queryItems.append(URLQueryItem(name: "reason", value: reason))
+        }
         let data = try await authorizedRequest(
             path: "admin/reports",
-            queryItems: [URLQueryItem(name: "status", value: status.rawValue)]
+            queryItems: queryItems
         )
         return try apiJSONDecoder.decode([StaffReport].self, from: data)
     }

@@ -55,7 +55,22 @@ class StaffReportServiceTests(unittest.IsolatedAsyncioTestCase):
         result = await self.service.list_staff_reports(status="open")
 
         self.assertEqual(result, tickets)
-        self.repo.list_staff_reports.assert_awaited_once_with(status="open")
+        self.repo.list_staff_reports.assert_awaited_once_with(
+            status="open", reason=None
+        )
+
+    async def test_list_passes_severe_illegal_reason_filter(self):
+        tickets = [_staff_report(reason="illegal_content")]
+        self.repo.list_staff_reports.return_value = tickets
+
+        result = await self.service.list_staff_reports(
+            status="open", reason="illegal_content"
+        )
+
+        self.assertEqual(result, tickets)
+        self.repo.list_staff_reports.assert_awaited_once_with(
+            status="open", reason="illegal_content"
+        )
 
     async def test_get_missing_is_404(self):
         self.repo.get_staff_report.return_value = None

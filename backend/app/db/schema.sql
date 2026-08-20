@@ -216,7 +216,20 @@ ON content_reports (status, created_at DESC);
 CREATE INDEX content_reports_post_id_idx
 ON content_reports (post_id);
 
--- REPORT LIMITS (UTC calendar day; max 1 report per reporter per reported user)
+-- Isolate severe-illegal / CSAM-bucket tickets for staff (reason + status).
+CREATE INDEX content_reports_reason_status_created_at_idx
+ON content_reports (reason, status, created_at DESC);
+
+-- REPORT LIMITS (UTC calendar day)
+-- Global: max N reports per reporter per day (queue flood control).
+CREATE TABLE reporter_daily_limits (
+    reporter_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    day DATE NOT NULL,
+    report_count INTEGER NOT NULL DEFAULT 0 CHECK (report_count >= 0),
+    PRIMARY KEY (reporter_id, day)
+);
+
+-- Per target: max 1 report per reporter per reported user per day.
 CREATE TABLE user_report_limits (
     reporter_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     reported_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

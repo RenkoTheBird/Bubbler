@@ -52,6 +52,18 @@ class ReportCreateSchemaTests(unittest.TestCase):
                 details="x" * (DETAILS_MAX_LENGTH + 1),
             )
 
+    def test_strips_control_characters_from_details(self):
+        body = ReportCreate(
+            post_id=uuid4(),
+            reason="other",
+            details="hello\x00world\x07\nnext",
+        )
+        self.assertEqual(body.details, "helloworld\nnext")
+
+    def test_accepts_severe_illegal_bucket_reason(self):
+        body = ReportCreate(post_id=uuid4(), reason="illegal_content")
+        self.assertEqual(body.reason, "illegal_content")
+
 
 class ReportServiceTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
@@ -89,8 +101,9 @@ class ReportServiceTests(unittest.IsolatedAsyncioTestCase):
             await self.service.create_report(7, self.body)
         self.assertEqual(raised.exception.status_code, 409)
 
-    async def test_daily_per_user_quota_is_429(self):
+    async def test_daily_quota_is_429(self):
         self.repo.create_report.side_effect = ReportRateLimited()
         with self.assertRaises(HTTPException) as raised:
             await self.service.create_report(7, self.body)
         self.assertEqual(raised.exception.status_code, 429)
+        self.assertIn("Report limit", raised.exception.detail)

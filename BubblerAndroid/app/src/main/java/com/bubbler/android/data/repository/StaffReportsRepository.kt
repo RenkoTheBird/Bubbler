@@ -4,6 +4,7 @@ import com.bubbler.android.core.auth.TokenStore
 import com.bubbler.android.core.network.ApiClient
 import com.bubbler.android.core.network.Endpoints
 import com.bubbler.android.data.model.StaffReport
+import com.bubbler.android.data.model.StaffReportReasonFilter
 import com.bubbler.android.data.model.StaffReportStatus
 import com.bubbler.android.data.model.StaffReportStatusUpdateBody
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -15,9 +16,10 @@ open class StaffReportsRepository(
 ) {
     open suspend fun listReports(
         status: StaffReportStatus = StaffReportStatus.OPEN,
+        reason: StaffReportReasonFilter = StaffReportReasonFilter.ALL,
     ): List<StaffReport> =
         apiClient.get(
-            Endpoints.adminReports(status.apiValue),
+            Endpoints.adminReports(status.apiValue, reason.apiValue),
             token = tokenStore.requireAccessToken(),
         )
 

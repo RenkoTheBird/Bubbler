@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.bubbler.android.core.auth.AuthSession
 import com.bubbler.android.core.network.ApiException
 import com.bubbler.android.data.model.StaffReport
+import com.bubbler.android.data.model.StaffReportReasonFilter
 import com.bubbler.android.data.model.StaffReportStatus
 import com.bubbler.android.data.repository.StaffReportsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,6 +23,9 @@ class StaffReportsViewModel(
 
     private val _selectedStatus = MutableStateFlow(StaffReportStatus.OPEN)
     val selectedStatus: StateFlow<StaffReportStatus> = _selectedStatus.asStateFlow()
+
+    private val _selectedReason = MutableStateFlow(StaffReportReasonFilter.ALL)
+    val selectedReason: StateFlow<StaffReportReasonFilter> = _selectedReason.asStateFlow()
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -49,6 +53,17 @@ class StaffReportsViewModel(
         loadReportsInternal(force = true)
     }
 
+    fun changeReasonFilter(reason: StaffReportReasonFilter) {
+        if (_selectedReason.value == reason && _reports.value.isNotEmpty()) return
+        _selectedReason.value = reason
+        viewModelScope.launch { loadReportsInternal(force = true) }
+    }
+
+    suspend fun changeReasonFilterAwait(reason: StaffReportReasonFilter) {
+        _selectedReason.value = reason
+        loadReportsInternal(force = true)
+    }
+
     private suspend fun loadReportsInternal(force: Boolean) {
         if (!force && _reports.value.isNotEmpty()) return
 
@@ -57,7 +72,10 @@ class StaffReportsViewModel(
         _errorMessage.value = null
 
         try {
-            _reports.value = staffReportsRepository.listReports(status = _selectedStatus.value)
+            _reports.value = staffReportsRepository.listReports(
+                status = _selectedStatus.value,
+                reason = _selectedReason.value,
+            )
         } catch (e: Exception) {
             handleSessionError(e, fallbackMessage = "We couldn't load the report queue.")
         }

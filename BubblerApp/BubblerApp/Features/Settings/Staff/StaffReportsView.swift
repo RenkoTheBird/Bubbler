@@ -21,6 +21,7 @@ struct StaffReportsView: View {
                 VStack(spacing: 20) {
                     headerSection
                     statusFilter
+                    reasonFilter
 
                     if let errorMessage = viewModel.errorMessage {
                         messageCard(title: viewModel.errorTitle, message: errorMessage)
@@ -91,6 +92,40 @@ struct StaffReportsView: View {
                             )
                     }
                     .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private var reasonFilter: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(StaffReportReasonFilter.allCases) { reason in
+                    Button {
+                        Task {
+                            await viewModel.changeReasonFilter(reason, using: authSession)
+                        }
+                    } label: {
+                        Text(reason.title)
+                            .font(.caption.bold())
+                            .foregroundColor(
+                                viewModel.selectedReason == reason
+                                    ? .black
+                                    : .white.opacity(0.85)
+                            )
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(
+                                Capsule()
+                                    .fill(
+                                        viewModel.selectedReason == reason
+                                            ? Color.white
+                                            : Color.white.opacity(0.12)
+                                    )
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(reason.title)
                 }
             }
         }

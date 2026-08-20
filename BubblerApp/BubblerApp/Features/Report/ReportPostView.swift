@@ -148,7 +148,12 @@ struct ReportPostView: View {
                 .font(.headline)
                 .foregroundColor(.white)
 
-            TextEditor(text: $viewModel.comments)
+            TextEditor(
+                text: Binding(
+                    get: { viewModel.comments },
+                    set: { viewModel.updateComments($0) }
+                )
+            )
                 .frame(minHeight: 120)
                 .scrollContentBackground(.hidden)
                 .padding(12)

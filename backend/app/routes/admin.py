@@ -2,7 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 
-from app.schemas.report import ReportStatus, StaffReportStatusUpdate
+from app.schemas.report import ReportReason, ReportStatus, StaffReportStatusUpdate
 from app.services.report import ReportService
 
 
@@ -15,9 +15,16 @@ def create_admin_router(report_service: ReportService, require_staff):
             default="open",
             description="Filter by ticket status (open, in_review, resolved, dismissed)",
         ),
+        reason: ReportReason | None = Query(
+            default=None,
+            description=(
+                "Optional reason filter. Use illegal_content to isolate the "
+                "severe-illegal / CSAM-bucket queue (escalation is L11)."
+            ),
+        ),
         _staff_id: int = Depends(require_staff),
     ):
-        return await report_service.list_staff_reports(status=status)
+        return await report_service.list_staff_reports(status=status, reason=reason)
 
     @router.get("/reports/{report_id}")
     async def get_report(

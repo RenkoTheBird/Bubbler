@@ -32,8 +32,8 @@ object Endpoints {
     fun adminReport(reportId: String): String =
         "admin/reports/${encodePathSegment(reportId)}"
 
-    fun adminReports(status: String): String =
-        withQuery(ADMIN_REPORTS, "status" to status)
+    fun adminReports(status: String, reason: String? = null): String =
+        withQuery(ADMIN_REPORTS, "status" to status, "reason" to reason)
 
     fun userProfile(username: String): String =
         "user/${encodePathSegment(username)}/profile"

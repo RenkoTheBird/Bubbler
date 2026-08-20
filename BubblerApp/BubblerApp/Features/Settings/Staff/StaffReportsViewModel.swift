@@ -1,10 +1,33 @@
 import Foundation
 import Combine
 
+/// Staff queue reason filter. `nil` = all reasons; illegal isolates the severe bucket.
+enum StaffReportReasonFilter: String, CaseIterable, Identifiable {
+    case all
+    case illegalContent = "illegal_content"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all: "All reasons"
+        case .illegalContent: "Illegal / CSAM"
+        }
+    }
+
+    var apiValue: String? {
+        switch self {
+        case .all: nil
+        case .illegalContent: rawValue
+        }
+    }
+}
+
 @MainActor
 final class StaffReportsViewModel: ObservableObject {
     @Published private(set) var reports: [StaffReport] = []
     @Published var selectedStatus: StaffReportStatus = .open
+    @Published var selectedReason: StaffReportReasonFilter = .all
     @Published private(set) var isLoading = false
     @Published var errorTitle = "Couldn't load reports"
     @Published var errorMessage: String?
@@ -19,7 +42,10 @@ final class StaffReportsViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            reports = try await APIClient.listStaffReports(status: selectedStatus)
+            reports = try await APIClient.listStaffReports(
+                status: selectedStatus,
+                reason: selectedReason.apiValue
+            )
             hasLoaded = true
         } catch {
             handle(error, using: authSession, fallbackMessage: "We couldn't load the report queue.")
@@ -31,6 +57,13 @@ final class StaffReportsViewModel: ObservableObject {
     func changeStatusFilter(_ status: StaffReportStatus, using authSession: AuthSession) async {
         guard selectedStatus != status || !hasLoaded else { return }
         selectedStatus = status
+        hasLoaded = false
+        await loadReports(using: authSession, force: true)
+    }
+
+    func changeReasonFilter(_ reason: StaffReportReasonFilter, using authSession: AuthSession) async {
+        guard selectedReason != reason || !hasLoaded else { return }
+        selectedReason = reason
         hasLoaded = false
         await loadReports(using: authSession, force: true)
     }

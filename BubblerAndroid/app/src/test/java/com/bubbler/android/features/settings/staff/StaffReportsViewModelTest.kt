@@ -6,6 +6,7 @@ import com.bubbler.android.core.auth.TokenStore
 import com.bubbler.android.core.network.ApiClient
 import com.bubbler.android.core.network.ApiException
 import com.bubbler.android.data.model.StaffReport
+import com.bubbler.android.data.model.StaffReportReasonFilter
 import com.bubbler.android.data.model.StaffReportStatus
 import com.bubbler.android.data.repository.AuthRepository
 import com.bubbler.android.data.repository.StaffReportsRepository
@@ -38,6 +39,7 @@ class StaffReportsViewModelTest {
 
         assertEquals(1, viewModel.reports.value.size)
         assertEquals(StaffReportStatus.OPEN, repository.lastListedStatus)
+        assertEquals(StaffReportReasonFilter.ALL, repository.lastListedReason)
         assertEquals(null, viewModel.errorMessage.value)
     }
 
@@ -49,6 +51,16 @@ class StaffReportsViewModelTest {
 
         assertEquals(StaffReportStatus.IN_REVIEW, viewModel.selectedStatus.value)
         assertEquals(StaffReportStatus.IN_REVIEW, repository.lastListedStatus)
+    }
+
+    @Test
+    fun changeReasonFilter_isolatesIllegalBucket() = runTest {
+        repository.reports = emptyList()
+
+        viewModel.changeReasonFilterAwait(StaffReportReasonFilter.ILLEGAL_CONTENT)
+
+        assertEquals(StaffReportReasonFilter.ILLEGAL_CONTENT, viewModel.selectedReason.value)
+        assertEquals(StaffReportReasonFilter.ILLEGAL_CONTENT, repository.lastListedReason)
     }
 
     @Test
@@ -101,9 +113,14 @@ class StaffReportsViewModelTest {
         var reports: List<StaffReport> = emptyList()
         var listError: Exception? = null
         var lastListedStatus: StaffReportStatus? = null
+        var lastListedReason: StaffReportReasonFilter? = null
 
-        override suspend fun listReports(status: StaffReportStatus): List<StaffReport> {
+        override suspend fun listReports(
+            status: StaffReportStatus,
+            reason: StaffReportReasonFilter,
+        ): List<StaffReport> {
             lastListedStatus = status
+            lastListedReason = reason
             listError?.let { throw it }
             return reports
         }

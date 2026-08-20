@@ -4,6 +4,7 @@ import android.content.SharedPreferences
 import com.bubbler.android.core.auth.TokenStore
 import com.bubbler.android.core.network.ApiClient
 import com.bubbler.android.core.network.ApiException
+import com.bubbler.android.data.model.ReportDetailsLimits
 import com.bubbler.android.data.model.ReportReason
 import com.bubbler.android.data.model.User
 import com.bubbler.android.data.repository.BlocksRepository
@@ -40,6 +41,14 @@ class ReportPostViewModelTest {
         viewModel.selectReason(ReportReason.HARASSMENT)
         assertNull(viewModel.errorMessage.value)
         assertEquals(ReportReason.HARASSMENT, viewModel.selectedReason.value)
+    }
+
+    @Test
+    fun updateComments_capsAtDetailsMaxLength() = runTest {
+        val viewModel = ReportPostViewModel()
+        val oversized = "x".repeat(ReportDetailsLimits.MAX_LENGTH + 50)
+        viewModel.updateComments(oversized)
+        assertEquals(ReportDetailsLimits.MAX_LENGTH, viewModel.comments.value.length)
     }
 
     @Test

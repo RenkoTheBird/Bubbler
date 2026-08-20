@@ -70,6 +70,12 @@ data class StaffReport(
         }
 }
 
+/** Staff queue reason filter. Null apiValue = all reasons. */
+enum class StaffReportReasonFilter(val title: String, val apiValue: String?) {
+    ALL("All reasons", null),
+    ILLEGAL_CONTENT("Illegal / CSAM", "illegal_content"),
+}
+
 @Serializable
 data class StaffReportStatusUpdateBody(
     val status: String,

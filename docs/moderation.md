@@ -213,6 +213,19 @@ Optional if low-cost: hash/signature blocklists for known severe illegal materia
 
 **Explicitly not required for launch:** full risk scoring, sensitivity slider, “why am I seeing this,” topic health dashboards, AI topic generation, quarantine automation.
 
+#### Reporter path (abuse & safety)
+
+Guarantees for `POST /user/me/reports` and the staff queue (roadmap L6):
+
+| Rule | Behavior |
+| --- | --- |
+| Cap details; untrusted text | Optional `details` ≤ 2000 chars; stripped of control characters; staff UIs render as plain text |
+| Rate-limit per reporter | Global daily cap per reporter **and** max one report per reporter→author per UTC day |
+| Deduplicate open reports | Unique open ticket per `(reporter_id, post_id)`; 409 only for *your* open duplicate |
+| No cross-reporter leak | Reporter responses never include other people’s tickets or aggregate “report counts”; public post payloads stay report-free |
+| No auto-hide / auto-delete | Filing a report only creates a queue ticket; removal is L7 / human review. Cheap automation (hash lists, etc.) stays optional above |
+| CSAM / severe-illegal isolation | Reason `illegal_content` is the severe-illegal bucket. Staff can filter `GET /admin/reports?reason=illegal_content`. Queue snapshots are **text-only** at launch (media is F6). Escalation / NCMEC procedure is L11 — not auto-takedown |
+
 ### Phase 1 — System-assisted topics
 
 Depends on / continues the FUTURE item in [`TODO`](TODO) (AI/ML topic determination; note there: continue from step 3.2).

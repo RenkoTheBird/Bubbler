@@ -48,6 +48,7 @@ import com.bubbler.android.core.auth.AuthSession
 import com.bubbler.android.core.auth.TokenStore
 import com.bubbler.android.core.network.ApiClient
 import com.bubbler.android.data.model.StaffReport
+import com.bubbler.android.data.model.StaffReportReasonFilter
 import com.bubbler.android.data.model.StaffReportStatus
 import com.bubbler.android.data.repository.StaffReportsRepository
 import com.bubbler.android.features.settings.SettingsGradient
@@ -86,6 +87,7 @@ fun StaffReportsScreen(
 
     val reports by viewModel.reports.collectAsStateWithLifecycle()
     val selectedStatus by viewModel.selectedStatus.collectAsStateWithLifecycle()
+    val selectedReason by viewModel.selectedReason.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val errorTitle by viewModel.errorTitle.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
@@ -147,6 +149,11 @@ fun StaffReportsScreen(
                 StatusFilterRow(
                     selected = selectedStatus,
                     onSelect = { status -> viewModel.changeStatusFilter(status) },
+                )
+
+                ReasonFilterRow(
+                    selected = selectedReason,
+                    onSelect = { reason -> viewModel.changeReasonFilter(reason) },
                 )
 
                 errorMessage?.let { message ->
@@ -224,6 +231,40 @@ private fun StatusFilterRow(
                         shape = RoundedCornerShape(50),
                     )
                     .clickable { onSelect(status) }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReasonFilterRow(
+    selected: StaffReportReasonFilter,
+    onSelect: (StaffReportReasonFilter) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        StaffReportReasonFilter.entries.forEach { reason ->
+            val isSelected = selected == reason
+            Text(
+                text = reason.title,
+                color = if (isSelected) Color.Black else Color.White.copy(alpha = 0.85f),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .semantics {
+                        role = Role.Button
+                        contentDescription = reason.title
+                    }
+                    .background(
+                        color = if (isSelected) Color.White else Color.White.copy(alpha = 0.12f),
+                        shape = RoundedCornerShape(50),
+                    )
+                    .clickable { onSelect(reason) }
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             )
         }

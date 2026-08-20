@@ -12,9 +12,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.bubbler.android.app.navigation.Routes
 import com.bubbler.android.core.auth.AuthSession
 import com.bubbler.android.core.auth.TokenStore
@@ -26,6 +28,9 @@ import com.bubbler.android.features.settings.account.PasswordSecurityScreen
 import com.bubbler.android.features.settings.account.ProfileInfoScreen
 import com.bubbler.android.features.settings.blocks.BlockedUsersScreen
 import com.bubbler.android.features.settings.preferences.PreferencesScreen
+import com.bubbler.android.features.settings.staff.StaffReportDetailScreen
+import com.bubbler.android.features.settings.staff.StaffReportsScreen
+import java.net.URLDecoder
 
 /**
  * Settings tab shell — hub list plus nested destinations (Phase 7 complete).
@@ -52,6 +57,7 @@ fun SettingsTabScreen(
     val isExporting by dataExportViewModel.isExporting.collectAsStateWithLifecycle()
     val exportErrorTitle by dataExportViewModel.errorTitle.collectAsStateWithLifecycle()
     val exportErrorMessage by dataExportViewModel.errorMessage.collectAsStateWithLifecycle()
+    val isStaff by authSession.isStaff.collectAsStateWithLifecycle()
 
     val createDocumentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json"),
@@ -63,6 +69,10 @@ fun SettingsTabScreen(
         dataExportViewModel.createDocumentRequests.collect { fileName ->
             createDocumentLauncher.launch(fileName)
         }
+    }
+
+    LaunchedEffect(Unit) {
+        authSession.refreshStaffAccess()
     }
 
     NavHost(
@@ -77,6 +87,7 @@ fun SettingsTabScreen(
                 },
                 onSignOut = { authSession.signOut() },
                 onExportData = { dataExportViewModel.startExport() },
+                isStaff = isStaff,
                 isExporting = isExporting,
                 exportErrorTitle = exportErrorTitle,
                 exportErrorMessage = exportErrorMessage,
@@ -125,6 +136,31 @@ fun SettingsTabScreen(
                 onBack = { navController.popBackStack() },
             )
         }
+        composable(Routes.SETTINGS_REPORTS) {
+            StaffReportsScreen(
+                authSession = authSession,
+                apiClient = apiClient,
+                onBack = { navController.popBackStack() },
+                onOpenReport = { report ->
+                    navController.navigate(Routes.settingsReportDetail(report.id))
+                },
+            )
+        }
+        composable(
+            route = Routes.SETTINGS_REPORT_DETAIL,
+            arguments = listOf(
+                navArgument("reportId") { type = NavType.StringType },
+            ),
+        ) { entry ->
+            val encodedId = entry.arguments?.getString("reportId").orEmpty()
+            val reportId = URLDecoder.decode(encodedId, Charsets.UTF_8.name())
+            StaffReportDetailScreen(
+                reportId = reportId,
+                authSession = authSession,
+                apiClient = apiClient,
+                onBack = { navController.popBackStack() },
+            )
+        }
     }
 }
 
@@ -136,4 +172,5 @@ private val SettingsDestination.route: String
         SettingsDestination.DeleteAccount -> Routes.SETTINGS_DELETE_ACCOUNT
         SettingsDestination.BlockedUsers -> Routes.SETTINGS_BLOCKED
         SettingsDestination.Preferences -> Routes.SETTINGS_PREFERENCES
+        SettingsDestination.Reports -> Routes.SETTINGS_REPORTS
     }

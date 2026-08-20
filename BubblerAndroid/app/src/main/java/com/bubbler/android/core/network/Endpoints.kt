@@ -24,8 +24,16 @@ object Endpoints {
     const val USER_ME_BLOCKS = "user/me/blocks"
     const val USER_ME_EXPORT = "user/me/export"
 
+    const val ADMIN_REPORTS = "admin/reports"
+
     fun graphNextPosts(postId: String): String =
         "graph/posts/${encodePathSegment(postId)}/next"
+
+    fun adminReport(reportId: String): String =
+        "admin/reports/${encodePathSegment(reportId)}"
+
+    fun adminReports(status: String): String =
+        withQuery(ADMIN_REPORTS, "status" to status)
 
     fun userProfile(username: String): String =
         "user/${encodePathSegment(username)}/profile"

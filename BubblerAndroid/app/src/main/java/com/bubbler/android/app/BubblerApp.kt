@@ -27,6 +27,7 @@ import com.bubbler.android.core.auth.AuthSession
 import com.bubbler.android.core.auth.TokenStore
 import com.bubbler.android.core.network.ApiClient
 import com.bubbler.android.data.repository.AuthRepository
+import com.bubbler.android.data.repository.UserRepository
 import kotlinx.coroutines.delay
 
 @Composable
@@ -36,13 +37,22 @@ fun BubblerApp(
 ) {
     val context = LocalContext.current
     val session = authSession ?: remember {
+        val tokenStore = TokenStore(context.applicationContext)
         AuthSession(
-            tokenStore = TokenStore(context.applicationContext),
+            tokenStore = tokenStore,
             authRepository = AuthRepository(apiClient),
+            userRepository = UserRepository(apiClient, tokenStore),
         )
     }
 
     val successMessage by session.successMessage.collectAsStateWithLifecycle()
+    val accessToken by session.accessToken.collectAsStateWithLifecycle()
+
+    LaunchedEffect(accessToken) {
+        if (accessToken != null) {
+            session.refreshStaffAccess()
+        }
+    }
 
     LaunchedEffect(successMessage) {
         if (successMessage != null) {

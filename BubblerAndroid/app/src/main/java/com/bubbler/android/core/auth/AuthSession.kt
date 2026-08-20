@@ -3,6 +3,7 @@ package com.bubbler.android.core.auth
 import com.bubbler.android.core.network.ApiException
 import com.bubbler.android.data.repository.AuthRepository
 import com.bubbler.android.data.repository.AuthResponse
+import com.bubbler.android.data.repository.UserRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,12 +35,16 @@ object AgeGate {
 class AuthSession(
     private val tokenStore: TokenStore,
     private val authRepository: AuthRepository,
+    private val userRepository: UserRepository? = null,
 ) {
     private val _accessToken = MutableStateFlow(tokenStore.loadAccessToken())
     val accessToken: StateFlow<String?> = _accessToken.asStateFlow()
 
     private val _userId = MutableStateFlow(restoredUserId(from = _accessToken.value))
     val userId: StateFlow<Int?> = _userId.asStateFlow()
+
+    private val _isStaff = MutableStateFlow(false)
+    val isStaff: StateFlow<Boolean> = _isStaff.asStateFlow()
 
     private val _authError = MutableStateFlow<String?>(null)
     val authError: StateFlow<String?> = _authError.asStateFlow()
@@ -127,10 +132,26 @@ class AuthSession(
         }
     }
 
+    suspend fun refreshStaffAccess() {
+        if (!isSignedIn) {
+            _isStaff.value = false
+            return
+        }
+        val repo = userRepository ?: return
+        try {
+            _isStaff.value = repo.getProfile().isStaff
+        } catch (e: ApiException.Unauthorized) {
+            signOut()
+        } catch (_: Exception) {
+            // Keep the last known staff flag on transient failures.
+        }
+    }
+
     fun signOut() {
         tokenStore.deleteAccessToken()
         _accessToken.value = null
         _userId.value = null
+        _isStaff.value = false
         _authError.value = null
         _successMessage.value = null
     }
@@ -155,6 +176,7 @@ class AuthSession(
             tokenStore.saveAccessToken(response.accessToken)
             _accessToken.value = response.accessToken
             _userId.value = response.userId
+            refreshStaffAccess()
             return true
         } catch (e: ApiException.Unauthorized) {
             _authError.value = unauthorizedErrorMessage ?: e.message

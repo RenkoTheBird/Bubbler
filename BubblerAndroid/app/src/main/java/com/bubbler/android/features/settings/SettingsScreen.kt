@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
@@ -65,6 +66,7 @@ fun SettingsScreen(
     onSignOut: () -> Unit,
     onExportData: () -> Unit,
     modifier: Modifier = Modifier,
+    isStaff: Boolean = false,
     isExporting: Boolean = false,
     exportErrorTitle: String = "Couldn't export data",
     exportErrorMessage: String? = null,
@@ -169,6 +171,16 @@ fun SettingsScreen(
                 )
             }
 
+            if (isStaff) {
+                SettingsSection(title = "Staff") {
+                    SettingsRow(
+                        icon = Icons.Filled.Flag,
+                        title = "Reports",
+                        onClick = { onNavigate(SettingsDestination.Reports) },
+                    )
+                }
+            }
+
             SettingsSection(title = "Bubble System") {
                 SettingsRow(
                     icon = Icons.Filled.Tune,
@@ -230,6 +242,7 @@ enum class SettingsDestination {
     DeleteAccount,
     BlockedUsers,
     Preferences,
+    Reports,
 }
 
 @Composable

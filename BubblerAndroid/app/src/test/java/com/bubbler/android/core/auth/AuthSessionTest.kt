@@ -177,6 +177,7 @@ class AuthSessionTest {
         session.signOut()
 
         assertFalse(session.isSignedIn)
+        assertFalse(session.isStaff.value)
         assertNull(store.loadAccessToken())
         assertNull(session.userId.value)
     }

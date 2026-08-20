@@ -7,7 +7,7 @@ import java.time.Instant
 /**
  * Consolidated user profile.
  *
- * - Own profile (`GET /user/me/profile`): [email] present, [isBlocked] absent/false.
+ * - Own profile (`GET /user/me/profile`): [email] present, [isBlocked] absent/false, [role] set.
  * - Public profile (`GET /user/{username}/profile`): no email, optional [isBlocked].
  */
 @Serializable
@@ -15,9 +15,13 @@ data class User(
     val id: Int,
     val username: String,
     val email: String? = null,
+    val role: String = "user",
     @SerialName("created_at")
     @Serializable(with = InstantIsoSerializer::class)
     val createdAt: Instant,
     @SerialName("is_blocked")
     val isBlocked: Boolean = false,
-)
+) {
+    val isStaff: Boolean
+        get() = role == "staff"
+}

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Bubbler checkpoint runner — roadmap Phases 0–6.
+Bubbler checkpoint runner — roadmap Phases 0–8.
 
 Prerequisites:
   - Postgres running (credentials in backend/.env, e.g. PORT=5433)
@@ -41,6 +41,12 @@ Phase 7 maps to post/topic features on the new schema (post_topics, topic_traini
   3    Add and remove secondary topics on a post
   4    Topic training events logged for user corrections
   5    iOS create-post flow sends topic with new posts
+
+Phase 8 maps to docs/moderation.md / roadmap L6 reports:
+  1    POST /user/me/reports creates an open ticket (no auto-hide)
+  2    Duplicate open / own-post / rate-limit error contracts
+  3    Staff queue list/get/patch (role-gated; illegal_content filter)
+  4    iOS staff queue + report reason wiring
 
 How to run
 Terminal 1 — start the API (if not already running):
@@ -119,6 +125,8 @@ SAMPLE_POSTS = list(SEEDED_SAMPLE_POSTS)
 REQUIRED_OPENAPI_PATHS = [
     "/auth/login",
     "/auth/register",
+    "/admin/reports",
+    "/admin/reports/{report_id}",
     "/feed/me",
     "/feed/me/session",
     "/search",
@@ -128,6 +136,7 @@ REQUIRED_OPENAPI_PATHS = [
     "/user/me/posts/{post_id}/topics",
     "/user/me/posts/{post_id}/topics/{topic_name}",
     "/user/me/preferences",
+    "/user/me/reports",
     "/graph/posts/{post_id}/next",
 ]
 
@@ -393,6 +402,15 @@ async def fetch_user_posts(pool: asyncpg.Pool, user_id: int) -> list[dict[str, A
         )
 
     return [dict(row) for row in rows]
+
+
+async def set_user_role(pool: asyncpg.Pool, user_id: int, role: str) -> None:
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE users SET role = $1 WHERE id = $2",
+            role,
+            user_id,
+        )
 
 
 async def ensure_dense_graph_edges(pool: asyncpg.Pool, post_ids: list[str]) -> None:
@@ -1375,6 +1393,355 @@ async def run_phase_7(ctx: Context) -> None:
     )
 
 
+async def run_phase_8(ctx: Context) -> None:
+    """Phase 8 — report → staff review queue (moderation Phase 0 / roadmap L6)."""
+    if not ctx.token:
+        ok(ctx, "8.1 Auth token available", False, "missing token from earlier phase")
+        return
+
+    if ctx.pool is None or ctx.user_id is None:
+        ok(ctx, "8.1 Database pool and user_id available", False)
+        return
+
+    # Target post must belong to another user (cannot report own posts).
+    status, phase3_login, raw = ctx.api.request(
+        "POST",
+        "/auth/login",
+        form={
+            "username": PHASE3_CHECKPOINT_EMAIL,
+            "password": CHECKPOINT_PASSWORD,
+        },
+    )
+    phase3_token = ""
+    if isinstance(phase3_login, dict):
+        phase3_token = str(phase3_login.get("access_token", "")).strip()
+    ok(
+        ctx,
+        "8.1 Phase-3 author token available for target post",
+        status == 200 and bool(phase3_token),
+        raw[:200],
+    )
+    if not phase3_token:
+        return
+
+    target_content = "Checkpoint post used as a report target"
+    status, created_target, raw = ctx.api.request(
+        "POST",
+        "/user/me/posts",
+        json_body={"post": target_content, "topic": "technology"},
+        token=phase3_token,
+    )
+    target_post_id = ""
+    if isinstance(created_target, dict):
+        target_post_id = str(created_target.get("id", "")).strip()
+    ok(
+        ctx,
+        "8.1 Create another user's post to report → 200",
+        status == 200 and bool(target_post_id),
+        raw[:200],
+    )
+    if not target_post_id:
+        return
+
+    status, report_body, raw = ctx.api.request(
+        "POST",
+        "/user/me/reports",
+        json_body={
+            "post_id": target_post_id,
+            "reason": "illegal_content",
+            "details": "  checkpoint severe-illegal note  ",
+        },
+        token=ctx.token,
+    )
+    ok(ctx, "8.1 POST /user/me/reports → 201", status == 201, raw[:200])
+
+    report_id = ""
+    if isinstance(report_body, dict):
+        report_id = str(report_body.get("id", "")).strip()
+        ok(
+            ctx,
+            "8.1 Reporter response has open status and no snapshots",
+            report_body.get("status") == "open"
+            and report_body.get("reason") == "illegal_content"
+            and report_body.get("details") == "checkpoint severe-illegal note"
+            and "content_snapshot" not in report_body,
+            str(report_body.keys()) if isinstance(report_body, dict) else type(report_body).__name__,
+        )
+        ok(
+            ctx,
+            "8.1 Reporter response post_id matches target",
+            str(report_body.get("post_id", "")).strip() == target_post_id,
+            str(report_body.get("post_id")),
+        )
+
+    status, _, raw = ctx.api.request(
+        "POST",
+        "/user/me/reports",
+        json_body={"post_id": target_post_id, "reason": "spam"},
+        token=ctx.token,
+    )
+    ok(
+        ctx,
+        "8.2 Duplicate open report on same post → 409",
+        status == 409,
+        f"status={status}, body={raw[:120]}",
+    )
+
+    own_posts = await fetch_user_posts(ctx.pool, ctx.user_id)
+    own_post_id = str(own_posts[0].get("id", "")).strip() if own_posts else ""
+    ok(ctx, "8.2 Own post available for self-report check", bool(own_post_id), own_post_id)
+    if own_post_id:
+        status, _, raw = ctx.api.request(
+            "POST",
+            "/user/me/reports",
+            json_body={"post_id": own_post_id, "reason": "spam"},
+            token=ctx.token,
+        )
+        ok(
+            ctx,
+            "8.2 Reporting own post → 400",
+            status == 400,
+            f"status={status}, body={raw[:120]}",
+        )
+
+    status, second_target, raw = ctx.api.request(
+        "POST",
+        "/user/me/posts",
+        json_body={"post": "Second report target from same author", "topic": "health"},
+        token=phase3_token,
+    )
+    second_post_id = ""
+    if isinstance(second_target, dict):
+        second_post_id = str(second_target.get("id", "")).strip()
+    ok(
+        ctx,
+        "8.2 Second target post from same author → 200",
+        status == 200 and bool(second_post_id),
+        raw[:200],
+    )
+    if second_post_id:
+        status, _, raw = ctx.api.request(
+            "POST",
+            "/user/me/reports",
+            json_body={"post_id": second_post_id, "reason": "spam"},
+            token=ctx.token,
+        )
+        ok(
+            ctx,
+            "8.2 Second report against same author same day → 429",
+            status == 429,
+            f"status={status}, body={raw[:120]}",
+        )
+
+    status, _, raw = ctx.api.request(
+        "POST",
+        "/user/me/reports",
+        json_body={
+            "post_id": "00000000-0000-0000-0000-000000000000",
+            "reason": "other",
+        },
+        token=ctx.token,
+    )
+    ok(
+        ctx,
+        "8.2 Missing post report → 404",
+        status == 404,
+        f"status={status}, body={raw[:120]}",
+    )
+
+    status, _, raw = ctx.api.request("GET", "/admin/reports", token=ctx.token)
+    ok(
+        ctx,
+        "8.3 Non-staff GET /admin/reports → 403",
+        status == 403,
+        f"status={status}, body={raw[:120]}",
+    )
+
+    await set_user_role(ctx.pool, ctx.user_id, "staff")
+    try:
+        status, staff_list, raw = ctx.api.request(
+            "GET",
+            "/admin/reports?status=open",
+            token=ctx.token,
+        )
+        ok(ctx, "8.3 Staff GET /admin/reports?status=open → 200", status == 200, raw[:200])
+        staff_tickets = staff_list if isinstance(staff_list, list) else []
+        matching = [
+            ticket
+            for ticket in staff_tickets
+            if isinstance(ticket, dict) and str(ticket.get("id", "")).strip() == report_id
+        ]
+        ok(
+            ctx,
+            "8.3 Open queue includes created ticket with content snapshot",
+            len(matching) == 1
+            and matching[0].get("content_snapshot") == target_content
+            and matching[0].get("reason") == "illegal_content",
+            f"matches={len(matching)}",
+        )
+
+        status, illegal_list, raw = ctx.api.request(
+            "GET",
+            "/admin/reports?status=open&reason=illegal_content",
+            token=ctx.token,
+        )
+        ok(
+            ctx,
+            "8.3 Staff filter reason=illegal_content → 200",
+            status == 200,
+            raw[:200],
+        )
+        illegal_tickets = illegal_list if isinstance(illegal_list, list) else []
+        ok(
+            ctx,
+            "8.3 Illegal filter returns the severe-illegal ticket",
+            any(
+                isinstance(ticket, dict) and str(ticket.get("id", "")).strip() == report_id
+                for ticket in illegal_tickets
+            ),
+            f"count={len(illegal_tickets)}",
+        )
+
+        status, spam_list, raw = ctx.api.request(
+            "GET",
+            "/admin/reports?status=open&reason=spam",
+            token=ctx.token,
+        )
+        ok(ctx, "8.3 Staff filter reason=spam → 200", status == 200, raw[:200])
+        spam_tickets = spam_list if isinstance(spam_list, list) else []
+        ok(
+            ctx,
+            "8.3 Spam filter excludes illegal_content ticket",
+            not any(
+                isinstance(ticket, dict) and str(ticket.get("id", "")).strip() == report_id
+                for ticket in spam_tickets
+            ),
+            f"count={len(spam_tickets)}",
+        )
+
+        if report_id:
+            status, detail, raw = ctx.api.request(
+                "GET",
+                f"/admin/reports/{report_id}",
+                token=ctx.token,
+            )
+            ok(ctx, "8.4 GET /admin/reports/{report_id} → 200", status == 200, raw[:200])
+            if isinstance(detail, dict):
+                ok(
+                    ctx,
+                    "8.4 Staff detail includes frozen snapshots and identities",
+                    detail.get("content_snapshot") == target_content
+                    and detail.get("reporter_id") == ctx.user_id
+                    and bool(str(detail.get("author_username_snapshot") or "").strip()),
+                    str(
+                        {
+                            "content_snapshot": detail.get("content_snapshot"),
+                            "reporter_id": detail.get("reporter_id"),
+                            "author": detail.get("author_username_snapshot"),
+                        }
+                    ),
+                )
+
+            status, updated, raw = ctx.api.request(
+                "PATCH",
+                f"/admin/reports/{report_id}",
+                json_body={"status": "in_review"},
+                token=ctx.token,
+            )
+            ok(
+                ctx,
+                "8.4 PATCH /admin/reports/{report_id} → in_review",
+                status == 200
+                and isinstance(updated, dict)
+                and updated.get("status") == "in_review",
+                raw[:200],
+            )
+
+            status, closed, raw = ctx.api.request(
+                "PATCH",
+                f"/admin/reports/{report_id}",
+                json_body={"status": "resolved"},
+                token=ctx.token,
+            )
+            ok(
+                ctx,
+                "8.4 PATCH /admin/reports/{report_id} → resolved",
+                status == 200
+                and isinstance(closed, dict)
+                and closed.get("status") == "resolved",
+                raw[:200],
+            )
+
+            # Filing a report must not delete the target post (no auto-action).
+            db_posts = await fetch_posts_by_id(ctx.pool, [target_post_id])
+            ok(
+                ctx,
+                "8.4 Report triage does not auto-delete the reported post",
+                target_post_id in db_posts,
+                target_post_id,
+            )
+    finally:
+        await set_user_role(ctx.pool, ctx.user_id, "user")
+
+    report_reason = read_ios_file("Models/ReportReason.swift")
+    ok(ctx, "8.5 ReportReason.swift exists", bool(report_reason))
+    ok(
+        ctx,
+        "8.5 ReportReason maps illegalContent to illegal_content",
+        'case .illegalContent: "illegal_content"' in report_reason
+        or 'case .illegalContent: return "illegal_content"' in report_reason,
+    )
+    ok(
+        ctx,
+        "8.5 Report details cap is 2000",
+        "maxLength = 2000" in report_reason or "static let maxLength = 2000" in report_reason,
+    )
+
+    api_client = read_ios_file("Core/APIClient.swift")
+    ok(ctx, "8.5 APIClient.swift exists", bool(api_client))
+    ok(
+        ctx,
+        "8.5 APIClient lists staff reports with optional reason",
+        "func listStaffReports(" in api_client and "admin/reports" in api_client,
+    )
+    ok(
+        ctx,
+        "8.5 APIClient fetches and patches staff report detail",
+        "func getStaffReport(id:" in api_client
+        and "func updateStaffReportStatus(" in api_client,
+    )
+
+    staff_vm = read_ios_file("Features/Settings/Staff/StaffReportsViewModel.swift")
+    ok(ctx, "8.6 StaffReportsViewModel.swift exists", bool(staff_vm))
+    ok(
+        ctx,
+        "8.6 StaffReportsViewModel loads queue via APIClient.listStaffReports",
+        "APIClient.listStaffReports(" in staff_vm,
+    )
+    ok(
+        ctx,
+        "8.6 StaffReportsViewModel supports illegal_content reason filter",
+        'case illegalContent = "illegal_content"' in staff_vm
+        and "changeReasonFilter" in staff_vm,
+    )
+
+    staff_view = read_ios_file("Features/Settings/Staff/StaffReportsView.swift")
+    ok(ctx, "8.6 StaffReportsView.swift exists", bool(staff_view))
+    ok(
+        ctx,
+        "8.6 StaffReportsView exposes illegal / CSAM reason filter",
+        "StaffReportReasonFilter" in staff_view or "Illegal / CSAM" in staff_view,
+    )
+
+    report_vm = read_ios_file("Features/Report/ReportPostViewModel.swift")
+    ok(ctx, "8.7 ReportPostViewModel.swift exists", bool(report_vm))
+    ok(
+        ctx,
+        "8.7 ReportPostViewModel caps untrusted details length",
+        "ReportDetailsLimits.maxLength" in report_vm,
+    )
+
+
 PhaseFn = Callable[[Context], Any]
 
 PHASES: list[tuple[str, str, PhaseFn]] = [
@@ -1386,6 +1753,7 @@ PHASES: list[tuple[str, str, PhaseFn]] = [
     ("5", "Graph Path (Core Product)", run_phase_5),
     ("6", "User-Controlled Algorithm", run_phase_6),
     ("7", "Posts, Topics & Training Events", run_phase_7),
+    ("8", "Reports → Staff Review Queue", run_phase_8),
 ]
 
 

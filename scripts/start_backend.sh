@@ -215,6 +215,8 @@ BEGIN
         'other'
       )),
       details TEXT,
+      CONSTRAINT content_reports_details_length_check
+        CHECK (details IS NULL OR char_length(details) <= 2000),
       status TEXT NOT NULL DEFAULT 'open' CHECK (status IN (
         'open',
         'in_review',
@@ -233,6 +235,22 @@ BEGIN
     ON content_reports (status, created_at DESC);
     CREATE INDEX content_reports_post_id_idx
     ON content_reports (post_id);
+  ELSIF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'content_reports_details_length_check'
+  ) THEN
+    ALTER TABLE content_reports
+    ADD CONSTRAINT content_reports_details_length_check
+    CHECK (details IS NULL OR char_length(details) <= 2000);
+  END IF;
+
+  IF to_regclass('public.user_report_limits') IS NULL THEN
+    CREATE TABLE user_report_limits (
+      reporter_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      reported_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      day DATE NOT NULL,
+      report_count INTEGER NOT NULL DEFAULT 0 CHECK (report_count >= 0),
+      PRIMARY KEY (reporter_id, reported_user_id, day)
+    );
   END IF;
 END
 $$;

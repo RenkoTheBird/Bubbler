@@ -2,7 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.services.user import UserService
 from app.services.interaction import InteractionService
 from app.services.post import PostService
+from app.services.report import ReportService
 from app.schemas.post import InteractionCreate, PostCreate, PostTopicMutation, PostUpdate
+from app.schemas.report import ReportCreate
 from app.schemas.user import EmailUpdate, PasswordUpdate, PrefsUpdate
 from app.db.topics import normalize_known_topic
 
@@ -14,7 +16,13 @@ def _require_known_topic(topic: str) -> str:
     return normalized
 
 
-def create_user_router(user_service: UserService, interaction_service: InteractionService, post_service: PostService, get_current_user_id):
+def create_user_router(
+    user_service: UserService,
+    interaction_service: InteractionService,
+    post_service: PostService,
+    report_service: ReportService,
+    get_current_user_id,
+):
     router = APIRouter()
 
     @router.get("/me/profile")
@@ -114,6 +122,13 @@ def create_user_router(user_service: UserService, interaction_service: Interacti
     @router.get("/me/export")
     async def export_user_data(user_id: int = Depends(get_current_user_id)):
         return await user_service.export_user_data(user_id)
+
+    @router.post("/me/reports", status_code=201)
+    async def create_report(
+        body: ReportCreate,
+        user_id: int = Depends(get_current_user_id),
+    ):
+        return await report_service.create_report(user_id, body)
 
     # Public profile lookup — registered after /me so literal "me" paths win.
     @router.get("/{username}/profile")

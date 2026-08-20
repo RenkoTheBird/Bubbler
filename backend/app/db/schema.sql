@@ -191,6 +191,8 @@ CREATE TABLE content_reports (
         'other'
     )),
     details TEXT,
+    CONSTRAINT content_reports_details_length_check
+        CHECK (details IS NULL OR char_length(details) <= 2000),
     status TEXT NOT NULL DEFAULT 'open' CHECK (status IN (
         'open',
         'in_review',
@@ -212,6 +214,15 @@ ON content_reports (status, created_at DESC);
 
 CREATE INDEX content_reports_post_id_idx
 ON content_reports (post_id);
+
+-- REPORT LIMITS (UTC calendar day; max 1 report per reporter per reported user)
+CREATE TABLE user_report_limits (
+    reporter_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    reported_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    day DATE NOT NULL,
+    report_count INTEGER NOT NULL DEFAULT 0 CHECK (report_count >= 0),
+    PRIMARY KEY (reporter_id, reported_user_id, day)
+);
 
 -- DATA EXPORT LIMITS (UTC calendar day; max 2 exports per user per day)
 CREATE TABLE user_data_export_limits (

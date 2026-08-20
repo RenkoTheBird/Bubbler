@@ -22,6 +22,7 @@ from app.services.graph import GraphService
 from app.services.interaction import InteractionService
 from app.services.post import EmbeddingService
 from app.services.post import PostService
+from app.services.report import ReportService
 from app.services.search import SearchService
 from app.services.topic_detection import TopicDetectionService
 from app.services.user import UserService
@@ -32,6 +33,7 @@ from .repositories.edge_builder_repo import EdgeBuilderRepo
 from .repositories.feed_repo import FeedRepository
 from .repositories.interaction_repo import InteractionRepository
 from .repositories.post_repo import PostRepository
+from .repositories.report_repo import ReportRepository
 from .repositories.search_repo import SearchRepository
 from .repositories.user_repo import UserRepository
 
@@ -64,6 +66,7 @@ async def lifespan(fastapi: FastAPI):
     auth_repo = AuthRepository(pool)
     feed_repo = FeedRepository(pool)
     post_repo = PostRepository(pool)
+    report_repo = ReportRepository(pool)
     search_repo = SearchRepository(pool)
     user_repo = UserRepository(pool)
     interaction_repo = InteractionRepository(pool)
@@ -78,6 +81,7 @@ async def lifespan(fastapi: FastAPI):
     logger.info("Embedding model loaded (single API worker owns the model)")
     topic_detection_service = TopicDetectionService(post_repo, embedding_service)
     post_service = PostService(post_repo, edge_builder_repo, embedding_service, topic_detection_service)
+    report_service = ReportService(report_repo)
     user_service = UserService(user_repo)
     strategy_service = StrategyService(feed_repo)
     feed_service = FeedService(feed_repo, graph_service, RankingService(), embedding_service, strategy_service,
@@ -92,7 +96,9 @@ async def lifespan(fastapi: FastAPI):
     graph_router = create_graph_router(feed_service, get_current_user_id)  # graph routes use feed service
     search_router = create_search_router(search_service, get_current_user_id)
     system_router = create_system_router(pool)
-    user_router = create_user_router(user_service, interaction_service, post_service, get_current_user_id)
+    user_router = create_user_router(
+        user_service, interaction_service, post_service, report_service, get_current_user_id
+    )
 
     # register routers
     fastapi.include_router(auth_router, prefix="/auth", tags=["auth"])

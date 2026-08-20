@@ -798,6 +798,7 @@ async def register_and_login(api: ApiClient, pool: asyncpg.Pool) -> tuple[str, i
             "username": IMPACT_USERNAME,
             "email": IMPACT_EMAIL,
             "password": IMPACT_PASSWORD,
+            "date_of_birth": "1990-01-01",
         },
     )
     if status == 409:

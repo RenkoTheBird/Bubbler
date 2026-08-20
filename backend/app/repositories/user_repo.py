@@ -376,6 +376,7 @@ class UserRepository:
     async def export_user_data(self, user_id: int) -> dict | None:
         """Machine-readable account export (no password, no embeddings).
 
+        Includes reports filed by this user; never reports filed against them.
         Enforces DATA_EXPORTS_PER_DAY per UTC calendar day.
         Raises DataExportRateLimited when the quota is exhausted.
         """
@@ -465,6 +466,16 @@ class UserRepository:
                 """,
                 user_id,
             )
+            # Own filed tickets only — never reports where this user is the target.
+            report_rows = await conn.fetch(
+                """
+                SELECT id, post_id, reason, details, status, created_at
+                FROM content_reports
+                WHERE reporter_id = $1
+                ORDER BY created_at DESC, id
+                """,
+                user_id,
+            )
 
         topics_by_post: dict[str, list[dict]] = {}
         for row in topic_rows:
@@ -542,5 +553,16 @@ class UserRepository:
                     "created_at": utc_iso_z(row["created_at"]),
                 }
                 for row in media_rows
+            ],
+            "reports": [
+                {
+                    "id": str(row["id"]),
+                    "post_id": str(row["post_id"]) if row["post_id"] is not None else None,
+                    "reason": row["reason"],
+                    "details": row["details"],
+                    "status": row["status"],
+                    "created_at": utc_iso_z(row["created_at"]),
+                }
+                for row in report_rows
             ],
         }

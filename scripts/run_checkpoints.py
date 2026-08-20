@@ -14,6 +14,7 @@ Optional env overrides (in backend/.env or shell):
   CHECKPOINT_EMAIL=checkpoint@bubbler.com
   CHECKPOINT_USERNAME=ckptuser
   CHECKPOINT_PASSWORD=secret123
+  CHECKPOINT_DATE_OF_BIRTH=1990-01-01
   PHASE3_CHECKPOINT_EMAIL=phase3-checkpoint@bubbler.com
   PHASE3_CHECKPOINT_USERNAME=phase3ckpt
 
@@ -113,6 +114,8 @@ from app.db.vector import to_pgvector  # noqa: E402
 CHECKPOINT_EMAIL = os.getenv("CHECKPOINT_EMAIL", "checkpoint@bubbler.com")
 CHECKPOINT_USERNAME = os.getenv("CHECKPOINT_USERNAME", "ckptuser")
 CHECKPOINT_PASSWORD = os.getenv("CHECKPOINT_PASSWORD", "secret123")
+# Adult DOB required by CreateUser / age gate (MINIMUM_SIGNUP_AGE).
+CHECKPOINT_DATE_OF_BIRTH = os.getenv("CHECKPOINT_DATE_OF_BIRTH", "1990-01-01")
 PHASE3_CHECKPOINT_EMAIL = os.getenv(
     "PHASE3_CHECKPOINT_EMAIL", "phase3-checkpoint@bubbler.com"
 )
@@ -511,6 +514,7 @@ def run_phase_0(ctx: Context) -> None:
             "username": CHECKPOINT_USERNAME,
             "email": CHECKPOINT_EMAIL,
             "password": CHECKPOINT_PASSWORD,
+            "date_of_birth": CHECKPOINT_DATE_OF_BIRTH,
         },
     )
     if status == 409:
@@ -613,6 +617,7 @@ def run_phase_3(ctx: Context) -> None:
             "username": PHASE3_CHECKPOINT_USERNAME,
             "email": PHASE3_CHECKPOINT_EMAIL,
             "password": CHECKPOINT_PASSWORD,
+            "date_of_birth": CHECKPOINT_DATE_OF_BIRTH,
         },
     )
     if status == 409:

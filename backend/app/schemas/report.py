@@ -116,3 +116,9 @@ class StaffReportStatusUpdate(BaseModel):
     """Triage / close a ticket without enforcement actions (those stay L7)."""
 
     status: ReportStatus
+
+
+class StaffReportLegalHoldUpdate(BaseModel):
+    """Retention hold — prevents auto-purge; syncs deleted_accounts tombstones."""
+
+    legal_hold: bool

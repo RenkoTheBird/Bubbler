@@ -291,12 +291,31 @@ private fun ReportRow(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text(
-                text = report.reasonTitle,
-                color = Color.White,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = report.reasonTitle,
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                if (report.legalHold) {
+                    Text(
+                        text = "HOLD",
+                        color = Color(0xFFFF9800).copy(alpha = 0.95f),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .background(
+                                Color(0xFFFF9800).copy(alpha = 0.18f),
+                                RoundedCornerShape(50),
+                            )
+                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                    )
+                }
+            }
             Text(
                 text = report.contentSnapshot,
                 color = Color.White.copy(alpha = 0.75f),

@@ -54,6 +54,8 @@ data class StaffReport(
     val topicSnapshot: String? = null,
     @SerialName("author_username_snapshot")
     val authorUsernameSnapshot: String? = null,
+    @SerialName("legal_hold")
+    val legalHold: Boolean = false,
     @SerialName("created_at")
     @Serializable(with = InstantIsoSerializer::class)
     val createdAt: Instant,
@@ -79,4 +81,10 @@ enum class StaffReportReasonFilter(val title: String, val apiValue: String?) {
 @Serializable
 data class StaffReportStatusUpdateBody(
     val status: String,
+)
+
+@Serializable
+data class StaffReportLegalHoldUpdateBody(
+    @SerialName("legal_hold")
+    val legalHold: Boolean,
 )

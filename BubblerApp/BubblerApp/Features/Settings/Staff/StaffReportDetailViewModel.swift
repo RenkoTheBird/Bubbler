@@ -52,6 +52,29 @@ final class StaffReportDetailViewModel: ObservableObject {
         isUpdating = false
     }
 
+    func updateLegalHold(_ legalHold: Bool, using authSession: AuthSession) async {
+        guard !isUpdating else { return }
+
+        isUpdating = true
+        errorTitle = "Couldn't update legal hold"
+        errorMessage = nil
+
+        do {
+            report = try await APIClient.updateStaffReportLegalHold(
+                id: reportId,
+                legalHold: legalHold
+            )
+        } catch {
+            handle(
+                error,
+                using: authSession,
+                fallbackMessage: "We couldn't update this report's legal hold."
+            )
+        }
+
+        isUpdating = false
+    }
+
     private func handle(
         _ error: Error,
         using authSession: AuthSession,

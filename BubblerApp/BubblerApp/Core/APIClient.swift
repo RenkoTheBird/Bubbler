@@ -93,6 +93,14 @@ private struct StaffReportStatusUpdateBody: Encodable {
     let status: String
 }
 
+private struct StaffReportLegalHoldUpdateBody: Encodable {
+    let legalHold: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case legalHold = "legal_hold"
+    }
+}
+
 private struct APIErrorBody: Decodable {
     let detail: String
 }
@@ -424,6 +432,20 @@ enum APIClient {
         let body = try JSONEncoder().encode(StaffReportStatusUpdateBody(status: status.rawValue))
         let data = try await authorizedRequest(
             path: "admin/reports/\(id)",
+            method: "PATCH",
+            body: body,
+            contentType: "application/json"
+        )
+        return try apiJSONDecoder.decode(StaffReport.self, from: data)
+    }
+
+    static func updateStaffReportLegalHold(
+        id: String,
+        legalHold: Bool
+    ) async throws -> StaffReport {
+        let body = try JSONEncoder().encode(StaffReportLegalHoldUpdateBody(legalHold: legalHold))
+        let data = try await authorizedRequest(
+            path: "admin/reports/\(id)/legal-hold",
             method: "PATCH",
             body: body,
             contentType: "application/json"

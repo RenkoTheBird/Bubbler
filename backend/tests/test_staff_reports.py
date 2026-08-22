@@ -6,7 +6,11 @@ from uuid import uuid4
 from fastapi import HTTPException
 from pydantic import ValidationError
 
-from app.schemas.report import StaffReport, StaffReportStatusUpdate
+from app.schemas.report import (
+    StaffReport,
+    StaffReportLegalHoldUpdate,
+    StaffReportStatusUpdate,
+)
 from app.services.report import ReportService
 
 
@@ -42,6 +46,10 @@ class StaffReportSchemaTests(unittest.TestCase):
     def test_status_update_rejects_unknown(self):
         with self.assertRaises(ValidationError):
             StaffReportStatusUpdate(status="closed")
+
+    def test_legal_hold_update_accepts_boolean(self):
+        update = StaffReportLegalHoldUpdate(legal_hold=True)
+        self.assertTrue(update.legal_hold)
 
 
 class StaffReportServiceTests(unittest.IsolatedAsyncioTestCase):
@@ -106,4 +114,23 @@ class StaffReportServiceTests(unittest.IsolatedAsyncioTestCase):
         self.repo.update_staff_report_status.return_value = None
         with self.assertRaises(HTTPException) as raised:
             await self.service.update_staff_report_status(self.report_id, "dismissed")
+        self.assertEqual(raised.exception.status_code, 404)
+
+    async def test_update_legal_hold(self):
+        updated = _staff_report(id=str(self.report_id), legal_hold=True)
+        self.repo.update_staff_report_legal_hold.return_value = updated
+
+        result = await self.service.update_staff_report_legal_hold(
+            self.report_id, True
+        )
+
+        self.assertTrue(result.legal_hold)
+        self.repo.update_staff_report_legal_hold.assert_awaited_once_with(
+            self.report_id, True
+        )
+
+    async def test_update_legal_hold_missing_is_404(self):
+        self.repo.update_staff_report_legal_hold.return_value = None
+        with self.assertRaises(HTTPException) as raised:
+            await self.service.update_staff_report_legal_hold(self.report_id, False)
         self.assertEqual(raised.exception.status_code, 404)

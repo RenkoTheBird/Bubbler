@@ -6,6 +6,7 @@ import com.bubbler.android.core.network.Endpoints
 import com.bubbler.android.data.model.StaffReport
 import com.bubbler.android.data.model.StaffReportReasonFilter
 import com.bubbler.android.data.model.StaffReportStatus
+import com.bubbler.android.data.model.StaffReportLegalHoldUpdateBody
 import com.bubbler.android.data.model.StaffReportStatusUpdateBody
 import okhttp3.RequestBody.Companion.toRequestBody
 
@@ -39,6 +40,23 @@ open class StaffReportsRepository(
         )
         return apiClient.request(
             path = Endpoints.adminReport(reportId),
+            method = "PATCH",
+            token = tokenStore.requireAccessToken(),
+            body = payload.toRequestBody(ApiClient.JSON_MEDIA_TYPE),
+            contentType = "application/json",
+        )
+    }
+
+    open suspend fun updateLegalHold(
+        reportId: String,
+        legalHold: Boolean,
+    ): StaffReport {
+        val payload = apiClient.json.encodeToString(
+            StaffReportLegalHoldUpdateBody.serializer(),
+            StaffReportLegalHoldUpdateBody(legalHold = legalHold),
+        )
+        return apiClient.request(
+            path = Endpoints.adminReportLegalHold(reportId),
             method = "PATCH",
             token = tokenStore.requireAccessToken(),
             body = payload.toRequestBody(ApiClient.JSON_MEDIA_TYPE),

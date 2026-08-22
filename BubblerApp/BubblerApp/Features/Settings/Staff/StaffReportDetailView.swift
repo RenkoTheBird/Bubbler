@@ -38,6 +38,7 @@ struct StaffReportDetailView: View {
                         snapshotCard(report)
                         identityCard(report)
                         detailsCard(report)
+                        retentionCard(report)
                         actionsCard(report)
                     }
                 }
@@ -118,6 +119,27 @@ struct StaffReportDetailView: View {
                 .font(.subheadline)
                 .foregroundColor(.white.opacity(0.85))
                 .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func retentionCard(_ report: StaffReport) -> some View {
+        sectionCard(title: "Retention") {
+            Toggle(isOn: Binding(
+                get: { report.legalHold },
+                set: { newValue in
+                    Task { await viewModel.updateLegalHold(newValue, using: authSession) }
+                }
+            )) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Legal hold")
+                        .foregroundColor(.white)
+                    Text("Prevents auto-purge per retention policy.")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.65))
+                }
+            }
+            .disabled(viewModel.isUpdating)
+            .tint(.orange)
         }
     }
 

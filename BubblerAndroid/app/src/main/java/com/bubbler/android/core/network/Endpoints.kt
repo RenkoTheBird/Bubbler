@@ -32,6 +32,9 @@ object Endpoints {
     fun adminReport(reportId: String): String =
         "admin/reports/${encodePathSegment(reportId)}"
 
+    fun adminReportLegalHold(reportId: String): String =
+        "admin/reports/${encodePathSegment(reportId)}/legal-hold"
+
     fun adminReports(status: String, reason: String? = null): String =
         withQuery(ADMIN_REPORTS, "status" to status, "reason" to reason)
 

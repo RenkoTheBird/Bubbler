@@ -46,6 +46,12 @@ class StaffReportDetailViewModel(
 
     suspend fun updateStatusAwait(status: StaffReportStatus) = updateStatusInternal(status)
 
+    fun updateLegalHold(legalHold: Boolean) {
+        viewModelScope.launch { updateLegalHoldInternal(legalHold) }
+    }
+
+    suspend fun updateLegalHoldAwait(legalHold: Boolean) = updateLegalHoldInternal(legalHold)
+
     private suspend fun loadInternal(force: Boolean) {
         if (_report.value != null && !force) return
 
@@ -75,6 +81,25 @@ class StaffReportDetailViewModel(
             handleSessionError(
                 e,
                 fallbackMessage = "We couldn't update this report's status.",
+            )
+        }
+
+        _isUpdating.value = false
+    }
+
+    private suspend fun updateLegalHoldInternal(legalHold: Boolean) {
+        if (_isUpdating.value) return
+
+        _isUpdating.value = true
+        _errorTitle.value = "Couldn't update legal hold"
+        _errorMessage.value = null
+
+        try {
+            _report.value = staffReportsRepository.updateLegalHold(reportId, legalHold)
+        } catch (e: Exception) {
+            handleSessionError(
+                e,
+                fallbackMessage = "We couldn't update this report's legal hold.",
             )
         }
 

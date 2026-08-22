@@ -181,9 +181,20 @@ struct StaffReportsView: View {
     private func reportRow(_ report: StaffReport) -> some View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(report.reasonTitle)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundColor(.white)
+                HStack(spacing: 8) {
+                    Text(report.reasonTitle)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.white)
+
+                    if report.legalHold {
+                        Text("HOLD")
+                            .font(.caption2.bold())
+                            .foregroundColor(.orange.opacity(0.95))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(Color.orange.opacity(0.18)))
+                    }
+                }
 
                 Text(report.contentSnapshot)
                     .font(.caption)

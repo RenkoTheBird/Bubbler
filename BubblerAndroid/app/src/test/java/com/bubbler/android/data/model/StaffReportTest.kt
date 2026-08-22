@@ -23,6 +23,7 @@ class StaffReportTest {
               "content_snapshot": "Buy followers now",
               "topic_snapshot": "business",
               "author_username_snapshot": "spammer",
+              "legal_hold": true,
               "created_at": "2026-08-20T14:30:00.000Z"
             }
         """.trimIndent()
@@ -34,6 +35,7 @@ class StaffReportTest {
         assertEquals(StaffReportStatus.OPEN, report.status)
         assertEquals("Buy followers now", report.contentSnapshot)
         assertEquals("Spam", report.reasonTitle)
+        assertTrue(report.legalHold)
         assertEquals(Instant.parse("2026-08-20T14:30:00.000Z"), report.createdAt)
     }
 

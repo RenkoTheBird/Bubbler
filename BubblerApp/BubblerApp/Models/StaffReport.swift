@@ -29,6 +29,7 @@ struct StaffReport: Codable, Identifiable, Equatable {
     let contentSnapshot: String
     let topicSnapshot: String?
     let authorUsernameSnapshot: String?
+    let legalHold: Bool
     let createdAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -42,6 +43,7 @@ struct StaffReport: Codable, Identifiable, Equatable {
         case contentSnapshot = "content_snapshot"
         case topicSnapshot = "topic_snapshot"
         case authorUsernameSnapshot = "author_username_snapshot"
+        case legalHold = "legal_hold"
         case createdAt = "created_at"
     }
 

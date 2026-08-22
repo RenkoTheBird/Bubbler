@@ -86,7 +86,7 @@ Policy and schema/config groundwork is in place. Still required for a complete r
 - [x] **Tests** — `backend/tests/test_retention.py` (repo/service dry-run, batching, schema reference guards, `resolved_at` SQL, deleted-account tombstone).
 - [x] **`resolved_at` population** — set on `resolved` / `dismissed`; cleared on reopen (`report_repo.update_staff_report_status`).
 - [x] **Deleted-account tombstone** — `deleted_accounts` snapshot on `DELETE /user/me`; purge after `DELETED_ACCOUNT_RETENTION_DAYS`.
-- [ ] **Admin legal hold** — staff API/UI to set `content_reports.legal_hold` and matching `deleted_accounts.legal_hold` (required before enabling report purge in production).
+- [x] **Admin legal hold** — staff API/UI to set `content_reports.legal_hold` and matching `deleted_accounts.legal_hold` (required before enabling report purge in production).
 - [x] **Severe-illegal policy in job** — auto-purge skips `reason = 'illegal_content'` until counsel signs off (L11).
 - [x] **Delete Account copy** — state that an identity record may be kept up to 90 days, and that moderation tickets and backups may retain data longer (L9 UX).
 - [ ] **Media object storage** — when uploads ship (F6), delete blobs when `media` rows are removed; orphan cleanup job.

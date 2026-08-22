@@ -265,6 +265,58 @@ class ReportRepository:
             return None
         return self._row_to_staff_report(row)
 
+    async def _sync_deleted_account_legal_hold(self, conn, user_id: int | None) -> None:
+        """Recompute tombstone legal_hold from remaining report obligations."""
+        if user_id is None:
+            return
+        hold = await conn.fetchval(
+            """
+            SELECT EXISTS (
+                SELECT 1
+                FROM content_reports
+                WHERE (reporter_id = $1 OR reported_user_id = $1)
+                  AND (
+                      legal_hold = TRUE
+                      OR status IN ('open', 'in_review')
+                      OR reason = 'illegal_content'
+                  )
+            )
+            """,
+            user_id,
+        )
+        await conn.execute(
+            """
+            UPDATE deleted_accounts
+            SET legal_hold = $2
+            WHERE user_id = $1
+            """,
+            user_id,
+            bool(hold),
+        )
+
+    async def update_staff_report_legal_hold(
+        self,
+        report_id: UUID,
+        legal_hold: bool,
+    ) -> StaffReport | None:
+        async with self.pool.acquire() as conn:
+            async with conn.transaction():
+                row = await conn.fetchrow(
+                    f"""
+                    UPDATE content_reports
+                    SET legal_hold = $2
+                    WHERE id = $1
+                    RETURNING {_STAFF_REPORT_COLUMNS}
+                    """,
+                    report_id,
+                    legal_hold,
+                )
+                if row is None:
+                    return None
+                await self._sync_deleted_account_legal_hold(conn, row["reporter_id"])
+                await self._sync_deleted_account_legal_hold(conn, row["reported_user_id"])
+        return self._row_to_staff_report(row)
+
     async def update_staff_report_status(
         self,
         report_id: UUID,

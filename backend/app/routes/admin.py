@@ -2,7 +2,12 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 
-from app.schemas.report import ReportReason, ReportStatus, StaffReportStatusUpdate
+from app.schemas.report import (
+    ReportReason,
+    ReportStatus,
+    StaffReportLegalHoldUpdate,
+    StaffReportStatusUpdate,
+)
 from app.services.report import ReportService
 
 
@@ -40,5 +45,15 @@ def create_admin_router(report_service: ReportService, require_staff):
         _staff_id: int = Depends(require_staff),
     ):
         return await report_service.update_staff_report_status(report_id, body.status)
+
+    @router.patch("/reports/{report_id}/legal-hold")
+    async def update_report_legal_hold(
+        report_id: UUID,
+        body: StaffReportLegalHoldUpdate,
+        _staff_id: int = Depends(require_staff),
+    ):
+        return await report_service.update_staff_report_legal_hold(
+            report_id, body.legal_hold
+        )
 
     return router

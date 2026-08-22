@@ -102,6 +102,7 @@ Response: array of staff tickets (frozen text snapshots):
     "content_snapshot": "Buy followers now",
     "topic_snapshot": "business",
     "author_username_snapshot": "spammer",
+    "legal_hold": false,
     "created_at": "2026-08-20T15:00:00Z"
   }
 ]
@@ -120,3 +121,13 @@ Request:
 ```
 
 Response: updated staff ticket. Status changes do **not** remove or restrict the post (L7).
+
+### Legal hold — `PATCH /admin/reports/{report_id}/legal-hold`
+
+Request:
+
+```json
+{ "legal_hold": true }
+```
+
+Response: updated staff ticket. When toggled, matching `deleted_accounts` tombstones for the reporter and reported user are recomputed so retention purge stays consistent.

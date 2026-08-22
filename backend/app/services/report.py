@@ -70,3 +70,15 @@ class ReportService:
         if report is None:
             raise HTTPException(status_code=404, detail="Report not found")
         return report
+
+    async def update_staff_report_legal_hold(
+        self,
+        report_id: UUID,
+        legal_hold: bool,
+    ) -> StaffReport:
+        report = await self.report_repo.update_staff_report_legal_hold(
+            report_id, legal_hold
+        )
+        if report is None:
+            raise HTTPException(status_code=404, detail="Report not found")
+        return report

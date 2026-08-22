@@ -22,6 +22,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -157,6 +158,13 @@ fun StaffReportDetailScreen(
                         SnapshotCard(ticket)
                         IdentityCard(ticket)
                         DetailsCard(ticket)
+                        RetentionCard(
+                            report = ticket,
+                            isUpdating = isUpdating,
+                            onUpdateLegalHold = { legalHold ->
+                                viewModel.updateLegalHold(legalHold)
+                            },
+                        )
                         ActionsCard(
                             report = ticket,
                             isUpdating = isUpdating,
@@ -227,6 +235,41 @@ private fun DetailsCard(report: StaffReport) {
             color = Color.White.copy(alpha = 0.85f),
             style = MaterialTheme.typography.bodyMedium,
         )
+    }
+}
+
+@Composable
+private fun RetentionCard(
+    report: StaffReport,
+    isUpdating: Boolean,
+    onUpdateLegalHold: (Boolean) -> Unit,
+) {
+    SettingsSectionCard(title = "Retention") {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    text = "Legal hold",
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    text = "Prevents auto-purge per retention policy.",
+                    color = Color.White.copy(alpha = 0.65f),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            Switch(
+                checked = report.legalHold,
+                onCheckedChange = onUpdateLegalHold,
+                enabled = !isUpdating,
+            )
+        }
     }
 }
 

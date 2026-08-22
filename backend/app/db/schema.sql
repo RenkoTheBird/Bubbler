@@ -84,10 +84,11 @@ CREATE TABLE post_topics (
 CREATE INDEX post_topics_topic_name_idx ON post_topics (topic_name);
 
 -- TOPIC TRAINING EVENTS (user corrections for future model training)
+-- user_id is nullable after retention anonymization (post/topic/action kept for training).
 CREATE TABLE topic_training_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
-    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
     topic_name TEXT NOT NULL REFERENCES topics(name) ON UPDATE CASCADE ON DELETE RESTRICT,
     action TEXT NOT NULL CHECK (action IN ('add', 'remove')),
     created_at TIMESTAMP DEFAULT NOW()
@@ -96,6 +97,7 @@ CREATE TABLE topic_training_events (
 CREATE INDEX topic_training_events_post_id_idx ON topic_training_events (post_id);
 CREATE INDEX topic_training_events_user_id_idx ON topic_training_events (user_id);
 CREATE INDEX topic_training_events_topic_name_idx ON topic_training_events (topic_name);
+CREATE INDEX topic_training_events_created_at_idx ON topic_training_events (created_at);
 
 -- Denormalized post row with highest-weight topic (see feed_sql.py)
 CREATE VIEW posts_with_topic AS
@@ -131,6 +133,11 @@ ON interactions (user_id, post_id)
 WHERE type = 'like';
 
 CREATE INDEX interactions_user_id_created_at_idx ON interactions (user_id, created_at DESC);
+
+-- Partial index for scheduled purge of explore/skip rows (see docs/retention.md).
+CREATE INDEX interactions_explore_skip_created_at_idx
+ON interactions (created_at)
+WHERE type IN ('explore', 'skip');
 
 -- EDGES (post graph)
 CREATE TABLE edges (
@@ -203,6 +210,8 @@ CREATE TABLE content_reports (
     content_snapshot TEXT NOT NULL,
     topic_snapshot TEXT,
     author_username_snapshot TEXT,
+    legal_hold BOOLEAN NOT NULL DEFAULT FALSE,
+    resolved_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT NOW()
 );
 
@@ -219,6 +228,11 @@ ON content_reports (post_id);
 -- Isolate severe-illegal / CSAM-bucket tickets for staff (reason + status).
 CREATE INDEX content_reports_reason_status_created_at_idx
 ON content_reports (reason, status, created_at DESC);
+
+-- Closed tickets eligible for retention purge (never open/in_review; never legal_hold).
+CREATE INDEX content_reports_purge_candidates_idx
+ON content_reports (COALESCE(resolved_at, created_at))
+WHERE status IN ('resolved', 'dismissed') AND legal_hold = FALSE;
 
 -- REPORT LIMITS (UTC calendar day)
 -- Global: max N reports per reporter per day (queue flood control).

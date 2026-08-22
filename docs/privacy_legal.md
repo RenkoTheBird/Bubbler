@@ -276,22 +276,19 @@ GDPR Arts. 15–20 (and CCPA analogues): access, rectification, erasure, restric
 
 ### Requirement
 
-Do not keep personal data longer than necessary. Current schema has no TTLs on interactions or training events.
+Do not keep personal data longer than necessary.
+
+### Status
+
+**Partial.** Beta schedule, schema support, config defaults, retention job (`scripts/run_retention.py`), and `resolved_at` wiring are documented in [`retention.md`](retention.md). Staff legal-hold API/UI and ops items (log/backup TTL, Privacy Policy summary) remain open.
 
 ### How to resolve
 
-1. Write a retention schedule, e.g.:
-  - Account data: life of account
-  - Posts: until user deletes or account erasure
-  - Interactions / view time: rolling N months (or life of account if justified)
-  - Topic training events: until model refresh + N months, or anonymize
-  - Server logs: 30–90 days
-  - Backups: 30 days then purge
-  - Moderation / CSAM legal holds: per counsel (may override deletion)
-2. Implement scheduled jobs (SQL deletes or anonymization) matching the schedule.
+1. Follow the schedule in [`retention.md`](retention.md) (accounts: life of account; explore/skip interactions: rolling window; training events: anonymize then delete; limit tables: 90 days; closed reports: counsel-aligned; logs/backups: ops config).
+2. Implement scheduled jobs (SQL deletes or anonymization) matching `backend/config.py` retention windows.
 3. Publish summary retention periods in the Privacy Policy.
 
-**Owner:** product + backend. **Eng:** cron/worker against `interactions`, `topic_training_events`, logs.
+**Owner:** product + backend. **Eng:** cron/worker against `interactions`, `topic_training_events`, limit tables, and closed `content_reports`.
 
 ---
 

@@ -94,13 +94,21 @@ class StaffReport(BaseModel):
     content_snapshot: str
     topic_snapshot: Optional[str] = None
     author_username_snapshot: Optional[str] = None
+    legal_hold: bool = False
+    resolved_at: Optional[datetime.datetime] = None
     created_at: datetime.datetime
 
     def model_post_init(self, __context) -> None:
         object.__setattr__(self, "created_at", ensure_utc(self.created_at))
+        if self.resolved_at is not None:
+            object.__setattr__(self, "resolved_at", ensure_utc(self.resolved_at))
 
     @field_serializer("created_at")
     def serialize_created_at(self, value: datetime.datetime) -> str:
+        return utc_iso_z(value)
+
+    @field_serializer("resolved_at")
+    def serialize_resolved_at(self, value: datetime.datetime | None) -> str | None:
         return utc_iso_z(value)
 
 

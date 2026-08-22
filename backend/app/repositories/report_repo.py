@@ -18,6 +18,8 @@ _STAFF_REPORT_COLUMNS = """
     content_snapshot,
     topic_snapshot,
     author_username_snapshot,
+    legal_hold,
+    resolved_at,
     created_at
 """
 
@@ -197,6 +199,8 @@ class ReportRepository:
             content_snapshot=row["content_snapshot"],
             topic_snapshot=row["topic_snapshot"],
             author_username_snapshot=row["author_username_snapshot"],
+            legal_hold=row["legal_hold"],
+            resolved_at=ensure_utc(row["resolved_at"]),
             created_at=ensure_utc(row["created_at"]),
         )
 
@@ -270,7 +274,13 @@ class ReportRepository:
             row = await conn.fetchrow(
                 f"""
                 UPDATE content_reports
-                SET status = $2
+                SET
+                    status = $2,
+                    resolved_at = CASE
+                        WHEN $2 IN ('resolved', 'dismissed')
+                            THEN COALESCE(resolved_at, NOW())
+                        ELSE NULL
+                    END
                 WHERE id = $1
                 RETURNING {_STAFF_REPORT_COLUMNS}
                 """,

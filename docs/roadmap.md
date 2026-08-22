@@ -16,13 +16,13 @@ This is a **product and engineering roadmap**, not legal advice. Counsel should 
 | Hard blockers     | 8     | Must ship before any public users / App Store / Play            |
 | Also for launch   | 12    | Required for soft launch with EU + CA in scope                  |
 | Soon after launch | 3     | First post-launch updates                                       |
-| Later updates     | 7     | Social/media depth and adaptive moderation                      |
+| Later updates     | 10    | Social/media depth and user-controlled moderation architecture  |
 
 
 
 ### Split rule
 
-`[TODO](TODO)` lists many product items under BEFORE PRODUCTION. This roadmap treats store/legal/safety as launch-blocking, keeps block-users and preference clarity as launch, and moves follows, bio, media, graph search, topic ML, and adaptive moderation to post-launch—matching `[moderation.md](moderation.md)` Phase 0 and `[project_spec.md](project_spec.md)` deferred scope.
+`[TODO](TODO)` lists many product items under BEFORE PRODUCTION. This roadmap treats store/legal/safety as launch-blocking, keeps block-users and preference clarity as launch, and moves follows, bio, media, graph search, topic ML, and the user-controlled moderation architecture to post-launch—matching `[moderation.md](moderation.md)` Phase 0 and `[project_spec.md](project_spec.md)` deferred scope.
 
 ```mermaid
 %%{init: {"flowchart": {"curve": "linear", "nodeSpacing": 20, "rankSpacing": 28}, "themeVariables": {"fontSize": "12px"}}}%%
@@ -129,7 +129,7 @@ Unblocks account recovery and the next moderation phases.
 
 ### Later updates
 
-Social/media depth and adaptive distribution.
+Social/media depth and the full **user-controlled discovery** moderation architecture (see below). Distribution is driven by user preferences within a platform safety floor—not by engagement-maximizing feed logic.
 
 
 | #   | Feature                                   | Why                                                                            | Source                       | Owner                    |
@@ -137,10 +137,82 @@ Social/media depth and adaptive distribution.
 | F4  | Follow others                             | Social graph growth; not required for safety floor or store release.           | TODO · project_spec deferred | iOS + Android + backend  |
 | F5  | Profile bio                               | Profile polish; no legal/safety dependency.                                    | TODO · project_spec deferred | iOS + Android + backend  |
 | F6  | Media attachments                         | Major surface; triggers Photo Library / Play photo labels, CSAM hashing, DPIA refresh. Backend contracts first, then both clients ([`android_rewrite_order.md`](android_rewrite_order.md)). | TODO · privacy_legal §18–19  | Full stack + T&S         |
-| F7  | Risk scores + visibility shaping          | Distribution moderation beyond delete; depends on scoring pipeline.            | moderation Phase 2           | Backend                  |
-| F8  | Topic health, quarantine, sensitivity UX  | Adaptive layer + Strict/Balanced/Open; after topic ML.                         | moderation Phase 3–4         | Product + backend + clients |
-| F9  | Bubble watermark / identity color         | Visual identity for authors in the graph.                                      | TODO FUTURE (from 3.2)       | iOS + Android            |
-| F10 | Preference-impact statistics + Roundabout | Show real preference effects; careful with likes/comments/stats amplification. | TODO FUTURE · caution note   | Product + clients        |
+| F7  | Automated moderation pipeline             | Safety classification, spam detection, toxicity/harassment, image/video analysis at scale; severe violations remove/block before user prefs apply. TikTok-style detection; Instagram-style preventative posture. | moderation Phase 2 · arch § below | Backend / ML + T&S  |
+| F8  | Classification layer (topics + risk metadata) | Every Bubble gets multi-label topics, safety/risk categories, sensitivity, spam likelihood, and policy-violation signals with confidence scores—not a single forced category. Depends on F2 topic ML. | moderation Phase 1–2 · arch § below | Backend / ML        |
+| F9  | User preference distribution layer        | Prefer / neutral / blacklist per topic plus sensitivity controls shape what appears in a user's Bubble path; prefs determine distribution, not engagement. Tumblr-style customization within the safety floor. | moderation Phase 3–4 · arch § below | Product + backend + clients |
+| F10 | Human oversight + policy feedback loop    | Reports, appeals, automated uncertainty, and high-risk content enter review queues; moderator decisions feed back into automated systems and policy rules. | moderation Phase 2+ · L6/L7 baseline | Backend + T&S + ops |
+| F11 | Topic health, quarantine, sensitivity UX  | Adaptive layer + Strict/Balanced/Open global sensitivity; topic health signals after classification exists. | moderation Phase 3–4         | Product + backend + clients |
+| F12 | Bubble watermark / identity color         | Visual identity for authors in the graph.                                      | TODO FUTURE (from 3.2)       | iOS + Android            |
+| F13 | Preference-impact statistics + Roundabout | Show real preference effects; careful with likes/comments/stats amplification. | TODO FUTURE · caution note   | Product + clients        |
+
+
+### Moderation architecture (target state)
+
+Bubbler moderation is a **user-controlled discovery system with a platform-wide safety floor**. The app does not need to decide what every user should see based on engagement. Instead, it determines what content is **allowed**, classifies it by topic and safety characteristics, and then lets each user's preferences determine what appears in their Bubble path.
+
+**Core distinction:** the platform controls what is *permissible*; the user controls what they *want to encounter*. Moderation itself is **not** completely user-controlled—**safety** ("Is this allowed on the platform?") and **personalization** ("Does this user want to see it?") are separate concerns.
+
+This combines **Tumblr-style user customization**, **Instagram-style preventative moderation**, and eventually **TikTok-style automated detection at scale**. Detail lives in [`moderation.md`](moderation.md); this section is the roadmap-facing summary.
+
+#### Content pipeline
+
+```mermaid
+%%{init: {"flowchart": {"curve": "linear", "nodeSpacing": 20, "rankSpacing": 28}, "themeVariables": {"fontSize": "12px"}}}%%
+flowchart TB
+    Posts["User posts"]
+    Auto["Automated moderation<br/>· safety classification<br/>· spam detection<br/>· toxicity / harassment<br/>· image / video analysis<br/>· topic classification"]
+    Severe["Severe violation<br/>→ remove / block"]
+    Meta["Risk + topics metadata<br/>e.g. Politics, Technology<br/>Risk: Low · Confidence: 94%"]
+    Prefs["User preferences<br/>· preferred topics<br/>· blacklisted topics<br/>· sensitivity settings"]
+    Path["Bubble path<br/>personalized topic sequence"]
+
+    Posts --> Auto
+    Auto --> Severe
+    Auto --> Meta
+    Meta --> Prefs
+    Prefs --> Path
+```
+
+Allowed and uncertain content receives **risk + topic metadata** (multi-label topics, safety/risk categories, sensitivity, spam likelihood, potential policy violations). User preferences then filter and rank what enters the walk—not an opaque engagement algorithm.
+
+#### Human oversight (alongside automation)
+
+```mermaid
+%%{init: {"flowchart": {"curve": "linear", "nodeSpacing": 20, "rankSpacing": 28}, "themeVariables": {"fontSize": "12px"}}}%%
+flowchart TB
+    Detect["Automated detection"]
+    Queue["Review queue"]
+    Mod["Human moderator"]
+    Appeal["User appeal"]
+    Decision["Final decision"]
+    Feedback["Policy / model feedback"]
+
+    Detect --> Queue
+    Queue --> Mod
+    Queue --> Appeal
+    Mod --> Decision
+    Appeal --> Decision
+    Decision --> Feedback
+    Feedback --> Detect
+```
+
+Reports, appeals, low-confidence classifications, and high-risk content enter human review. Moderator outcomes update policy rules and retrain or tune automated systems.
+
+#### Four components → roadmap items
+
+| Component | Role | Roadmap |
+| --- | --- | --- |
+| **1. Global safety layer** | Certain content is prohibited regardless of user preferences—the platform minimum safety standard. No opt-in path around severe harm. | Launch floor: L2, L6, L7, L8 · Full automated enforcement: **F7** |
+| **2. Classification layer** | Every Bubble receives metadata: topics (multi-label), safety/risk categories, sensitivity, spam likelihood, potential policy violations, confidence scores. | **F2** (topic ML) → **F8** |
+| **3. User preference layer** | Users control encounter via prefer / neutral / blacklist per topic and sensitivity for borderline material. Prefs shape **distribution**, not engagement. | Launch clarity: L13 · Full layer: **F9**, **F11** |
+| **4. Human oversight** | Review queues for reports, appeals, uncertainty, and high-risk content; decisions feed back into automation and policy. | Launch baseline: L6, L7, L18 · Full loop: **F10** |
+
+#### Architectural principle (non-negotiable)
+
+| Question | Who decides | Examples |
+| --- | --- | --- |
+| **Safety** — Is this allowed on the platform? | Platform (hard rules + automated + human review) | Illegal content, severe harm, CSAM → remove/block regardless of prefs |
+| **Personalization** — Does this user want to see it? | User (within what is allowed) | Prefer politics, blacklist sports, Strict sensitivity for borderline topics |
 
 
 ---
@@ -165,7 +237,7 @@ Export + retention + breach playbook → lawful bases, ROPA/DPAs, transfers, DPI
 
 ### Wave D — First updates
 
-Forgot-password email → topic ML → graph search → then follows / bio / media → risk & visibility → stats / Roundabout. Dual-client features land on both frontends in the same release train.
+Forgot-password email → topic ML (classification foundation) → graph search → then follows / bio / media → automated moderation pipeline → classification + user preference distribution → human feedback loop → topic health / sensitivity UX → stats / Roundabout. Dual-client features land on both frontends in the same release train.
 
 ---
 
@@ -183,13 +255,13 @@ Use this as a pre-production gate. Unchecked items block public launch under the
 - [x] L4 Age gate
 - [ ] L5 Apple App Privacy labels + Privacy Manifest
 - [ ] L5a Google Play Data Safety
-- [ ] L6 In-app report → review queue
+- [x] L6 In-app report → review queue
 - [ ] L7 Admin remove / restrict + audit logging
 
 **Also for launch**
 
 - [ ] L8 Safe discovery defaults
-- [ ] L9 Data export + erasure completeness
+- [x] L9 Data export + erasure completeness
 - [ ] L10 Retention schedule + breach playbook
 - [ ] L11 DMCA agent + CSAM / LE runbooks
 - [x] L12 Block users
@@ -218,4 +290,4 @@ Use this as a pre-production gate. Unchecked items block public launch under the
 
 ## Summary
 
-Launch ships the **safety floor**, **US/EU/CA legal surfaces**, and **two product trust items** (block users, preference clarity) on **iOS and Android**. Follows, bio, media, graph search, topic ML, and adaptive moderation stay in **future updates**, even where `[TODO](TODO)` listed them under BEFORE PRODUCTION. Store privacy (L5 / L5a) is per-platform; shared API and policy work stays single-sourced in `backend/` and `docs/`.
+Launch ships the **safety floor**, **US/EU/CA legal surfaces**, and **two product trust items** (block users, preference clarity) on **iOS and Android**. The full moderation architecture—**platform-controlled safety** plus **user-controlled discovery** (classification → preferences → Bubble path, with human oversight feeding policy and models)—lands in **future updates** (F2, F7–F11). Follows, bio, media, and graph search stay post-launch too, even where `[TODO](TODO)` listed them under BEFORE PRODUCTION. Store privacy (L5 / L5a) is per-platform; shared API and policy work stays single-sourced in `backend/` and `docs/`.

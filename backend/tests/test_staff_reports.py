@@ -22,6 +22,8 @@ def _staff_report(**overrides) -> StaffReport:
         "content_snapshot": "Buy followers now",
         "topic_snapshot": "business",
         "author_username_snapshot": "spammer",
+        "legal_hold": False,
+        "resolved_at": None,
         "created_at": datetime.datetime.now(datetime.timezone.utc),
     }
     values.update(overrides)

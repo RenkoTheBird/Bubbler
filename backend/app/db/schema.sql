@@ -14,6 +14,10 @@ CREATE TABLE users (
     role TEXT NOT NULL DEFAULT 'user' CONSTRAINT users_role_check CHECK (role IN ('user', 'staff')),
     email_lower TEXT GENERATED ALWAYS AS (lower(email)) STORED,
     username_lower TEXT GENERATED ALWAYS AS (lower(username)) STORED,
+    account_status TEXT NOT NULL DEFAULT 'active'
+        CONSTRAINT users_account_status_check
+        CHECK (account_status IN ('active', 'suspended', 'banned')),
+    restricted_until TIMESTAMPTZ,
     created_at TIMESTAMP DEFAULT NOW()
 );
 
@@ -205,6 +209,18 @@ CREATE TABLE user_blocks (
 
 CREATE INDEX user_blocks_blocked_id_idx ON user_blocks (blocked_id);
 
+-- BLOCKED IDENTITIES (permanent-ban re-registration guard; no FK so rows survive user delete)
+CREATE TABLE blocked_identities (
+    id SERIAL PRIMARY KEY,
+    source_user_id INTEGER NOT NULL,
+    email_lower TEXT NOT NULL,
+    username_lower TEXT NOT NULL,
+    blocked_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX blocked_identities_email_lower_idx ON blocked_identities (email_lower);
+CREATE UNIQUE INDEX blocked_identities_username_lower_idx ON blocked_identities (username_lower);
+
 -- CONTENT REPORTS (staff review queue; snapshots live here, not on posts)
 -- FKs SET NULL so tickets outlive post/user delete. Public post payload stays report-free.
 CREATE TABLE content_reports (
@@ -255,6 +271,27 @@ ON content_reports (reason, status, created_at DESC);
 CREATE INDEX content_reports_purge_candidates_idx
 ON content_reports (COALESCE(resolved_at, created_at))
 WHERE status IN ('resolved', 'dismissed') AND legal_hold = FALSE;
+
+-- ACCOUNT SANCTIONS (append-only staff enforcement audit log)
+CREATE TABLE account_sanctions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    action TEXT NOT NULL CHECK (action IN (
+        'suspend', 'ban', 'unsuspend', 'unban', 'remove_post'
+    )),
+    reason_code TEXT,
+    staff_note TEXT,
+    public_message TEXT,
+    suspension_days INTEGER CHECK (suspension_days IS NULL OR suspension_days > 0),
+    restricted_until TIMESTAMPTZ,
+    report_id UUID REFERENCES content_reports(id) ON DELETE SET NULL,
+    post_id UUID REFERENCES posts(id) ON DELETE SET NULL,
+    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX account_sanctions_user_id_created_at_idx
+ON account_sanctions (user_id, created_at DESC);
 
 -- REPORT LIMITS (UTC calendar day)
 -- Global: max N reports per reporter per day (queue flood control).

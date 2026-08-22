@@ -21,6 +21,7 @@ from app.services.feed import RankingService
 from app.services.feed import StrategyService
 from app.services.graph import GraphService
 from app.services.interaction import InteractionService
+from app.services.moderation import ModerationService
 from app.services.post import EmbeddingService
 from app.services.post import PostService
 from app.services.report import ReportService
@@ -33,13 +34,18 @@ from .repositories.auth_repo import AuthRepository
 from .repositories.edge_builder_repo import EdgeBuilderRepo
 from .repositories.feed_repo import FeedRepository
 from .repositories.interaction_repo import InteractionRepository
+from .repositories.moderation_repo import ModerationRepository
 from .repositories.post_repo import PostRepository
 from .repositories.report_repo import ReportRepository
 from .repositories.search_repo import SearchRepository
 from .repositories.user_repo import UserRepository
 
 # Dependencies
-from app.deps import create_require_staff, get_current_user_id
+from app.deps import (
+    create_get_current_user_id,
+    create_require_staff,
+    create_require_write_access,
+)
 
 # grab logger
 logger = logging.getLogger(__name__)
@@ -72,9 +78,16 @@ async def lifespan(fastapi: FastAPI):
     user_repo = UserRepository(pool)
     interaction_repo = InteractionRepository(pool)
     edge_builder_repo = EdgeBuilderRepo(pool)
+    moderation_repo = ModerationRepository(pool)
 
     # Start services
-    auth_service = AuthService(auth_repo, my_env_vars.secret_key, my_env_vars.algorithm, my_env_vars.timeoffset)
+    auth_service = AuthService(
+        auth_repo,
+        moderation_repo,
+        my_env_vars.secret_key,
+        my_env_vars.algorithm,
+        my_env_vars.timeoffset,
+    )
     graph_service = GraphService(feed_repo)
     interaction_service = InteractionService(interaction_repo)
     embedding_service = EmbeddingService()
@@ -83,6 +96,7 @@ async def lifespan(fastapi: FastAPI):
     topic_detection_service = TopicDetectionService(post_repo, embedding_service)
     post_service = PostService(post_repo, edge_builder_repo, embedding_service, topic_detection_service)
     report_service = ReportService(report_repo)
+    moderation_service = ModerationService(moderation_repo)
     user_service = UserService(user_repo)
     strategy_service = StrategyService(feed_repo)
     feed_service = FeedService(feed_repo, graph_service, RankingService(), embedding_service, strategy_service,
@@ -92,15 +106,26 @@ async def lifespan(fastapi: FastAPI):
     )
 
     # start routers
-    require_staff = create_require_staff(user_repo)
+    get_current_user_id = create_get_current_user_id(moderation_repo)
+    require_write_access = create_require_write_access(
+        moderation_repo, get_current_user_id
+    )
+    require_staff = create_require_staff(user_repo, get_current_user_id)
     auth_router = create_auth_router(auth_service)
-    admin_router = create_admin_router(report_service, require_staff)
+    admin_router = create_admin_router(
+        report_service, moderation_service, require_staff
+    )
     feed_router = create_feed_router(feed_service, get_current_user_id)
     graph_router = create_graph_router(feed_service, get_current_user_id)  # graph routes use feed service
     search_router = create_search_router(search_service, get_current_user_id)
     system_router = create_system_router(pool)
     user_router = create_user_router(
-        user_service, interaction_service, post_service, report_service, get_current_user_id
+        user_service,
+        interaction_service,
+        post_service,
+        report_service,
+        get_current_user_id,
+        require_write_access,
     )
 
     # register routers

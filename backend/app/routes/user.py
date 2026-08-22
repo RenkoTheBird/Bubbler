@@ -22,6 +22,7 @@ def create_user_router(
     post_service: PostService,
     report_service: ReportService,
     get_current_user_id,
+    require_write_access,
 ):
     router = APIRouter()
 
@@ -30,11 +31,11 @@ def create_user_router(
         return await user_service.get_profile_info(user_id)
 
     @router.put("/me/profile/email")
-    async def put_email(body: EmailUpdate, user_id: int = Depends(get_current_user_id)):
+    async def put_email(body: EmailUpdate, user_id: int = Depends(require_write_access)):
         return await user_service.put_email(body.email, user_id)
 
     @router.put("/me/profile/password")
-    async def put_password(body: PasswordUpdate, user_id: int = Depends(get_current_user_id)):
+    async def put_password(body: PasswordUpdate, user_id: int = Depends(require_write_access)):
         return await user_service.put_password(body, user_id)
 
     @router.get("/me")
@@ -50,14 +51,14 @@ def create_user_router(
         return await post_service.get_user_posts(user_id)
 
     @router.put("/me/posts/{post_id}")
-    async def edit_post(post_id: str, body: PostUpdate, user_id: int = Depends(get_current_user_id)):
+    async def edit_post(post_id: str, body: PostUpdate, user_id: int = Depends(require_write_access)):
         return await post_service.edit_post(user_id, post_id, body.post)
 
     @router.post("/me/posts/{post_id}/topics")
     async def add_post_topic(
         post_id: str,
         body: PostTopicMutation,
-        user_id: int = Depends(get_current_user_id),
+        user_id: int = Depends(require_write_access),
     ):
         return await post_service.add_post_topic(
             user_id, post_id, _require_known_topic(body.topic)
@@ -67,7 +68,7 @@ def create_user_router(
     async def remove_post_topic(
         post_id: str,
         topic_name: str,
-        user_id: int = Depends(get_current_user_id),
+        user_id: int = Depends(require_write_access),
     ):
         return await post_service.remove_post_topic(
             user_id, post_id, _require_known_topic(topic_name)
@@ -76,7 +77,7 @@ def create_user_router(
     @router.post("/me/posts")
     async def post_user_posts(
         body: PostCreate,
-        user_id: int = Depends(get_current_user_id),
+        user_id: int = Depends(require_write_access),
     ):
         normalized_topic = (
             _require_known_topic(body.topic) if body.topic is not None else None
@@ -84,11 +85,11 @@ def create_user_router(
         return await post_service.post_user_posts(user_id, body.post, topic=normalized_topic)
     
     @router.post("/me/interactions")
-    async def record_interaction(body: InteractionCreate, user_id: int = Depends(get_current_user_id)):
+    async def record_interaction(body: InteractionCreate, user_id: int = Depends(require_write_access)):
         return await interaction_service.record(user_id, body)
 
     @router.delete("/me/interactions/{post_id}/like", status_code=204)
-    async def delete_like(post_id: str, user_id: int = Depends(get_current_user_id)):
+    async def delete_like(post_id: str, user_id: int = Depends(require_write_access)):
         await interaction_service.delete_like(user_id, post_id)
 
     @router.get("/me/preferences")
@@ -96,15 +97,15 @@ def create_user_router(
         return await user_service.get_prefs(user_id)
 
     @router.put("/me/preferences")
-    async def put_preferences(body: PrefsUpdate, user_id: int = Depends(get_current_user_id)):
+    async def put_preferences(body: PrefsUpdate, user_id: int = Depends(require_write_access)):
         return await user_service.put_prefs(user_id, body)
 
     @router.delete("/me/posts/{post_id}", status_code=204)
-    async def delete_post(post_id: str, user_id: int = Depends(get_current_user_id)):
+    async def delete_post(post_id: str, user_id: int = Depends(require_write_access)):
         return await post_service.delete_post(user_id, post_id)
 
     @router.delete("/me", status_code=204)
-    async def delete_user(user_id: int = Depends(get_current_user_id)):
+    async def delete_user(user_id: int = Depends(require_write_access)):
         return await user_service.delete_user(user_id)
 
     @router.get("/me/blocks")
@@ -112,11 +113,11 @@ def create_user_router(
         return await user_service.list_blocked_users(user_id)
 
     @router.post("/me/blocks/{username}")
-    async def block_user(username: str, user_id: int = Depends(get_current_user_id)):
+    async def block_user(username: str, user_id: int = Depends(require_write_access)):
         return await user_service.block_user(user_id, username)
 
     @router.delete("/me/blocks/{username}")
-    async def unblock_user(username: str, user_id: int = Depends(get_current_user_id)):
+    async def unblock_user(username: str, user_id: int = Depends(require_write_access)):
         return await user_service.unblock_user(user_id, username)
 
     @router.get("/me/export")
@@ -126,7 +127,7 @@ def create_user_router(
     @router.post("/me/reports", status_code=201)
     async def create_report(
         body: ReportCreate,
-        user_id: int = Depends(get_current_user_id),
+        user_id: int = Depends(require_write_access),
     ):
         return await report_service.create_report(user_id, body)
 

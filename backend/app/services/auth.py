@@ -25,8 +25,9 @@ def age_on(birth_date: date, today: date | None = None) -> int:
 
 
 class AuthService:
-    def __init__(self, auth_repo, secret_key, algorithm, expiration_offset):
+    def __init__(self, auth_repo, moderation_repo, secret_key, algorithm, expiration_offset):
         self.auth_repo = auth_repo
+        self.moderation_repo = moderation_repo
         self.secret_key = secret_key
         self.algorithm = algorithm
         self.expiration_offset = expiration_offset  # Used as hours
@@ -56,6 +57,13 @@ class AuthService:
         if not check_password(password, row["password"]):
             raise HTTPException(status_code=401, detail="Incorrect email or password")
 
+        access = await self.moderation_repo.resolve_account_access(row["id"])
+        if access is None:
+            raise HTTPException(status_code=401, detail="Incorrect email or password")
+        if access.account_status == "banned":
+            detail = access.public_message or "Your account has been restricted."
+            raise HTTPException(status_code=403, detail=detail)
+
         return self._token_response(row["id"])
 
     async def post_registration_info(self, username, email, password, date_of_birth: date):
@@ -68,6 +76,8 @@ class AuthService:
             )
 
         password_hash = hash_password(password)
+        if await self.moderation_repo.is_identity_blocked(email, username):
+            raise HTTPException(status_code=409, detail="username or email already taken")
         try:
             user_id = await self.auth_repo.post_registration_info(
                 username, email, password_hash, date_of_birth

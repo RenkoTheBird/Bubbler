@@ -554,6 +554,86 @@ async def ensure_schema(pool: asyncpg.Pool) -> None:
                 """
             )
 
+        if await _table_exists(conn, "users") and not await _column_exists(
+            conn, "users", "account_status"
+        ):
+            await conn.execute(
+                """
+                ALTER TABLE users
+                ADD COLUMN account_status TEXT NOT NULL DEFAULT 'active'
+                """
+            )
+            await conn.execute(
+                """
+                ALTER TABLE users
+                ADD COLUMN restricted_until TIMESTAMPTZ
+                """
+            )
+
+        if await _table_exists(conn, "users") and not await _constraint_exists(
+            conn, "users_account_status_check"
+        ):
+            await conn.execute(
+                """
+                ALTER TABLE users
+                ADD CONSTRAINT users_account_status_check
+                CHECK (account_status IN ('active', 'suspended', 'banned'))
+                """
+            )
+
+        if not await _table_exists(conn, "blocked_identities"):
+            await conn.execute(
+                """
+                CREATE TABLE blocked_identities (
+                    id SERIAL PRIMARY KEY,
+                    source_user_id INTEGER NOT NULL,
+                    email_lower TEXT NOT NULL,
+                    username_lower TEXT NOT NULL,
+                    blocked_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+                """
+            )
+            await conn.execute(
+                """
+                CREATE UNIQUE INDEX blocked_identities_email_lower_idx
+                ON blocked_identities (email_lower)
+                """
+            )
+            await conn.execute(
+                """
+                CREATE UNIQUE INDEX blocked_identities_username_lower_idx
+                ON blocked_identities (username_lower)
+                """
+            )
+
+        if not await _table_exists(conn, "account_sanctions"):
+            await conn.execute(
+                """
+                CREATE TABLE account_sanctions (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    action TEXT NOT NULL CHECK (action IN (
+                        'suspend', 'ban', 'unsuspend', 'unban', 'remove_post'
+                    )),
+                    reason_code TEXT,
+                    staff_note TEXT,
+                    public_message TEXT,
+                    suspension_days INTEGER CHECK (suspension_days IS NULL OR suspension_days > 0),
+                    restricted_until TIMESTAMPTZ,
+                    report_id UUID REFERENCES content_reports(id) ON DELETE SET NULL,
+                    post_id UUID REFERENCES posts(id) ON DELETE SET NULL,
+                    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+                """
+            )
+            await conn.execute(
+                """
+                CREATE INDEX account_sanctions_user_id_created_at_idx
+                ON account_sanctions (user_id, created_at DESC)
+                """
+            )
+
 
 async def main():
     pool = await asyncpg.create_pool(my_env_vars.db_url)

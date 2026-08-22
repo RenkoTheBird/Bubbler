@@ -9,7 +9,8 @@ from app.deps import create_require_staff
 class RequireStaffTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.repo = AsyncMock()
-        self.require_staff = create_require_staff(self.repo)
+        self.get_current_user_id = AsyncMock(return_value=7)
+        self.require_staff = create_require_staff(self.repo, self.get_current_user_id)
 
     async def test_staff_user_passes(self):
         self.repo.is_staff.return_value = True

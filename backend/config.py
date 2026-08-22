@@ -60,6 +60,11 @@ class RetentionConfig:
         # Closed moderation tickets without legal hold (open/in_review never auto-purged).
         self.closed_report_retention_days = _int_env("CLOSED_REPORT_RETENTION_DAYS", 730)
 
+        # Identity tombstones after account erasure (email/username reusable immediately).
+        self.deleted_account_retention_days = _int_env(
+            "DELETED_ACCOUNT_RETENTION_DAYS", 90
+        )
+
         # Ops targets documented for runbooks; not enforced in application code.
         self.log_retention_days = _int_env("LOG_RETENTION_DAYS", 90)
         self.backup_retention_days = _int_env("BACKUP_RETENTION_DAYS", 30)

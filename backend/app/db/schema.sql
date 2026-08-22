@@ -20,6 +20,28 @@ CREATE TABLE users (
 CREATE UNIQUE INDEX users_email_lower_idx ON users (email_lower);
 CREATE UNIQUE INDEX users_username_lower_idx ON users (username_lower);
 
+-- DELETED ACCOUNTS (identity tombstone after erasure; no FK to users)
+-- Email/username are not unique here so they can be reused on live users immediately.
+CREATE TABLE deleted_accounts (
+    user_id INTEGER PRIMARY KEY,
+    username VARCHAR(20) NOT NULL,
+    email VARCHAR(80) NOT NULL,
+    date_of_birth DATE NOT NULL,
+    role TEXT NOT NULL CONSTRAINT deleted_accounts_role_check
+        CHECK (role IN ('user', 'staff')),
+    created_at TIMESTAMP NOT NULL,
+    deleted_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    deletion_source TEXT NOT NULL DEFAULT 'self'
+        CONSTRAINT deleted_accounts_deletion_source_check
+        CHECK (deletion_source IN ('self', 'staff')),
+    legal_hold BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+-- Eligible tombstones for scheduled purge (never legal_hold).
+CREATE INDEX deleted_accounts_purge_candidates_idx
+ON deleted_accounts (deleted_at)
+WHERE legal_hold = FALSE;
+
 -- TOPICS (name stored canonical lowercase)
 CREATE TABLE topics (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

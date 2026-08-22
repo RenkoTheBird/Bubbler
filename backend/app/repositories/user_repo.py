@@ -347,9 +347,68 @@ class UserRepository:
         """Persist preferences after system-driven updates (e.g. interaction-derived topics)."""
         return await self._upsert_prefs(user_id, body)
 
-    async def delete_user(self, user_id: int) -> bool:
+    async def delete_user(self, user_id: int, *, deletion_source: str = "self") -> bool:
+        """Hard-delete the live account after writing an identity tombstone.
+
+        Password is never copied. Email and username stay unique only on `users`,
+        so they can be reused immediately after this returns.
+        """
         async with self.pool.acquire() as conn:
-            result = await conn.execute("DELETE FROM users WHERE id = $1", user_id)
+            async with conn.transaction():
+                row = await conn.fetchrow(
+                    """
+                    SELECT id, username, email, date_of_birth, role, created_at
+                    FROM users
+                    WHERE id = $1
+                    FOR UPDATE
+                    """,
+                    user_id,
+                )
+                if row is None:
+                    return False
+
+                legal_hold = await conn.fetchval(
+                    """
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM content_reports
+                        WHERE (reporter_id = $1 OR reported_user_id = $1)
+                          AND (
+                              legal_hold = TRUE
+                              OR status IN ('open', 'in_review')
+                              OR reason = 'illegal_content'
+                          )
+                    )
+                    """,
+                    user_id,
+                )
+                await conn.execute(
+                    """
+                    INSERT INTO deleted_accounts (
+                        user_id,
+                        username,
+                        email,
+                        date_of_birth,
+                        role,
+                        created_at,
+                        deletion_source,
+                        legal_hold
+                    )
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                    """,
+                    row["id"],
+                    row["username"],
+                    row["email"],
+                    row["date_of_birth"],
+                    row["role"],
+                    row["created_at"],
+                    deletion_source,
+                    bool(legal_hold),
+                )
+                result = await conn.execute(
+                    "DELETE FROM users WHERE id = $1",
+                    user_id,
+                )
         return result == "DELETE 1"
 
     async def _consume_data_export_quota(self, conn, user_id: int) -> bool:

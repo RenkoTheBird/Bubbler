@@ -11,7 +11,7 @@ This is a **product and engineering gap map**, not legal advice. Have counsel re
 
 | Area                                    | Status                                                                         |
 | --------------------------------------- | ------------------------------------------------------------------------------ |
-| Account deletion                        | `DELETE /me` + FK cascades (`users` → posts, interactions, prefs, media, etc.) |
+| Account deletion                        | `DELETE /me` snapshots identity to `deleted_accounts` (no password), then FK cascades; email/username reusable immediately |
 | Signup consent / age gate               | Missing (`CreateAccountView`: username, email, password only)                  |
 | Privacy Policy / Terms                  | Missing (no docs, no Settings links)                                           |
 | Data export / portability               | Missing                                                                        |
@@ -260,7 +260,7 @@ GDPR Arts. 15–20 (and CCPA analogues): access, rectification, erasure, restric
 
 1. **Export:** add `GET /me/export` (or async job) returning machine-readable JSON/ZIP: profile, posts, interactions, preferences, topic training events, media metadata.
 2. **Access:** same export, plus in-app ability to view/edit email, username, posts (partially exists via settings/profile).
-3. **Erasure completeness:** document that `DELETE FROM users` cascades; define backup TTL, log scrubbing, and moderation-ticket handling; update Delete Account copy if anything survives temporarily.
+3. **Erasure completeness:** `DELETE FROM users` cascades after writing `deleted_accounts`; email/username can be reused immediately. Document backup TTL, log scrubbing, the 90-day identity tombstone, and moderation-ticket handling; Delete Account copy already discloses leftovers.
 4. **Objection / restriction:** honor `use_view_time = false` and blacklist controls; add a documented “limit personalization” path if counsel requires it.
 5. **Intake:** privacy@ / in-app form for rights requests with identity verification (password or signed-in session).
 
@@ -280,15 +280,15 @@ Do not keep personal data longer than necessary.
 
 ### Status
 
-**Partial.** Beta schedule, schema support, config defaults, retention job (`scripts/run_retention.py`), and `resolved_at` wiring are documented in [`retention.md`](retention.md). Staff legal-hold API/UI and ops items (log/backup TTL, Privacy Policy summary) remain open.
+**Partial.** Beta schedule, schema support, config defaults, retention job (`scripts/run_retention.py`), identity tombstone (`deleted_accounts`), and `resolved_at` wiring are documented in [`retention.md`](retention.md). Staff legal-hold API/UI and ops items (log/backup TTL, Privacy Policy summary) remain open.
 
 ### How to resolve
 
-1. Follow the schedule in [`retention.md`](retention.md) (accounts: life of account; explore/skip interactions: rolling window; training events: anonymize then delete; limit tables: 90 days; closed reports: counsel-aligned; logs/backups: ops config).
+1. Follow the schedule in [`retention.md`](retention.md) (live accounts: life of account; deleted-account identity: 90 days; explore/skip interactions: rolling window; training events: anonymize then delete; limit tables: 90 days; closed reports: counsel-aligned; logs/backups: ops config).
 2. Implement scheduled jobs (SQL deletes or anonymization) matching `backend/config.py` retention windows.
 3. Publish summary retention periods in the Privacy Policy.
 
-**Owner:** product + backend. **Eng:** cron/worker against `interactions`, `topic_training_events`, limit tables, and closed `content_reports`.
+**Owner:** product + backend. **Eng:** cron/worker against `interactions`, `topic_training_events`, limit tables, closed `content_reports`, and `deleted_accounts`.
 
 ---
 

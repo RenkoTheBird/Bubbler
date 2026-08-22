@@ -527,6 +527,33 @@ async def ensure_schema(pool: asyncpg.Pool) -> None:
                 """
             )
 
+        if not await _table_exists(conn, "deleted_accounts"):
+            await conn.execute(
+                """
+                CREATE TABLE deleted_accounts (
+                    user_id INTEGER PRIMARY KEY,
+                    username VARCHAR(20) NOT NULL,
+                    email VARCHAR(80) NOT NULL,
+                    date_of_birth DATE NOT NULL,
+                    role TEXT NOT NULL CONSTRAINT deleted_accounts_role_check
+                        CHECK (role IN ('user', 'staff')),
+                    created_at TIMESTAMP NOT NULL,
+                    deleted_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                    deletion_source TEXT NOT NULL DEFAULT 'self'
+                        CONSTRAINT deleted_accounts_deletion_source_check
+                        CHECK (deletion_source IN ('self', 'staff')),
+                    legal_hold BOOLEAN NOT NULL DEFAULT FALSE
+                )
+                """
+            )
+            await conn.execute(
+                """
+                CREATE INDEX deleted_accounts_purge_candidates_idx
+                ON deleted_accounts (deleted_at)
+                WHERE legal_hold = FALSE
+                """
+            )
+
 
 async def main():
     pool = await asyncpg.create_pool(my_env_vars.db_url)

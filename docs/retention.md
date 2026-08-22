@@ -10,7 +10,8 @@ Related: [`privacy_legal.md`](privacy_legal.md) §10, [`roadmap.md`](roadmap.md)
 
 | Data | Table(s) | Retention | Mechanism |
 | --- | --- | --- | --- |
-| Accounts, prefs, blocks | `users`, `user_profiles`, `user_topic_prefs`, `user_blocks` | Life of account | `DELETE /user/me` cascades |
+| Accounts, prefs, blocks (live) | `users`, `user_profiles`, `user_topic_prefs`, `user_blocks` | Life of account | `DELETE /user/me` cascades after tombstone write |
+| Deleted-account identity | `deleted_accounts` | **90 days** after `deleted_at` | Snapshot on delete (`DELETED_ACCOUNT_RETENTION_DAYS`); skip `legal_hold` |
 | Posts, topics, edges | `posts`, `post_topics`, `edges`, `media` | Until user deletes or account erasure | FK `ON DELETE CASCADE` |
 | Interactions — likes | `interactions` (`type = 'like'`) | Life of account | Not auto-purged (heart state) |
 | Interactions — explore/skip + view-time | `interactions` (`type IN ('explore', 'skip')`) | **270 days** rolling | Scheduled job (`INTERACTIONS_RETENTION_DAYS`) |
@@ -22,13 +23,20 @@ Related: [`privacy_legal.md`](privacy_legal.md) §10, [`roadmap.md`](roadmap.md)
 | App / server logs | Hosting log sink | **90 days** | Platform config (`LOG_RETENTION_DAYS`) |
 | DB backups (Supabase) | Backups / PITR | **30 days** | Supabase project settings (`BACKUP_RETENTION_DAYS`) |
 
-Account erasure note: `content_reports` use `ON DELETE SET NULL` on user/post FKs so tickets and snapshots can outlive deleted accounts. Disclose in Delete Account copy and Privacy Policy.
+Account erasure: `DELETE /user/me` writes an identity tombstone to `deleted_accounts` (no password), then hard-deletes the live `users` row. Email and username unique indexes stay on `users` only, so they can be reused immediately. `content_reports` use `ON DELETE SET NULL` on user/post FKs so tickets and snapshots can outlive deleted accounts. Disclose tombstone TTL, ticket leftovers, and backups in Delete Account copy and Privacy Policy.
 
 ---
 
 ## Schema changes (implemented)
 
 Reference schema updates in `backend/app/db/schema.sql`:
+
+### `deleted_accounts`
+
+- Identity copy written in the same transaction as `DELETE FROM users` (`user_id`, `username`, `email`, `date_of_birth`, `role`, `created_at`, `deleted_at`, `deletion_source`, `legal_hold`).
+- **No** password hash. **No** FK to `users`. **No** unique constraint on email or username (erasure-friendly reuse).
+- `legal_hold` is set at delete time when the user has open/`in_review` tickets, `legal_hold` tickets, or `reason = 'illegal_content'`.
+- Partial index `deleted_accounts_purge_candidates_idx` on `(deleted_at)` where `legal_hold = FALSE`.
 
 ### `topic_training_events`
 
@@ -62,6 +70,7 @@ Optional env vars in `backend/config.py` (`my_env_vars.retention`). Defaults mat
 | `TRAINING_EVENTS_DELETE_AFTER_DAYS` | 365 | Delete anonymized training rows |
 | `LIMIT_TABLE_RETENTION_DAYS` | 90 | Purge old limit-table rows |
 | `CLOSED_REPORT_RETENTION_DAYS` | 730 | Purge closed, non-hold reports |
+| `DELETED_ACCOUNT_RETENTION_DAYS` | 90 | Purge identity tombstones |
 | `LOG_RETENTION_DAYS` | 90 | Documented ops target (hosting) |
 | `BACKUP_RETENTION_DAYS` | 30 | Documented ops target (Supabase) |
 
@@ -74,11 +83,12 @@ Policy and schema/config groundwork is in place. Still required for a complete r
 ### Engineering
 
 - [x] **`run_retention.py`** — `backend/scripts/run_retention.py` with `--dry-run` and batched purges via `RetentionService` / `RetentionRepository`.
-- [x] **Tests** — `backend/tests/test_retention.py` (repo/service dry-run, batching, schema reference guards, `resolved_at` SQL).
+- [x] **Tests** — `backend/tests/test_retention.py` (repo/service dry-run, batching, schema reference guards, `resolved_at` SQL, deleted-account tombstone).
 - [x] **`resolved_at` population** — set on `resolved` / `dismissed`; cleared on reopen (`report_repo.update_staff_report_status`).
-- [ ] **Admin legal hold** — staff API/UI to set `content_reports.legal_hold` (required before enabling report purge in production).
+- [x] **Deleted-account tombstone** — `deleted_accounts` snapshot on `DELETE /user/me`; purge after `DELETED_ACCOUNT_RETENTION_DAYS`.
+- [ ] **Admin legal hold** — staff API/UI to set `content_reports.legal_hold` and matching `deleted_accounts.legal_hold` (required before enabling report purge in production).
 - [x] **Severe-illegal policy in job** — auto-purge skips `reason = 'illegal_content'` until counsel signs off (L11).
-- [ ] **Delete Account copy** — state that moderation tickets and backups may retain data temporarily (L9 UX).
+- [x] **Delete Account copy** — state that an identity record may be kept up to 90 days, and that moderation tickets and backups may retain data longer (L9 UX).
 - [ ] **Media object storage** — when uploads ship (F6), delete blobs when `media` rows are removed; orphan cleanup job.
 
 ### Ops / legal
@@ -91,7 +101,7 @@ Policy and schema/config groundwork is in place. Still required for a complete r
 
 ### Roadmap
 
-L10 stays **partially complete**: schedule documented, schema/config ready, retention job and `resolved_at` wired; staff legal-hold tooling and ops/legal items still open.
+L10 stays **partially complete**: schedule documented, schema/config ready, retention job, identity tombstone, and `resolved_at` wired; staff legal-hold tooling and ops/legal items still open.
 
 ### Running the job
 

@@ -71,6 +71,12 @@ class RetentionService:
                     count_fn=self.repo.count_closed_reports_to_purge,
                     purge_fn=self.repo.purge_closed_reports_batch,
                 )
+                stats["deleted_accounts"] = await self._run_batched(
+                    conn,
+                    dry_run=dry_run,
+                    count_fn=self.repo.count_deleted_accounts_to_purge,
+                    purge_fn=self.repo.purge_deleted_accounts_batch,
+                )
 
         mode = "dry_run" if dry_run else "applied"
         logger.info("retention_complete mode=%s stats=%s", mode, stats)

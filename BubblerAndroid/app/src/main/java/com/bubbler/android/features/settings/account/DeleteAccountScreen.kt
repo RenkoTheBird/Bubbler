@@ -59,7 +59,7 @@ fun DeleteAccountScreen(
             title = { Text("Delete your account permanently?") },
             text = {
                 Text(
-                    "This will permanently remove your Bubbler account and data. This cannot be undone.",
+                    "This will remove your Bubbler account and content. Your email and username can be used again immediately. We may keep a limited identity record for up to 90 days for safety and legal purposes. Moderation tickets and backups may last longer.",
                 )
             },
             confirmButton = {
@@ -107,7 +107,7 @@ fun DeleteAccountScreen(
                     ?.let { "Signed in as $it." },
             ) {
                 Text(
-                    text = "Deleting your account removes your profile, posts, and preferences. This action is permanent.",
+                    text = "Deleting your account removes your profile, posts, and preferences. Your email and username can be used again immediately. We may keep a limited identity record for up to 90 days for safety and legal purposes. Moderation tickets and backups may last longer.",
                     color = Color.White.copy(alpha = 0.85f),
                     style = MaterialTheme.typography.bodyMedium,
                 )

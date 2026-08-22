@@ -9,6 +9,7 @@ from config import RetentionConfig
 
 from app.repositories.report_repo import ReportRepository
 from app.repositories.retention_repo import RetentionRepository, _parse_execute_count
+from app.repositories.user_repo import UserRepository
 from app.services.retention import RetentionService
 
 
@@ -78,6 +79,21 @@ class RetentionRepositorySqlTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("reporter_daily_limits", sql)
         self.assertIn("day < $1", sql)
 
+    async def test_purge_deleted_accounts_skips_legal_hold(self):
+        self.conn.execute = AsyncMock(return_value="DELETE 1")
+
+        deleted = await self.repo.purge_deleted_accounts_batch(self.conn)
+
+        self.assertEqual(deleted, 1)
+        sql = self.conn.execute.call_args[0][0]
+        self.assertIn("DELETE FROM deleted_accounts", sql)
+        self.assertIn("legal_hold = FALSE", sql)
+        self.assertIn("deleted_at < $1", sql)
+        self.assertEqual(
+            self.conn.execute.call_args[0][2],
+            self.repo.batch_size,
+        )
+
 
 class RetentionServiceTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
@@ -99,7 +115,7 @@ class RetentionServiceTests(unittest.IsolatedAsyncioTestCase):
         self.conn.transaction.return_value.__aexit__ = AsyncMock(return_value=None)
 
         self.conn.fetchval = AsyncMock(
-            side_effect=[5, 3, 2, 10, 4, 1, 6]
+            side_effect=[5, 3, 2, 10, 4, 1, 6, 8]
         )
 
         stats = await self.service.run(dry_run=True)
@@ -111,6 +127,7 @@ class RetentionServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(stats["user_report_limits"], 4)
         self.assertEqual(stats["user_data_export_limits"], 1)
         self.assertEqual(stats["content_reports_closed"], 6)
+        self.assertEqual(stats["deleted_accounts"], 8)
         self.conn.execute.assert_not_called()
 
     async def test_apply_loops_until_batch_exhausted(self):
@@ -130,6 +147,8 @@ class RetentionServiceTests(unittest.IsolatedAsyncioTestCase):
                 "DELETE 1",
                 "DELETE 3",
                 "DELETE 0",
+                "DELETE 2",
+                "DELETE 0",
             ]
         )
 
@@ -142,6 +161,7 @@ class RetentionServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(stats["user_report_limits"], 4)
         self.assertEqual(stats["user_data_export_limits"], 1)
         self.assertEqual(stats["content_reports_closed"], 3)
+        self.assertEqual(stats["deleted_accounts"], 2)
 
 
 class RetentionSchemaReferenceTests(unittest.TestCase):
@@ -170,6 +190,20 @@ class RetentionSchemaReferenceTests(unittest.TestCase):
         self.assertIn("interactions_explore_skip_created_at_idx", self.schema)
         self.assertIn("topic_training_events_created_at_idx", self.schema)
         self.assertIn("content_reports_purge_candidates_idx", self.schema)
+        self.assertIn("deleted_accounts_purge_candidates_idx", self.schema)
+
+    def test_deleted_accounts_tombstone_columns(self):
+        start = self.schema.index("CREATE TABLE deleted_accounts")
+        end = self.schema.index("CREATE INDEX deleted_accounts_purge_candidates_idx")
+        block = self.schema[start:end]
+        self.assertIn("user_id INTEGER PRIMARY KEY", block)
+        self.assertIn("email VARCHAR(80) NOT NULL", block)
+        self.assertNotIn("password", block)
+        self.assertNotIn("UNIQUE", block)
+        self.assertNotIn("REFERENCES users(id)", block)
+
+    def test_deleted_account_retention_default_is_90_days(self):
+        self.assertEqual(RetentionConfig().deleted_account_retention_days, 90)
 
 
 class ReportResolvedAtTests(unittest.IsolatedAsyncioTestCase):
@@ -234,3 +268,75 @@ class ReportResolvedAtTests(unittest.IsolatedAsyncioTestCase):
         report = await self.repo.update_staff_report_status(self.report_id, "dismissed")
 
         self.assertEqual(report.resolved_at, first)
+
+
+class DeleteUserTombstoneTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        self.conn = AsyncMock()
+        self.pool = MagicMock()
+
+        @asynccontextmanager
+        async def _acquire():
+            yield self.conn
+
+        self.pool.acquire = _acquire
+        self.conn.transaction = MagicMock()
+        self.conn.transaction.return_value.__aenter__ = AsyncMock(return_value=None)
+        self.conn.transaction.return_value.__aexit__ = AsyncMock(return_value=None)
+        self.repo = UserRepository(self.pool)
+        self.user_row = {
+            "id": 7,
+            "username": "ada",
+            "email": "ada@example.com",
+            "date_of_birth": datetime.date(1990, 1, 1),
+            "role": "user",
+            "created_at": datetime.datetime(2024, 1, 1, tzinfo=timezone.utc),
+        }
+
+    async def test_missing_user_does_not_write_tombstone(self):
+        self.conn.fetchrow = AsyncMock(return_value=None)
+
+        deleted = await self.repo.delete_user(7)
+
+        self.assertFalse(deleted)
+        self.conn.execute.assert_not_called()
+
+    async def test_snapshots_identity_without_password_then_deletes(self):
+        self.conn.fetchrow = AsyncMock(return_value=self.user_row)
+        self.conn.fetchval = AsyncMock(return_value=False)
+        self.conn.execute = AsyncMock(side_effect=["INSERT 0 1", "DELETE 1"])
+
+        deleted = await self.repo.delete_user(7)
+
+        self.assertTrue(deleted)
+        select_sql = self.conn.fetchrow.call_args[0][0]
+        self.assertIn("FOR UPDATE", select_sql)
+        self.assertNotIn("password", select_sql.lower())
+
+        insert_sql = self.conn.execute.call_args_list[0][0][0]
+        self.assertIn("INSERT INTO deleted_accounts", insert_sql)
+        self.assertNotIn("password", insert_sql.lower())
+        insert_args = self.conn.execute.call_args_list[0][0]
+        self.assertEqual(insert_args[1], 7)
+        self.assertEqual(insert_args[2], "ada")
+        self.assertEqual(insert_args[3], "ada@example.com")
+        self.assertEqual(insert_args[7], "self")
+        self.assertIs(insert_args[8], False)
+
+        delete_sql = self.conn.execute.call_args_list[1][0][0]
+        self.assertIn("DELETE FROM users", delete_sql)
+
+    async def test_legal_hold_when_open_or_illegal_reports_exist(self):
+        self.conn.fetchrow = AsyncMock(return_value=self.user_row)
+        self.conn.fetchval = AsyncMock(return_value=True)
+        self.conn.execute = AsyncMock(side_effect=["INSERT 0 1", "DELETE 1"])
+
+        await self.repo.delete_user(7, deletion_source="staff")
+
+        hold_sql = self.conn.fetchval.call_args[0][0]
+        self.assertIn("legal_hold = TRUE", hold_sql)
+        self.assertIn("status IN ('open', 'in_review')", hold_sql)
+        self.assertIn("reason = 'illegal_content'", hold_sql)
+        insert_args = self.conn.execute.call_args_list[0][0]
+        self.assertEqual(insert_args[7], "staff")
+        self.assertIs(insert_args[8], True)

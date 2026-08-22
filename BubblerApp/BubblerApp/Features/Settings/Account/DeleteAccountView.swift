@@ -66,7 +66,7 @@ struct DeleteAccountView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This will permanently remove your Bubbler account and data. This cannot be undone.")
+            Text("This will remove your Bubbler account and content. Your email and username can be used again immediately. We may keep a limited identity record for up to 90 days for safety and legal purposes. Moderation tickets and backups may last longer.")
         }
     }
 
@@ -106,7 +106,7 @@ struct DeleteAccountView: View {
                 ? nil
                 : "Signed in as \(viewModel.accountEmail)."
         ) {
-            Text("Deleting your account removes your profile, posts, and preferences. This action is permanent.")
+            Text("Deleting your account removes your profile, posts, and preferences. Your email and username can be used again immediately. We may keep a limited identity record for up to 90 days for safety and legal purposes. Moderation tickets and backups may last longer.")
                 .font(.subheadline)
                 .foregroundColor(.white.opacity(0.85))
         }

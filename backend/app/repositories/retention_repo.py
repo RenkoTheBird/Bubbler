@@ -170,3 +170,33 @@ class RetentionRepository:
             self.batch_size,
         )
         return _parse_execute_count(result)
+
+    async def count_deleted_accounts_to_purge(self, conn) -> int:
+        cutoff = self._cutoff(self.config.deleted_account_retention_days)
+        return await conn.fetchval(
+            """
+            SELECT COUNT(*)
+            FROM deleted_accounts
+            WHERE legal_hold = FALSE
+              AND deleted_at < $1
+            """,
+            cutoff,
+        )
+
+    async def purge_deleted_accounts_batch(self, conn) -> int:
+        cutoff = self._cutoff(self.config.deleted_account_retention_days)
+        result = await conn.execute(
+            """
+            DELETE FROM deleted_accounts
+            WHERE user_id IN (
+                SELECT user_id
+                FROM deleted_accounts
+                WHERE legal_hold = FALSE
+                  AND deleted_at < $1
+                LIMIT $2
+            )
+            """,
+            cutoff,
+            self.batch_size,
+        )
+        return _parse_execute_count(result)

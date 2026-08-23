@@ -331,6 +331,8 @@ Personal-data breaches require timely assessment and, where applicable, regulato
 4. Practice once (tabletop) before launch.
 5. Ensure logging is enough to detect abuse but retained per §10.
 
+**Status:** **Partial.** Internal scaffold in [`breach_playbook.md`](breach_playbook.md). Contacts, counsel review, tabletop, and Privacy Policy paragraph still required.
+
 **Owner:** ops. **Eng:** secrets rotation procedure for `SECRETKEY`, DB credentials; force token invalidation path if JWTs are long-lived.
 
 ---

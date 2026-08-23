@@ -2,7 +2,7 @@
 
 Internal retention policy for Bubbler (beta). Counsel should review before production. Public summary belongs in the Privacy Policy (roadmap L1).
 
-Related: [`privacy_legal.md`](privacy_legal.md) §10, [`roadmap.md`](roadmap.md) L10, [`backend/config.py`](../backend/config.py), [`backend/app/db/schema.sql`](../backend/app/db/schema.sql).
+Related: [`privacy_legal.md`](privacy_legal.md) §10, [`breach_playbook.md`](breach_playbook.md), [`roadmap.md`](roadmap.md) L10, [`backend/config.py`](../backend/config.py), [`backend/app/db/schema.sql`](../backend/app/db/schema.sql).
 
 ---
 
@@ -96,12 +96,12 @@ Policy and schema/config groundwork is in place. Still required for a complete r
 - [ ] **Supabase backup TTL** — set to ~30 days; record in ROPA.
 - [ ] **Log retention** — configure 30–90 days on the hosting log sink.
 - [ ] **Privacy Policy summary** — publish retention periods for users (L1).
-- [ ] **Breach playbook** — separate L10 item (`privacy_legal.md` §12); not covered here.
+- [ ] **Breach playbook** — scaffold in [`breach_playbook.md`](breach_playbook.md); fill contacts, counsel review, tabletop, and Privacy Policy paragraph still open.
 - [ ] **Counsel review** — especially closed-report retention, CSAM/legal-hold workflow (L11).
 
 ### Roadmap
 
-L10 stays **partially complete**: schedule documented, schema/config ready, retention job, identity tombstone, and `resolved_at` wired; staff legal-hold tooling and ops/legal items still open.
+L10 stays **partially complete**: schedule documented, schema/config ready, retention job, identity tombstone, `resolved_at`, and staff legal-hold wired; breach playbook scaffolded; ops/legal completion items still open (see [`breach_playbook.md`](breach_playbook.md) §12).
 
 ### Running the job
 

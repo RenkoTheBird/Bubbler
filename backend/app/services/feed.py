@@ -23,6 +23,15 @@ def _topic_sets(topic_preferences: list[TopicPreference]) -> tuple[set[str], set
     return preferred, blacklisted
 
 
+def _without_blocked_users(
+    posts: list[dict],
+    blocked_user_ids: set[int] | None,
+) -> list[dict]:
+    if not blocked_user_ids:
+        return posts
+    return [post for post in posts if post.get("user_id") not in blocked_user_ids]
+
+
 def _normalize_topic(topic: str | None) -> str | None:
     if not isinstance(topic, str) or not topic.strip():
         return None

@@ -64,35 +64,41 @@ class PostComposer:
                 post["_topic_bucket"] = topic_bucket
                 buckets[self.BUCKET_SIMILAR].append(post)
 
-            edges = await self.repo.get_outbound_edges_by_type(
-                anchor_post_id, conn=conn
-            )
-            if edges:
-                target_ids = [
-                    edge.to_post_id
-                    for edge in edges
-                    if edge.type in _GRAPH_EDGE_TYPES
-                ]
-                graph_posts = await self.repo.get_posts_by_ids(target_ids, conn=conn)
-                posts_by_id = {post["id"]: post for post in graph_posts}
-                for edge in edges:
-                    if edge.type not in _GRAPH_EDGE_TYPES:
-                        continue
-                    post = posts_by_id.get(edge.to_post_id)
-                    if not post:
-                        continue
-                    post_topic = post.get("topic")
-                    if not isinstance(post_topic, str) or post_topic.casefold() != topic.casefold():
-                        continue
-                    if post.get("user_id") in blacklisted_user_ids:
-                        continue
-                    if post["id"] == anchor_post_id:
-                        continue
-                    enriched = dict(post)
-                    enriched["similarity"] = float(edge.weight or 0.0)
-                    enriched["_post_bucket"] = self.BUCKET_SIMILAR
-                    enriched["_topic_bucket"] = topic_bucket
-                    buckets[self.BUCKET_SIMILAR].append(enriched)
+            if anchor_post_id:
+                edges = await self.repo.get_outbound_edges_by_type(
+                    anchor_post_id, conn=conn
+                )
+                if edges:
+                    target_ids = [
+                        edge.to_post_id
+                        for edge in edges
+                        if edge.type in _GRAPH_EDGE_TYPES
+                    ]
+                    graph_posts = await self.repo.get_posts_by_ids(
+                        target_ids, conn=conn
+                    )
+                    posts_by_id = {post["id"]: post for post in graph_posts}
+                    for edge in edges:
+                        if edge.type not in _GRAPH_EDGE_TYPES:
+                            continue
+                        post = posts_by_id.get(edge.to_post_id)
+                        if not post:
+                            continue
+                        post_topic = post.get("topic")
+                        if (
+                            not isinstance(post_topic, str)
+                            or post_topic.casefold() != topic.casefold()
+                        ):
+                            continue
+                        if post.get("user_id") in blacklisted_user_ids:
+                            continue
+                        if post["id"] == anchor_post_id:
+                            continue
+                        enriched = dict(post)
+                        enriched["similarity"] = float(edge.weight or 0.0)
+                        enriched["_post_bucket"] = self.BUCKET_SIMILAR
+                        enriched["_topic_bucket"] = topic_bucket
+                        buckets[self.BUCKET_SIMILAR].append(enriched)
 
         if quotas[self.BUCKET_OPPOSITE] > 0:
             opposite_posts = await self.repo.get_posts_by_embedding_in_topic(

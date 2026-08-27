@@ -8,7 +8,7 @@ from app.db.feed_sql import (
     POSTS_TABLESAMPLE_FROM,
     POSTS_WITH_TOPIC_COLUMNS,
 )
-from app.db.vector import to_pgvector
+from app.db.vector import from_pgvector, to_pgvector
 from app.schemas.edge import Edge
 
 # TABLESAMPLE percentage — tunable; avoids full-table ORDER BY RANDOM()
@@ -189,7 +189,7 @@ class FeedRepository:
             )
             if row is None or row["embedding"] is None:
                 return None
-            return list(row["embedding"])
+            return from_pgvector(row["embedding"])
 
     async def get_similar_topics(
         self,
@@ -319,7 +319,7 @@ class FeedRepository:
             )
             if row is None or row["embedding"] is None:
                 return None
-            return list(row["embedding"])
+            return from_pgvector(row["embedding"])
 
     async def _fetch_random_posts(self, conn, limit: int) -> list[dict[str, Any]]:
         rows = await conn.fetch(

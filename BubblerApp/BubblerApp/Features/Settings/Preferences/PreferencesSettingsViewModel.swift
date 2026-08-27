@@ -20,15 +20,17 @@ final class PreferencesSettingsViewModel: ObservableObject {
 
     private var hasLoaded = false
 
-    var strategyTotal: Double {
-        preferences.strategyWeights.total
+    var topicCompositionTotal: Double {
+        preferences.topicComposition.total
+    }
+
+    var postCompositionTotal: Double {
+        preferences.postComposition.total
     }
 
     func loadPreferences(using authSession: AuthSession, force: Bool = false) async {
         guard force || !hasLoaded else { return }
 
-        // Only show the loading card on the first fetch so subsequent silent
-        // refreshes (e.g. after returning from the graph view) don't flash.
         if !hasLoaded {
             isLoading = true
         }
@@ -46,9 +48,6 @@ final class PreferencesSettingsViewModel: ObservableObject {
         isLoading = false
     }
 
-    /// Re-fetches the latest saved preferences from the server. Call this when the
-    /// view reappears so external changes (like unpreferring a topic in the graph
-    /// view) are reflected instead of a stale first-load snapshot.
     func refreshFromServer(using authSession: AuthSession) async {
         await loadPreferences(using: authSession, force: true)
     }
@@ -63,6 +62,40 @@ final class PreferencesSettingsViewModel: ObservableObject {
         applyFeatureGates()
         errorMessage = nil
         successMessage = "Defaults restored locally. Tap Save Preferences to apply them."
+    }
+
+    func selectPreset(_ preset: FeedPreset) {
+        preferences.applyPreset(preset)
+    }
+
+    func updateTopicComposition(
+        similar: Double? = nil,
+        opposite: Double? = nil,
+        surprise: Double? = nil
+    ) {
+        var composition = preferences.topicComposition
+        if let similar { composition.similar = similar }
+        if let opposite { composition.opposite = opposite }
+        if let surprise { composition.surprise = surprise }
+        preferences.topicComposition = composition
+        markCompositionCustomIfNeeded()
+    }
+
+    func updatePostComposition(
+        similar: Double? = nil,
+        opposite: Double? = nil,
+        surprise: Double? = nil
+    ) {
+        var composition = preferences.postComposition
+        if let similar { composition.similar = similar }
+        if let opposite { composition.opposite = opposite }
+        if let surprise { composition.surprise = surprise }
+        preferences.postComposition = composition
+        markCompositionCustomIfNeeded()
+    }
+
+    func markCompositionCustomIfNeeded() {
+        preferences.detectPreset()
     }
 
     func savePreferences(using authSession: AuthSession) async {

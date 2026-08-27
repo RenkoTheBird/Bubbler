@@ -1,9 +1,9 @@
 from datetime import datetime, timezone
 
-from app.db.jsonb import normalize_strategy_weights, to_jsonb
+from app.db.jsonb import normalize_composition, to_jsonb
 from app.db.datetime_utils import ensure_utc, utc_iso_z
+from app.schemas.composition import DEFAULT_COMPOSITION, CompositionWeights
 from app.schemas.user import (
-    DEFAULT_STRATEGY_WEIGHTS,
     STAFF_ROLE,
     BlockedUserInfo,
     PublicUserInfo,
@@ -26,19 +26,24 @@ class UserRepository:
         self.pool = pool
 
     def _build_user_profile(self, row, topic_preferences: list[TopicPreference]) -> UserProfile:
+        topic_raw = normalize_composition(
+            row["topic_composition"],
+            defaults=DEFAULT_COMPOSITION,
+        )
+        post_raw = normalize_composition(
+            row["post_composition"],
+            defaults=DEFAULT_COMPOSITION,
+        )
         return UserProfile(
             user_id=row["user_id"],
-            diversity_tolerance=row["diversity_tolerance"],
-            randomness=row["randomness"],
+            feed_preset=row["feed_preset"],
+            topic_composition=CompositionWeights(**topic_raw),
+            post_composition=CompositionWeights(**post_raw),
             topic_preferences=topic_preferences,
             use_view_time=row["use_view_time"],
             view_time_weight=row["view_time_weight"],
             use_recency=row["use_recency"],
             ai_topic_detection=row["ai_topic_detection"],
-            strategy_weights=normalize_strategy_weights(
-                row["strategy_weights"],
-                defaults=DEFAULT_STRATEGY_WEIGHTS,
-            ),
         )
 
     def _row_to_user_info(self, row) -> UserInfo:
@@ -306,33 +311,33 @@ class UserRepository:
                     """
                     INSERT INTO user_profiles (
                         user_id,
-                        diversity_tolerance,
-                        randomness,
+                        feed_preset,
+                        topic_composition,
+                        post_composition,
                         use_view_time,
                         view_time_weight,
                         use_recency,
-                        ai_topic_detection,
-                        strategy_weights
+                        ai_topic_detection
                     )
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
+                    VALUES ($1, $2, $3::jsonb, $4::jsonb, $5, $6, $7, $8)
                     ON CONFLICT (user_id) DO UPDATE
-                    SET diversity_tolerance = EXCLUDED.diversity_tolerance,
-                        randomness = EXCLUDED.randomness,
+                    SET feed_preset = EXCLUDED.feed_preset,
+                        topic_composition = EXCLUDED.topic_composition,
+                        post_composition = EXCLUDED.post_composition,
                         use_view_time = EXCLUDED.use_view_time,
                         view_time_weight = EXCLUDED.view_time_weight,
                         use_recency = EXCLUDED.use_recency,
-                        ai_topic_detection = EXCLUDED.ai_topic_detection,
-                        strategy_weights = EXCLUDED.strategy_weights
+                        ai_topic_detection = EXCLUDED.ai_topic_detection
                     RETURNING *;
                     """,
                     user_id,
-                    body.diversity_tolerance,
-                    body.randomness,
+                    body.feed_preset,
+                    to_jsonb(body.topic_composition.as_dict()),
+                    to_jsonb(body.post_composition.as_dict()),
                     body.use_view_time,
                     body.view_time_weight,
                     body.use_recency,
                     body.ai_topic_detection,
-                    to_jsonb(body.strategy_weights),
                 )
                 await self._sync_topic_prefs(conn, user_id, body.topic_preferences)
                 topic_preferences = await self._fetch_topic_prefs(conn, user_id)

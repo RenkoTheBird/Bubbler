@@ -20,43 +20,140 @@ struct TopicPreference: Codable, Equatable {
     }
 }
 
+enum FeedPreset: String, Codable, CaseIterable, Identifiable {
+    case stayInLane = "stay_in_lane"
+    case crossPollinate = "cross_pollinate"
+    case wildWalk = "wild_walk"
+    case custom
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .stayInLane: return "Stay in lane"
+        case .crossPollinate: return "Cross-pollinate"
+        case .wildWalk: return "Wild walk"
+        case .custom: return "Custom"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .stayInLane:
+            return "Keep exploring within familiar topics and closely related posts."
+        case .crossPollinate:
+            return "Jump to different topics while surfacing posts that still feel connected to what you're reading."
+        case .wildWalk:
+            return "Maximize variety with unexpected topics and posts."
+        case .custom:
+            return "Your manually tuned topic and post mix (set in Advanced)."
+        }
+    }
+
+    static let selectablePresets: [FeedPreset] = [.stayInLane, .crossPollinate, .wildWalk]
+}
+
+struct CompositionWeights: Codable, Equatable {
+    var similar: Double
+    var opposite: Double
+    var surprise: Double
+
+    static let defaultWeights = CompositionWeights(
+        similar: 0.55,
+        opposite: 0.15,
+        surprise: 0.30
+    )
+
+    var total: Double {
+        similar + opposite + surprise
+    }
+
+    func normalized() -> CompositionWeights {
+        let clamped = CompositionWeights(
+            similar: similar.clamped(to: 0 ... 1),
+            opposite: opposite.clamped(to: 0 ... 1),
+            surprise: surprise.clamped(to: 0 ... 1)
+        )
+
+        let total = clamped.total
+        guard total > 0 else {
+            return .defaultWeights
+        }
+
+        return CompositionWeights(
+            similar: clamped.similar / total,
+            opposite: clamped.opposite / total,
+            surprise: clamped.surprise / total
+        )
+    }
+
+    static func presetWeights(for preset: FeedPreset, tier: CompositionTier) -> CompositionWeights {
+        switch (preset, tier) {
+        case (.stayInLane, _):
+            return CompositionWeights(similar: 0.55, opposite: 0.15, surprise: 0.30)
+        case (.crossPollinate, .topic):
+            return CompositionWeights(similar: 0.15, opposite: 0.55, surprise: 0.30)
+        case (.crossPollinate, .post):
+            return CompositionWeights(similar: 0.55, opposite: 0.15, surprise: 0.30)
+        case (.wildWalk, _):
+            return CompositionWeights(similar: 0.15, opposite: 0.25, surprise: 0.60)
+        case (.custom, _):
+            return .defaultWeights
+        }
+    }
+
+    enum CompositionTier {
+        case topic
+        case post
+    }
+
+    private static let matchEpsilon = 0.02
+
+    static func matches(_ left: CompositionWeights, _ right: CompositionWeights) -> Bool {
+        let a = left.normalized()
+        let b = right.normalized()
+        return abs(a.similar - b.similar) <= matchEpsilon
+            && abs(a.opposite - b.opposite) <= matchEpsilon
+            && abs(a.surprise - b.surprise) <= matchEpsilon
+    }
+}
+
 struct UserPreferences: Codable, Equatable {
     let userId: Int
-    var diversityTolerance: Double
-    var randomness: Double
+    var feedPreset: FeedPreset
+    var topicComposition: CompositionWeights
+    var postComposition: CompositionWeights
     var topicPreferences: [TopicPreference]
     var useViewTime: Bool
     var viewTimeWeight: Double
     var useRecency: Bool
     var aiTopicDetection: Bool
-    var strategyWeights: FeedStrategyWeights
 
     enum CodingKeys: String, CodingKey {
         case userId = "user_id"
-        case diversityTolerance = "diversity_tolerance"
-        case randomness
+        case feedPreset = "feed_preset"
+        case topicComposition = "topic_composition"
+        case postComposition = "post_composition"
         case topicPreferences = "topic_preferences"
         case useViewTime = "use_view_time"
         case viewTimeWeight = "view_time_weight"
         case useRecency = "use_recency"
         case aiTopicDetection = "ai_topic_detection"
-        case strategyWeights = "strategy_weights"
     }
 
     static let placeholder = systemDefaults(userId: 0)
 
-    /// Built-in algorithm defaults (matches backend `default_user_prefs`).
     static func systemDefaults(userId: Int) -> UserPreferences {
         UserPreferences(
             userId: userId,
-            diversityTolerance: 0.4,
-            randomness: 0.4,
+            feedPreset: .stayInLane,
+            topicComposition: .presetWeights(for: .stayInLane, tier: .topic),
+            postComposition: .presetWeights(for: .stayInLane, tier: .post),
             topicPreferences: [],
             useViewTime: false,
             viewTimeWeight: 0.1,
             useRecency: true,
-            aiTopicDetection: false,
-            strategyWeights: .default
+            aiTopicDetection: false
         )
     }
 
@@ -74,15 +171,38 @@ struct UserPreferences: Codable, Equatable {
 
     var updatePayload: PreferencesUpdatePayload {
         PreferencesUpdatePayload(
-            diversityTolerance: diversityTolerance,
-            randomness: randomness,
+            feedPreset: feedPreset,
+            topicComposition: topicComposition,
+            postComposition: postComposition,
             topicPreferences: topicPreferences,
             useViewTime: useViewTime,
             viewTimeWeight: viewTimeWeight,
             useRecency: useRecency,
-            aiTopicDetection: aiTopicDetection,
-            strategyWeights: strategyWeights
+            aiTopicDetection: aiTopicDetection
         )
+    }
+
+    mutating func applyPreset(_ preset: FeedPreset) {
+        guard preset != .custom else {
+            feedPreset = .custom
+            return
+        }
+        feedPreset = preset
+        topicComposition = .presetWeights(for: preset, tier: .topic)
+        postComposition = .presetWeights(for: preset, tier: .post)
+    }
+
+    mutating func detectPreset() {
+        for preset in FeedPreset.selectablePresets {
+            let topic = CompositionWeights.presetWeights(for: preset, tier: .topic)
+            let post = CompositionWeights.presetWeights(for: preset, tier: .post)
+            if CompositionWeights.matches(topicComposition, topic),
+               CompositionWeights.matches(postComposition, post) {
+                feedPreset = preset
+                return
+            }
+        }
+        feedPreset = .custom
     }
 
     mutating func updatePreferredTopics(_ topics: [String]) {
@@ -90,7 +210,6 @@ struct UserPreferences: Codable, Equatable {
             TopicPreference(topic: $0, preferenceType: .preferred)
         }
         let preferredKeys = Set(preferred.map { $0.topic.lowercased() })
-        // Preferring a topic must clear any blacklist entry in the same update.
         let blacklisted = topicPreferences.filter {
             $0.preferenceType == .blacklisted && !preferredKeys.contains($0.topic.lowercased())
         }
@@ -102,8 +221,6 @@ struct UserPreferences: Codable, Equatable {
             TopicPreference(topic: $0, preferenceType: .blacklisted)
         }
         let blacklistedKeys = Set(blacklisted.map { $0.topic.lowercased() })
-        // Blacklisting a topic must clear any preferred entry in the same update.
-        // Without this, merge keeps preferred and the blacklist add is dropped.
         let preferred = topicPreferences.filter {
             $0.preferenceType == .preferred && !blacklistedKeys.contains($0.topic.lowercased())
         }
@@ -135,10 +252,11 @@ struct UserPreferences: Codable, Equatable {
                 !preferred.contains(where: { $0.caseInsensitiveCompare(blacklistedTopic) == .orderedSame })
             }
 
-        return UserPreferences(
+        var sanitized = UserPreferences(
             userId: userId,
-            diversityTolerance: diversityTolerance.clamped(to: 0 ... 1),
-            randomness: randomness.clamped(to: 0 ... 1),
+            feedPreset: feedPreset,
+            topicComposition: topicComposition.normalized(),
+            postComposition: postComposition.normalized(),
             topicPreferences: Self.mergeTopicPreferences(
                 preferred: preferred.map { TopicPreference(topic: $0, preferenceType: .preferred) },
                 blacklisted: blacklist.map { TopicPreference(topic: $0, preferenceType: .blacklisted) }
@@ -146,9 +264,14 @@ struct UserPreferences: Codable, Equatable {
             useViewTime: useViewTime,
             viewTimeWeight: viewTimeWeight.clamped(to: 0 ... 1),
             useRecency: useRecency,
-            aiTopicDetection: aiTopicDetection,
-            strategyWeights: strategyWeights.normalized()
+            aiTopicDetection: aiTopicDetection
         )
+        if sanitized.feedPreset != .custom {
+            sanitized.applyPreset(sanitized.feedPreset)
+        } else {
+            sanitized.detectPreset()
+        }
+        return sanitized
     }
 
     private static func mergeTopicPreferences(
@@ -173,92 +296,24 @@ struct UserPreferences: Codable, Equatable {
 }
 
 struct PreferencesUpdatePayload: Codable {
-    var diversityTolerance: Double
-    var randomness: Double
+    var feedPreset: FeedPreset
+    var topicComposition: CompositionWeights
+    var postComposition: CompositionWeights
     var topicPreferences: [TopicPreference]
     var useViewTime: Bool
     var viewTimeWeight: Double
     var useRecency: Bool
     var aiTopicDetection: Bool
-    var strategyWeights: FeedStrategyWeights
 
     enum CodingKeys: String, CodingKey {
-        case diversityTolerance = "diversity_tolerance"
-        case randomness
+        case feedPreset = "feed_preset"
+        case topicComposition = "topic_composition"
+        case postComposition = "post_composition"
         case topicPreferences = "topic_preferences"
         case useViewTime = "use_view_time"
         case viewTimeWeight = "view_time_weight"
         case useRecency = "use_recency"
         case aiTopicDetection = "ai_topic_detection"
-        case strategyWeights = "strategy_weights"
-    }
-}
-
-struct FeedStrategyWeights: Codable, Equatable {
-    var similar: Double
-    var graph: Double
-    var opposite: Double
-    var random: Double
-
-    static let `default` = FeedStrategyWeights(
-        similar: 0.4,
-        graph: 0.25,
-        opposite: 0.2,
-        random: 0.15
-    )
-
-    var total: Double {
-        similar + graph + opposite + random
-    }
-
-    func normalized() -> FeedStrategyWeights {
-        let clamped = FeedStrategyWeights(
-            similar: similar.clamped(to: 0 ... 1),
-            graph: graph.clamped(to: 0 ... 1),
-            opposite: opposite.clamped(to: 0 ... 1),
-            random: random.clamped(to: 0 ... 1)
-        )
-
-        let total = clamped.total
-        guard total > 0 else {
-            return .default
-        }
-
-        return FeedStrategyWeights(
-            similar: clamped.similar / total,
-            graph: clamped.graph / total,
-            opposite: clamped.opposite / total,
-            random: clamped.random / total
-        )
-    }
-
-    init(similar: Double, graph: Double, opposite: Double, random: Double) {
-        self.similar = similar
-        self.graph = graph
-        self.opposite = opposite
-        self.random = random
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        let dictionary = try container.decode([String: Double].self)
-
-        similar = dictionary["similar"] ?? FeedStrategyWeights.default.similar
-        graph = dictionary["graph"] ?? FeedStrategyWeights.default.graph
-        opposite = dictionary["opposite"] ?? FeedStrategyWeights.default.opposite
-        random = dictionary["random"] ?? FeedStrategyWeights.default.random
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        try container.encode(
-            [
-                "similar": similar,
-                "graph": graph,
-                "opposite": opposite,
-                "random": random,
-            ]
-        )
     }
 }
 

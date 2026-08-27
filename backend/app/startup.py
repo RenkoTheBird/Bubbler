@@ -18,7 +18,8 @@ from app.services.auth import AuthService
 from app.services.feed import FeedService
 from app.services.feed import PreferenceService
 from app.services.feed import RankingService
-from app.services.feed import StrategyService
+from app.services.post_composer import PostComposer
+from app.services.topic_composer import TopicComposer
 from app.services.graph import GraphService
 from app.services.interaction import InteractionService
 from app.services.moderation import ModerationService
@@ -98,9 +99,19 @@ async def lifespan(fastapi: FastAPI):
     report_service = ReportService(report_repo)
     moderation_service = ModerationService(moderation_repo)
     user_service = UserService(user_repo)
-    strategy_service = StrategyService(feed_repo)
-    feed_service = FeedService(feed_repo, graph_service, RankingService(), embedding_service, strategy_service,
-                               PreferenceService(), user_repo, interaction_repo)
+    topic_composer = TopicComposer(feed_repo, embedding_service)
+    post_composer = PostComposer(feed_repo)
+    feed_service = FeedService(
+        feed_repo,
+        graph_service,
+        RankingService(),
+        embedding_service,
+        topic_composer,
+        post_composer,
+        PreferenceService(),
+        user_repo,
+        interaction_repo,
+    )
     search_service = SearchService(
         search_repo, graph_service, embedding_service, user_repo
     )

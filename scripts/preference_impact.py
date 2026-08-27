@@ -127,12 +127,12 @@ PREFERRED_TOPIC = "science"
 BLACKLIST_TOPIC = "politics"
 YESTERDAY_LIKE_TOPIC = "technology"
 
-DEFAULT_STRATEGY = {
-    "similar": 0.4,
-    "graph": 0.25,
-    "opposite": 0.2,
-    "random": 0.15,
+DEFAULT_TOPIC_COMPOSITION = {
+    "similar": 0.55,
+    "opposite": 0.15,
+    "surprise": 0.30,
 }
+DEFAULT_POST_COMPOSITION = dict(DEFAULT_TOPIC_COMPOSITION)
 
 MetricName = Literal[
     "kendall_tau",
@@ -294,15 +294,30 @@ def post_ids(posts: list[dict[str, Any]]) -> list[str]:
 
 def preferences_payload(**overrides: Any) -> dict[str, Any]:
     payload: dict[str, Any] = {
-        "diversity_tolerance": 0.4,
-        "randomness": 0.0,
+        "feed_preset": "stay_in_lane",
+        "topic_composition": dict(DEFAULT_TOPIC_COMPOSITION),
+        "post_composition": dict(DEFAULT_POST_COMPOSITION),
         "topic_preferences": [],
         "use_view_time": False,
         "view_time_weight": 0.1,
         "use_recency": True,
         "ai_topic_detection": False,
-        "strategy_weights": dict(DEFAULT_STRATEGY),
     }
+
+    legacy_keys = ("diversity_tolerance", "randomness", "strategy_weights")
+    legacy = {key: overrides.pop(key) for key in list(overrides) if key in legacy_keys}
+    if legacy:
+        from app.schemas.composition import migrate_legacy_prefs
+
+        preset, topic, post = migrate_legacy_prefs(
+            diversity_tolerance=legacy.get("diversity_tolerance"),
+            randomness=legacy.get("randomness"),
+            strategy_weights=legacy.get("strategy_weights"),
+        )
+        payload["feed_preset"] = preset
+        payload["topic_composition"] = topic
+        payload["post_composition"] = post
+
     payload.update(overrides)
     return payload
 

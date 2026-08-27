@@ -2,8 +2,29 @@ package com.bubbler.android.data.model
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
+
+@Serializable
+enum class FeedPreset {
+    @SerialName("stay_in_lane")
+    STAY_IN_LANE,
+
+    @SerialName("cross_pollinate")
+    CROSS_POLLINATE,
+
+    @SerialName("wild_walk")
+    WILD_WALK,
+
+    @SerialName("custom")
+    CUSTOM,
+}
+
+enum class CompositionTier {
+    TOPIC,
+    POST,
+}
 
 @Serializable
 enum class PreferenceType {
@@ -22,38 +43,60 @@ data class TopicPreference(
 )
 
 @Serializable
-data class FeedStrategyWeights(
+data class CompositionWeights(
     val similar: Double = DEFAULT.similar,
-    val graph: Double = DEFAULT.graph,
     val opposite: Double = DEFAULT.opposite,
-    val random: Double = DEFAULT.random,
+    val surprise: Double = DEFAULT.surprise,
 ) {
-    val total: Double get() = similar + graph + opposite + random
+    val total: Double get() = similar + opposite + surprise
 
-    fun normalized(): FeedStrategyWeights {
-        val clamped = FeedStrategyWeights(
+    fun normalized(): CompositionWeights {
+        val clamped = CompositionWeights(
             similar = similar.clamped(0.0, 1.0),
-            graph = graph.clamped(0.0, 1.0),
             opposite = opposite.clamped(0.0, 1.0),
-            random = random.clamped(0.0, 1.0),
+            surprise = surprise.clamped(0.0, 1.0),
         )
         val sum = clamped.total
         if (sum <= 0.0) return DEFAULT
-        return FeedStrategyWeights(
+        return CompositionWeights(
             similar = clamped.similar / sum,
-            graph = clamped.graph / sum,
             opposite = clamped.opposite / sum,
-            random = clamped.random / sum,
+            surprise = clamped.surprise / sum,
         )
     }
 
     companion object {
-        val DEFAULT = FeedStrategyWeights(
-            similar = 0.4,
-            graph = 0.25,
-            opposite = 0.2,
-            random = 0.15,
+        val DEFAULT = CompositionWeights(
+            similar = 0.55,
+            opposite = 0.15,
+            surprise = 0.30,
         )
+
+        private const val MATCH_EPSILON = 0.02
+
+        fun presetWeights(preset: FeedPreset, tier: CompositionTier): CompositionWeights =
+            when (preset) {
+                FeedPreset.STAY_IN_LANE -> DEFAULT
+                FeedPreset.CROSS_POLLINATE -> if (tier == CompositionTier.TOPIC) {
+                    CompositionWeights(similar = 0.15, opposite = 0.55, surprise = 0.30)
+                } else {
+                    CompositionWeights(similar = 0.55, opposite = 0.15, surprise = 0.30)
+                }
+                FeedPreset.WILD_WALK -> CompositionWeights(
+                    similar = 0.15,
+                    opposite = 0.25,
+                    surprise = 0.60,
+                )
+                FeedPreset.CUSTOM -> DEFAULT
+            }
+
+        fun matches(left: CompositionWeights, right: CompositionWeights): Boolean {
+            val a = left.normalized()
+            val b = right.normalized()
+            return abs(a.similar - b.similar) <= MATCH_EPSILON &&
+                abs(a.opposite - b.opposite) <= MATCH_EPSILON &&
+                abs(a.surprise - b.surprise) <= MATCH_EPSILON
+        }
     }
 }
 
@@ -61,9 +104,18 @@ data class FeedStrategyWeights(
 data class UserPreferences(
     @SerialName("user_id")
     val userId: Int,
-    @SerialName("diversity_tolerance")
-    val diversityTolerance: Double,
-    val randomness: Double,
+    @SerialName("feed_preset")
+    val feedPreset: FeedPreset = FeedPreset.STAY_IN_LANE,
+    @SerialName("topic_composition")
+    val topicComposition: CompositionWeights = CompositionWeights.presetWeights(
+        FeedPreset.STAY_IN_LANE,
+        CompositionTier.TOPIC,
+    ),
+    @SerialName("post_composition")
+    val postComposition: CompositionWeights = CompositionWeights.presetWeights(
+        FeedPreset.STAY_IN_LANE,
+        CompositionTier.POST,
+    ),
     @SerialName("topic_preferences")
     val topicPreferences: List<TopicPreference> = emptyList(),
     @SerialName("use_view_time")
@@ -74,8 +126,6 @@ data class UserPreferences(
     val useRecency: Boolean = true,
     @SerialName("ai_topic_detection")
     val aiTopicDetection: Boolean = false,
-    @SerialName("strategy_weights")
-    val strategyWeights: FeedStrategyWeights = FeedStrategyWeights.DEFAULT,
 ) {
     val preferredTopics: List<String>
         get() = topicPreferences
@@ -89,22 +139,45 @@ data class UserPreferences(
 
     val updatePayload: PreferencesUpdatePayload
         get() = PreferencesUpdatePayload(
-            diversityTolerance = diversityTolerance,
-            randomness = randomness,
+            feedPreset = feedPreset,
+            topicComposition = topicComposition,
+            postComposition = postComposition,
             topicPreferences = topicPreferences,
             useViewTime = useViewTime,
             viewTimeWeight = viewTimeWeight,
             useRecency = useRecency,
             aiTopicDetection = aiTopicDetection,
-            strategyWeights = strategyWeights,
         )
+
+    fun applyPreset(preset: FeedPreset): UserPreferences {
+        if (preset == FeedPreset.CUSTOM) {
+            return copy(feedPreset = FeedPreset.CUSTOM)
+        }
+        return copy(
+            feedPreset = preset,
+            topicComposition = CompositionWeights.presetWeights(preset, CompositionTier.TOPIC),
+            postComposition = CompositionWeights.presetWeights(preset, CompositionTier.POST),
+        )
+    }
+
+    fun detectPreset(): UserPreferences {
+        for (preset in SELECTABLE_PRESETS) {
+            val topic = CompositionWeights.presetWeights(preset, CompositionTier.TOPIC)
+            val post = CompositionWeights.presetWeights(preset, CompositionTier.POST)
+            if (CompositionWeights.matches(topicComposition, topic) &&
+                CompositionWeights.matches(postComposition, post)
+            ) {
+                return copy(feedPreset = preset)
+            }
+        }
+        return copy(feedPreset = FeedPreset.CUSTOM)
+    }
 
     fun updatePreferredTopics(topics: List<String>): UserPreferences {
         val preferred = TopicPreferenceList.cleaned(topics).map {
             TopicPreference(it, PreferenceType.PREFERRED)
         }
         val preferredKeys = preferred.map { it.topic.lowercase() }.toSet()
-        // Preferring a topic must clear any blacklist entry in the same update.
         val blacklisted = topicPreferences.filter {
             it.preferenceType == PreferenceType.BLACKLISTED &&
                 it.topic.lowercase() !in preferredKeys
@@ -117,7 +190,6 @@ data class UserPreferences(
             TopicPreference(it, PreferenceType.BLACKLISTED)
         }
         val blacklistedKeys = blacklisted.map { it.topic.lowercase() }.toSet()
-        // Blacklisting a topic must clear any preferred entry in the same update.
         val preferred = topicPreferences.filter {
             it.preferenceType == PreferenceType.PREFERRED &&
                 it.topic.lowercase() !in blacklistedKeys
@@ -156,10 +228,11 @@ data class UserPreferences(
                 preferred.none { it.equals(blacklistedTopic, ignoreCase = true) }
             }
 
-        return UserPreferences(
+        var result = UserPreferences(
             userId = userId,
-            diversityTolerance = diversityTolerance.clamped(0.0, 1.0),
-            randomness = randomness.clamped(0.0, 1.0),
+            feedPreset = feedPreset,
+            topicComposition = topicComposition.normalized(),
+            postComposition = postComposition.normalized(),
             topicPreferences = mergeTopicPreferences(
                 preferred = preferred.map { TopicPreference(it, PreferenceType.PREFERRED) },
                 blacklisted = blacklist.map { TopicPreference(it, PreferenceType.BLACKLISTED) },
@@ -168,24 +241,40 @@ data class UserPreferences(
             viewTimeWeight = viewTimeWeight.clamped(0.0, 1.0),
             useRecency = useRecency,
             aiTopicDetection = aiTopicDetection,
-            strategyWeights = strategyWeights.normalized(),
         )
+        result = if (result.feedPreset != FeedPreset.CUSTOM) {
+            result.applyPreset(result.feedPreset)
+        } else {
+            result.detectPreset()
+        }
+        return result
     }
 
     companion object {
         val PLACEHOLDER: UserPreferences = systemDefaults(userId = 0)
 
-        /** Built-in algorithm defaults (matches backend `default_user_prefs`). */
+        val SELECTABLE_PRESETS: List<FeedPreset> = listOf(
+            FeedPreset.STAY_IN_LANE,
+            FeedPreset.CROSS_POLLINATE,
+            FeedPreset.WILD_WALK,
+        )
+
         fun systemDefaults(userId: Int): UserPreferences = UserPreferences(
             userId = userId,
-            diversityTolerance = 0.4,
-            randomness = 0.4,
+            feedPreset = FeedPreset.STAY_IN_LANE,
+            topicComposition = CompositionWeights.presetWeights(
+                FeedPreset.STAY_IN_LANE,
+                CompositionTier.TOPIC,
+            ),
+            postComposition = CompositionWeights.presetWeights(
+                FeedPreset.STAY_IN_LANE,
+                CompositionTier.POST,
+            ),
             topicPreferences = emptyList(),
             useViewTime = false,
             viewTimeWeight = 0.1,
             useRecency = true,
             aiTopicDetection = false,
-            strategyWeights = FeedStrategyWeights.DEFAULT,
         )
 
         private fun mergeTopicPreferences(
@@ -207,9 +296,12 @@ data class UserPreferences(
 
 @Serializable
 data class PreferencesUpdatePayload(
-    @SerialName("diversity_tolerance")
-    val diversityTolerance: Double,
-    val randomness: Double,
+    @SerialName("feed_preset")
+    val feedPreset: FeedPreset = FeedPreset.STAY_IN_LANE,
+    @SerialName("topic_composition")
+    val topicComposition: CompositionWeights = CompositionWeights.DEFAULT,
+    @SerialName("post_composition")
+    val postComposition: CompositionWeights = CompositionWeights.DEFAULT,
     @SerialName("topic_preferences")
     val topicPreferences: List<TopicPreference>,
     @SerialName("use_view_time")
@@ -220,8 +312,24 @@ data class PreferencesUpdatePayload(
     val useRecency: Boolean = true,
     @SerialName("ai_topic_detection")
     val aiTopicDetection: Boolean = false,
-    @SerialName("strategy_weights")
-    val strategyWeights: FeedStrategyWeights = FeedStrategyWeights.DEFAULT,
 )
+
+fun FeedPreset.displayTitle(): String = when (this) {
+    FeedPreset.STAY_IN_LANE -> "Stay in lane"
+    FeedPreset.CROSS_POLLINATE -> "Cross-pollinate"
+    FeedPreset.WILD_WALK -> "Wild walk"
+    FeedPreset.CUSTOM -> "Custom"
+}
+
+fun FeedPreset.displayDescription(): String = when (this) {
+    FeedPreset.STAY_IN_LANE ->
+        "Keep exploring within familiar topics and closely related posts."
+    FeedPreset.CROSS_POLLINATE ->
+        "Jump to different topics while surfacing posts that still feel connected to what you're reading."
+    FeedPreset.WILD_WALK ->
+        "Maximize variety with unexpected topics and posts."
+    FeedPreset.CUSTOM ->
+        "Your manually tuned topic and post mix (set in Advanced)."
+}
 
 private fun Double.clamped(min: Double, max: Double): Double = min(max(this, min), max)

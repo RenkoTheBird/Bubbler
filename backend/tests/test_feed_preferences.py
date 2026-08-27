@@ -1,9 +1,10 @@
 import datetime
 import unittest
 from types import SimpleNamespace
-from unittest.mock import patch
 
+from app.services.composition_utils import weighted_quotas
 from app.services.feed import FeedService, PreferenceService, RankingService
+from app.services.post_composer import PostComposer
 
 
 def preferences(**overrides):
@@ -12,7 +13,6 @@ def preferences(**overrides):
         "use_view_time": False,
         "view_time_weight": 0.1,
         "use_recency": False,
-        "randomness": 0.0,
     }
     values.update(overrides)
     return SimpleNamespace(**values)
@@ -68,54 +68,50 @@ class RankingServiceTests(unittest.TestCase):
 
         self.assertEqual(ranked[0]["id"], "new")
 
-    def test_randomness_cannot_outweigh_preferred_topic_bonus(self):
+    def test_preferred_topic_bonus_wins_tie(self):
         preferred = SimpleNamespace(topic="science", preference_type="preferred")
         posts = [
             {"id": "preferred", "topic": "science", "score": 0.5},
             {"id": "other", "topic": "sports", "score": 0.5},
         ]
 
-        with patch("app.services.feed.random.random", side_effect=[0.0, 1.0]):
-            ranked = RankingService().apply_preferences(
-                preferences(topic_preferences=[preferred], randomness=1.0),
-                posts,
-            )
+        ranked = RankingService().apply_preferences(
+            preferences(topic_preferences=[preferred]),
+            posts,
+        )
 
         self.assertEqual(ranked[0]["id"], "preferred")
 
 
 class GraphSelectionTests(unittest.TestCase):
     def setUp(self):
-        self.service = FeedService(None, None, RankingService(), None, None, None, None, None)
+        self.service = FeedService(
+            None, None, RankingService(), None, None, None, None, None, None
+        )
 
     @staticmethod
-    def candidate(post_id, topic, edge_type, score):
+    def candidate(post_id, topic, post_bucket, score):
         return {
             "id": post_id,
             "topic": topic,
-            "_edge_type": edge_type,
+            "_post_bucket": post_bucket,
             "score": score,
         }
 
-    def test_high_diversity_caps_same_topic_at_one(self):
+    def test_high_surprise_caps_same_topic_at_one(self):
         candidates = [
-            self.candidate("t1", "science", "topic", 1.0),
-            self.candidate("t2", "science", "similar", 0.9),
-            self.candidate("t3", "science", "bridge", 0.8),
-            self.candidate("o1", "sports", "opposite", 0.7),
-            self.candidate("r1", "business", "random", 0.6),
+            self.candidate("t1", "science", PostComposer.BUCKET_SIMILAR, 1.0),
+            self.candidate("t2", "science", PostComposer.BUCKET_SIMILAR, 0.9),
+            self.candidate("t3", "science", PostComposer.BUCKET_SIMILAR, 0.8),
+            self.candidate("o1", "sports", PostComposer.BUCKET_OPPOSITE, 0.7),
+            self.candidate("r1", "business", PostComposer.BUCKET_SURPRISE, 0.6),
         ]
 
-        selected = self.service._select_next_quota(
+        selected = self.service._select_next_composition(
             candidates,
             current_topic="science",
-            diversity_tolerance=1.0,
-            strategy_weights={
-                "similar": 0.4,
-                "graph": 0.25,
-                "opposite": 0.2,
-                "random": 0.15,
-            },
+            topic_composition={"similar": 0.15, "opposite": 0.25, "surprise": 0.60},
+            post_composition={"similar": 0.15, "opposite": 0.25, "surprise": 0.60},
         )
 
         self.assertLessEqual(
@@ -123,31 +119,26 @@ class GraphSelectionTests(unittest.TestCase):
             1,
         )
 
-    def test_low_diversity_allows_three_same_topic_posts(self):
+    def test_high_similar_allows_three_same_topic_posts(self):
         candidates = [
-            self.candidate("t1", "science", "topic", 1.0),
-            self.candidate("t2", "science", "topic", 0.9),
-            self.candidate("t3", "science", "similar", 0.8),
-            self.candidate("o1", "sports", "opposite", 0.7),
+            self.candidate("t1", "science", PostComposer.BUCKET_SIMILAR, 1.0),
+            self.candidate("t2", "science", PostComposer.BUCKET_SIMILAR, 0.9),
+            self.candidate("t3", "science", PostComposer.BUCKET_SIMILAR, 0.8),
+            self.candidate("o1", "sports", PostComposer.BUCKET_OPPOSITE, 0.7),
         ]
 
-        selected = self.service._select_next_quota(
+        selected = self.service._select_next_composition(
             candidates,
             current_topic="science",
-            diversity_tolerance=0.0,
-            strategy_weights={
-                "similar": 1.0,
-                "graph": 0.0,
-                "opposite": 0.0,
-                "random": 0.0,
-            },
+            topic_composition={"similar": 0.55, "opposite": 0.15, "surprise": 0.30},
+            post_composition={"similar": 1.0, "opposite": 0.0, "surprise": 0.0},
         )
 
         self.assertEqual(sum(post["topic"] == "science" for post in selected), 3)
 
-    def test_strategy_weights_control_non_topic_quotas(self):
-        quotas = self.service._weighted_quotas(
-            {"similar": 0.0, "bridge": 0.0, "opposite": 1.0, "random": 0.0},
+    def test_post_composition_controls_bucket_quotas(self):
+        quotas = weighted_quotas(
+            {"similar": 0.0, "opposite": 1.0, "surprise": 0.0},
             4,
         )
 

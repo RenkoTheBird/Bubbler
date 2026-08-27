@@ -4,7 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.bubbler.android.core.auth.AuthSession
 import com.bubbler.android.core.network.ApiException
-import com.bubbler.android.data.model.FeedStrategyWeights
+import com.bubbler.android.data.model.CompositionWeights
+import com.bubbler.android.data.model.FeedPreset
 import com.bubbler.android.data.model.UserPreferences
 import com.bubbler.android.data.repository.PreferencesRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,8 +15,6 @@ import kotlinx.coroutines.launch
 
 /**
  * Recommendation preferences — mirrors Swift `PreferencesSettingsViewModel`.
- *
- * Strategy weights are normalized via [UserPreferences.sanitized] before PUT.
  */
 class PreferencesViewModel(
     private val authSession: AuthSession,
@@ -41,26 +40,52 @@ class PreferencesViewModel(
 
     private var hasLoaded = false
 
+    val topicCompositionTotal: Double
+        get() = _preferences.value.topicComposition.total
+
+    val postCompositionTotal: Double
+        get() = _preferences.value.postComposition.total
+
     fun updatePreferences(transform: (UserPreferences) -> UserPreferences) {
         _preferences.value = transform(_preferences.value)
     }
 
-    fun updateDiversity(value: Double) {
-        updatePreferences { it.copy(diversityTolerance = value) }
+    fun selectPreset(preset: FeedPreset) {
+        _preferences.value = _preferences.value.applyPreset(preset)
     }
 
-    fun updateRandomness(value: Double) {
-        updatePreferences { it.copy(randomness = value) }
+    fun updateTopicComposition(
+        similar: Double? = null,
+        opposite: Double? = null,
+        surprise: Double? = null,
+    ) {
+        val current = _preferences.value.topicComposition
+        _preferences.value = _preferences.value.copy(
+            topicComposition = current.copy(
+                similar = similar ?: current.similar,
+                opposite = opposite ?: current.opposite,
+                surprise = surprise ?: current.surprise,
+            ),
+        ).detectPreset()
+    }
+
+    fun updatePostComposition(
+        similar: Double? = null,
+        opposite: Double? = null,
+        surprise: Double? = null,
+    ) {
+        val current = _preferences.value.postComposition
+        _preferences.value = _preferences.value.copy(
+            postComposition = current.copy(
+                similar = similar ?: current.similar,
+                opposite = opposite ?: current.opposite,
+                surprise = surprise ?: current.surprise,
+            ),
+        ).detectPreset()
     }
 
     fun updateUseRecency(value: Boolean) {
         updatePreferences { it.copy(useRecency = value) }
-    }
-
-    fun updateStrategyWeights(transform: (FeedStrategyWeights) -> FeedStrategyWeights) {
-        updatePreferences { prefs ->
-            prefs.copy(strategyWeights = transform(prefs.strategyWeights))
-        }
     }
 
     fun updatePreferredTopics(topics: List<String>) {
@@ -72,11 +97,11 @@ class PreferencesViewModel(
     }
 
     fun updateUseViewTime(value: Boolean) {
-        updatePreferences { it.copy(useViewTime = value) }
+        updatePreferences { it.copy(useViewTime = value).detectPreset() }
     }
 
     fun updateViewTimeWeight(value: Double) {
-        updatePreferences { it.copy(viewTimeWeight = value) }
+        updatePreferences { it.copy(viewTimeWeight = value).detectPreset() }
     }
 
     fun updateAiTopicDetection(value: Boolean) {
@@ -89,7 +114,6 @@ class PreferencesViewModel(
         viewModelScope.launch { loadPreferencesInternal(force = force) }
     }
 
-    /** Force-refresh so graph/feed topic edits aren't stale — mirrors iOS `.task`. */
     fun refreshFromServer() {
         viewModelScope.launch { loadPreferencesInternal(force = true) }
     }
@@ -125,7 +149,6 @@ class PreferencesViewModel(
     private suspend fun loadPreferencesInternal(force: Boolean) {
         if (!force && hasLoaded) return
 
-        // Only flash the loading card on the first fetch (matches iOS).
         if (!hasLoaded) {
             _isLoading.value = true
         }
@@ -179,7 +202,6 @@ class PreferencesViewModel(
     }
 
     companion object {
-        /** Flip when AI topic detection / contribution is hooked up server-side. */
         const val IS_AI_TOPIC_DETECTION_AVAILABLE = false
     }
 }

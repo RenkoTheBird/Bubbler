@@ -1,20 +1,28 @@
 Frontend should return something like:
 
 {
-  "strategy_weights": {
-    "similar": 0.4,
-    "graph": 0.25,
-    "opposite": 0.2,
-    "random": 0.15
+  "feed_preset": "stay_in_lane",
+  "topic_composition": {
+    "similar": 0.55,
+    "opposite": 0.15,
+    "surprise": 0.30
   },
-  "randomness": 0.4,
-  "diversity_tolerance": 0.4,
+  "post_composition": {
+    "similar": 0.55,
+    "opposite": 0.15,
+    "surprise": 0.30
+  },
   "topic_preferences": [
     {"topic": "technology", "preference_type": "preferred"},
     {"topic": "politics", "preference_type": "blacklisted"}
   ],
+  "use_view_time": false,
+  "view_time_weight": 0.1,
+  "use_recency": true,
   "ai_topic_detection": false
 }
+
+Preset IDs: `stay_in_lane`, `cross_pollinate`, `wild_walk`, `custom`. When `feed_preset` is not `custom`, the server normalizes `topic_composition` and `post_composition` to the preset values on save.
 
 Graph session (`GET /feed/me/session?diversify=true|false`) returns:
 

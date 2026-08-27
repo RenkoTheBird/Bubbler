@@ -204,7 +204,7 @@ struct ReportPostView: View {
         .buttonStyle(.plain)
         .disabled(viewModel.isSubmitting)
         .accessibilityLabel("Block this user too")
-        .accessibilityAddTraits(viewModel.alsoBlockUser ? [.isToggleButton, .isSelected] : [.isToggleButton])
+        .accessibilityAddTraits(viewModel.alsoBlockUser ? [.isToggle, .isSelected] : [.isToggle])
         .accessibilityValue(viewModel.alsoBlockUser ? "On" : "Off")
     }
 

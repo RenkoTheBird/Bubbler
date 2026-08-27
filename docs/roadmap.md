@@ -70,7 +70,7 @@ Ship before public users. Suggested build order: policies & age → App Privacy 
 | L10 | Retention schedule + breach playbook     | Document + implement TTLs; 72h-ready incident response before public users. | privacy_legal §10 · §12                    | Ops + backend          |
 | L11 | DMCA agent + CSAM / LE runbooks          | US safe harbor + NCMEC / government request processes around UGC.           | privacy_legal §19–21                       | Counsel + T&S          |
 | L12 | Block users                              | Harassment control for a public social product; expands with follows later. | TODO before prod · moderation human queues | iOS + Android + backend |
-| L13 | Clarify preference / similarity settings | Users may expect topic-based similarity; core product trust at launch.      | TODO before prod                           | Product + iOS + Android |
+| L13 | Clarify preference / similarity settings | Users may expect topic-based similarity; core product trust at launch.      | TODO before prod                           | Product + iOS + Android — **in progress:** two-tier composition + presets shipped |
 
 
 
@@ -256,13 +256,13 @@ Use this as a pre-production gate. Unchecked items block public launch under the
 - [ ] L5 Apple App Privacy labels + Privacy Manifest
 - [ ] L5a Google Play Data Safety
 - [x] L6 In-app report → review queue
-- [ ] L7 Admin remove / restrict + audit logging
+- [x] L7 Admin remove / restrict + audit logging
 
 **Also for launch**
 
 - [ ] L8 Safe discovery defaults
 - [x] L9 Data export + erasure completeness
-- [ ] L10 Retention schedule + breach playbook
+- [x] L10 Retention schedule + breach playbook
 - [ ] L11 DMCA agent + CSAM / LE runbooks
 - [x] L12 Block users
 - [ ] L13 Preference / similarity clarity

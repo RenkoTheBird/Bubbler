@@ -28,6 +28,7 @@ object Routes {
     const val SETTINGS_PASSWORD = "settings_password"
     const val SETTINGS_DELETE_ACCOUNT = "settings_delete_account"
     const val SETTINGS_PREFERENCES = "settings_preferences"
+    const val SETTINGS_PREFERENCES_ADVANCED = "settings_preferences_advanced"
     const val SETTINGS_BLOCKED = "settings_blocked"
     const val SETTINGS_REPORTS = "settings_reports"
     const val SETTINGS_REPORT_DETAIL = "settings_report/{reportId}"

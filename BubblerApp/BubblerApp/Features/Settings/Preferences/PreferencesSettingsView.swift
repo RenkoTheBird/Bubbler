@@ -46,11 +46,9 @@ struct PreferencesSettingsView: View {
                     if viewModel.isLoading {
                         loadingCard
                     } else {
-                        tuningSection
-                        strategySection
+                        feedCompositionSection
+                        recencySection
                         topicSections
-                        aiTopicSection
-                        behaviorSection
                         saveSection
                     }
                 }
@@ -72,7 +70,7 @@ struct PreferencesSettingsView: View {
                 .font(.system(size: 30, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
 
-            Text("Tune how much variety, randomness, and topic weighting shape your feed.")
+            Text("Choose how your bubble explores topics and posts.")
                 .font(.subheadline)
                 .multilineTextAlignment(.center)
                 .foregroundColor(.white.opacity(0.72))
@@ -95,68 +93,52 @@ struct PreferencesSettingsView: View {
         }
     }
 
-    private var tuningSection: some View {
+    private var feedCompositionSection: some View {
         PreferenceSectionCard(
-            title: "Core Tuning",
-            subtitle: "Higher diversity broadens your bubble. Higher randomness introduces more unexpected posts."
+            title: "Feed Composition",
+            subtitle: "Pick a preset that matches how you want to explore."
         ) {
-            PreferenceSliderRow(
-                title: "Diversity",
-                value: $viewModel.preferences.diversityTolerance,
-                tint: .cyan
-            )
-            PreferenceSliderRow(
-                title: "Randomness",
-                value: $viewModel.preferences.randomness,
-                tint: .purple
+            FeedPresetPicker(
+                selectedPreset: Binding(
+                    get: { viewModel.preferences.feedPreset },
+                    set: { viewModel.preferences.feedPreset = $0 }
+                ),
+                onSelect: { preset in
+                    viewModel.selectPreset(preset)
+                }
             )
 
+            NavigationLink {
+                PreferencesAdvancedSettingsView(viewModel: viewModel)
+            } label: {
+                HStack {
+                    Text("Advanced feed settings")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.white.opacity(0.9))
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(.white.opacity(0.55))
+                }
+                .padding(.top, 8)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var recencySection: some View {
+        PreferenceSectionCard(
+            title: "Recency",
+            subtitle: "Boost newer posts when ranking candidates."
+        ) {
             Toggle(isOn: $viewModel.preferences.useRecency) {
-                Text("Boost Recent Posts")
+                Text("Prioritize Recent Posts")
                     .foregroundColor(.white.opacity(0.9))
                     .font(.subheadline.weight(.semibold))
             }
             .toggleStyle(SwitchToggleStyle(tint: .orange))
-        }
-    }
-
-    private var strategySection: some View {
-        PreferenceSectionCard(
-            title: "Feed Composition",
-            subtitle: "These weights are normalized automatically when you save."
-        ) {
-            PreferenceSliderRow(
-                title: "Similar",
-                value: $viewModel.preferences.strategyWeights.similar,
-                tint: .blue
-            )
-            PreferenceSliderRow(
-                title: "Graph",
-                value: $viewModel.preferences.strategyWeights.graph,
-                tint: .teal
-            )
-            PreferenceSliderRow(
-                title: "Opposite",
-                value: $viewModel.preferences.strategyWeights.opposite,
-                tint: .indigo
-            )
-            PreferenceSliderRow(
-                title: "Random",
-                value: $viewModel.preferences.strategyWeights.random,
-                tint: .pink
-            )
-
-            HStack {
-                Text("Current total")
-                    .font(.caption.weight(.semibold))
-                    .foregroundColor(.white.opacity(0.65))
-
-                Spacer()
-
-                Text("\(Int((viewModel.strategyTotal * 100).rounded()))%")
-                    .font(.caption.monospacedDigit())
-                    .foregroundColor(.white.opacity(0.75))
-            }
         }
     }
 
@@ -190,65 +172,6 @@ struct PreferencesSettingsView: View {
                     get: { viewModel.preferences.preferredTopics },
                     set: { viewModel.preferences.updatePreferredTopics($0) }
                 )
-            )
-        }
-    }
-
-    private var aiTopicSection: some View {
-        PreferenceSectionCard(
-            title: "AI Topic Detection",
-            subtitle: PreferencesSettingsViewModel.isAITopicDetectionAvailable
-                ? "When enabled, your topic classifications can help train smarter topic suggestions."
-                : "Coming soon. Topic training contributions and AI suggestions are not available yet."
-        ) {
-            HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Contribute Topic Classifications")
-                        .foregroundColor(.white.opacity(
-                            PreferencesSettingsViewModel.isAITopicDetectionAvailable ? 0.9 : 0.55
-                        ))
-                        .font(.subheadline.weight(.semibold))
-
-                    if !PreferencesSettingsViewModel.isAITopicDetectionAvailable {
-                        Text("Unavailable")
-                            .font(.caption.weight(.semibold))
-                            .foregroundColor(.white.opacity(0.45))
-                    }
-                }
-
-                Spacer()
-
-                Toggle(
-                    "",
-                    isOn: PreferencesSettingsViewModel.isAITopicDetectionAvailable
-                        ? $viewModel.preferences.aiTopicDetection
-                        : .constant(false)
-                )
-                .labelsHidden()
-                .toggleStyle(SwitchToggleStyle(tint: .mint))
-                .disabled(!PreferencesSettingsViewModel.isAITopicDetectionAvailable)
-                .opacity(PreferencesSettingsViewModel.isAITopicDetectionAvailable ? 1 : 0.45)
-            }
-        }
-    }
-
-    private var behaviorSection: some View {
-        PreferenceSectionCard(
-            title: "Behavior Signals",
-            subtitle: "Enable view-time feedback if you want watch time to influence recommendations."
-        ) {
-            Toggle(isOn: $viewModel.preferences.useViewTime) {
-                Text("Use View Time")
-                    .foregroundColor(.white.opacity(0.9))
-                    .font(.subheadline.weight(.semibold))
-            }
-            .toggleStyle(SwitchToggleStyle(tint: .cyan))
-
-            PreferenceSliderRow(
-                title: "View Time Weight",
-                value: $viewModel.preferences.viewTimeWeight,
-                tint: .green,
-                isDisabled: !viewModel.preferences.useViewTime
             )
         }
     }

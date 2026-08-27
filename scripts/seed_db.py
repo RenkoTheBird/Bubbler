@@ -3,6 +3,7 @@ Developer testing script — seeds topics, posts (with post_topics), and edges.
 '''
 
 import asyncio
+import json
 import sys
 from pathlib import Path
 
@@ -324,6 +325,69 @@ async def ensure_schema(pool: asyncpg.Pool) -> None:
                 ALTER TABLE user_profiles
                 ADD COLUMN use_recency BOOLEAN NOT NULL DEFAULT TRUE
                 """
+            )
+
+        # Two-tier feed composition migration (replaces strategy_weights / diversity / randomness).
+        if not await _column_exists(conn, "user_profiles", "feed_preset"):
+            await conn.execute(
+                """
+                ALTER TABLE user_profiles
+                ADD COLUMN feed_preset TEXT NOT NULL DEFAULT 'stay_in_lane'
+                """
+            )
+        if not await _column_exists(conn, "user_profiles", "topic_composition"):
+            await conn.execute(
+                """
+                ALTER TABLE user_profiles
+                ADD COLUMN topic_composition JSONB NOT NULL DEFAULT
+                    '{"similar":0.55,"opposite":0.15,"surprise":0.30}'
+                """
+            )
+        if not await _column_exists(conn, "user_profiles", "post_composition"):
+            await conn.execute(
+                """
+                ALTER TABLE user_profiles
+                ADD COLUMN post_composition JSONB NOT NULL DEFAULT
+                    '{"similar":0.55,"opposite":0.15,"surprise":0.30}'
+                """
+            )
+
+        if await _column_exists(conn, "user_profiles", "strategy_weights"):
+            from app.schemas.composition import migrate_legacy_prefs  # noqa: E402
+
+            rows = await conn.fetch(
+                """
+                SELECT user_id, diversity_tolerance, randomness, strategy_weights
+                FROM user_profiles
+                """
+            )
+            for row in rows:
+                preset, topic, post = migrate_legacy_prefs(
+                    diversity_tolerance=row["diversity_tolerance"],
+                    randomness=row["randomness"],
+                    strategy_weights=row["strategy_weights"],
+                )
+                await conn.execute(
+                    """
+                    UPDATE user_profiles
+                    SET feed_preset = $2,
+                        topic_composition = $3::jsonb,
+                        post_composition = $4::jsonb
+                    WHERE user_id = $1
+                    """,
+                    row["user_id"],
+                    preset,
+                    json.dumps(topic),
+                    json.dumps(post),
+                )
+            await conn.execute(
+                "ALTER TABLE user_profiles DROP COLUMN IF EXISTS diversity_tolerance"
+            )
+            await conn.execute(
+                "ALTER TABLE user_profiles DROP COLUMN IF EXISTS randomness"
+            )
+            await conn.execute(
+                "ALTER TABLE user_profiles DROP COLUMN IF EXISTS strategy_weights"
             )
 
         if not await _column_exists(conn, "posts", "search_vector"):

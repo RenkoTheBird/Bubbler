@@ -107,45 +107,28 @@ outbound edges are deleted and rebuilt from the new embedding. Incoming edges fr
 other posts are unchanged until those source posts are rebuilt. Adding or removing a
 topic currently does not trigger an edge rebuild.
 
-## Candidate strategies
+## Two-tier feed composition
 
-Users control four non-negative strategy weights. Defaults are:
-
-```text
-similar = 0.40
-graph   = 0.25
-opposite = 0.20
-random  = 0.15
-```
-
-The iOS model clamps each value to `[0, 1]` and normalizes the group before saving.
-The backend uses the saved values both to score candidates and to allocate limited
-candidate slots:
-
-- `similar` favors high cosine similarity.
-- `graph` favors graph-native `topic` and `bridge` relationships. In ranked-feed seed
-  generation, a positive graph weight also uses nearby semantic posts as traversal
-  seeds so graph expansion has a starting frontier.
-- `opposite` favors low cosine similarity.
-- `random` contributes sampled posts with a neutral base relevance of `0.5`.
-
-For a strategy candidate, the base score is approximately:
+Users control exploration through **topic composition** and **post composition**, each with three normalized weights (`similar`, `opposite`, `surprise`). Defaults match the `stay_in_lane` preset:
 
 ```text
-strategy score = strategy weight × relevance
-
-similar/graph relevance = max(similarity, 0)
-opposite relevance      = (1 - similarity) / 2
-random relevance        = 0.5
+similar  = 0.55
+opposite = 0.15
+surprise = 0.30
 ```
 
-Weights therefore affect both representation (quota allocation) and order (score);
-they are not merely UI labels or post-ranking multipliers.
+Presets (`stay_in_lane`, `cross_pollinate`, `wild_walk`) set both tiers; `custom` preserves Advanced slider values.
+
+The backend selects candidates in two stages:
+
+1. **Topic tier** — using `topics.embedding`, pick topic buckets (same/near, distant, random).
+2. **Post tier** — within each topic, pick posts by embedding similarity, embedding contrast, or random sample. Post **similar** also merges outbound graph neighbors (`similar`, `topic`, `bridge`).
+
+Surprise at the topic tier replaces legacy diversity caps; surprise at the post tier replaces legacy randomness jitter and the random strategy pool.
 
 ## Preferences layered onto the graph
 
-Candidate strategy establishes a base score. User preferences then modify eligibility
-and ordering:
+Composition establishes candidate pools and base scores. User preferences then modify eligibility and ordering:
 
 1. Blacklisted primary topics are removed.
 2. Preferred primary topics receive `+0.3`.
@@ -153,55 +136,24 @@ and ordering:
    `log1p`, normalized against the strongest topic, and capped by
    `0.3 × view_time_weight`.
 4. If recency is enabled, a post receives `0.3 / (1 + age_in_days)`.
-5. Randomness adds bounded jitter:
-   `random(0...1) × randomness × 0.15`.
-
-Randomness changes ordering within the candidate pool; the random strategy changes
-which posts enter the pool. These are separate controls.
 
 The client also re-applies blacklist filtering and promotes preferred-topic posts while
-preserving the backend order among otherwise equal choices. This protects the graph UI
-from stale preference state, but the backend remains the authoritative selector.
+preserving the backend order among otherwise equal choices.
 
 ## Neighbor selection for the graph feed
 
 For `GET /graph/posts/{post_id}/next`, the backend:
 
-1. Loads up to eight outbound edges per persisted edge type.
-2. Maps edge types to user strategies: `topic`/`bridge` to `graph`, `similar` to
-   `similar`, and `opposite` to `opposite`.
-3. Optionally adds eight request-time random candidates when random weight is positive.
-4. Scores edges using their weight, strategy weight, preference bonuses, recency, and
-   bounded jitter. `bridge`, `opposite`, and `similar` also receive small type bonuses;
-   cross-topic hops receive a novelty bonus.
-5. Allocates the four visible slots with weighted quotas, then fills unused slots with
-   the highest-scoring leftovers.
-
-Diversity tolerance limits same-topic hops from the current post:
-
-- `0...1/3`: reserve up to two topic-edge slots and allow at most three same-topic posts.
-- Between `1/3` and `2/3`: reserve one topic-edge slot and allow at most two.
-- `2/3...1`: reserve no topic-edge slots and allow at most one.
-
-Quotas are best-effort. If one edge type has too few candidates, globally ranked
-leftovers fill the remaining slots while still respecting the same-topic cap.
+1. Runs `TopicComposer` from the current post's primary topic.
+2. Runs `PostComposer` per selected topic using the anchor post embedding.
+3. Applies preference bonuses and recency, then ranks candidates.
+4. Allocates four visible slots using post-composition quotas and a same-topic cap derived from topic composition.
 
 ## Session seeding and escape behavior
 
-A graph session returns six posts before the user starts choosing neighbors. The
-backend caches, per user and UTC day, the embedding and topic of one post liked
-yesterday:
+A graph session returns six posts before the user starts choosing neighbors. The backend uses two-tier composition seeded from yesterday's liked post/topic when available. `?diversify=true` forces a high topic-surprise mix to escape stale regions.
 
-- With a prior like, a normal session uses it as a soft similarity target and mixes in
-  random posts. The target similarity is `1 - diversity_tolerance`.
-- Without a prior like, the session starts from random candidates.
-- A diversify request excludes the liked topic, mixes opposite, target-similarity, and
-  random candidates, and applies the strictest per-topic cap.
-
-Blacklisted topics are excluded before ranking. Preferred topics, view time, recency,
-and randomness then rank the session candidates. Diversity tolerance caps a six-post
-session at three, two, or one post per topic. If a candidate source is empty, the
-repository falls back to random posts while preserving blacklist filtering.
+Blacklisted topics are excluded before ranking. Preferred topics, view time, and recency then rank session candidates. Topic surprise controls per-topic spread in the six-post session. If candidate pools are empty, the service falls back to random posts while preserving blacklist filtering.
 
 The client retries an unusable session up to three times and forces diversification
 after the first attempt. It keeps the first post as the current node and the rest as a
@@ -248,7 +200,9 @@ immediately requests a diversified session.
 - `backend/app/repositories/feed_repo.py`: vector candidates, neighbor queries, random
   sampling, and session candidate retrieval.
 - `backend/app/services/graph.py`: depth-limited batched traversal.
-- `backend/app/services/feed.py`: strategies, preferences, ranking, quotas, and graph
+- `backend/app/services/topic_composer.py`: topic-tier selection via `topics.embedding`.
+- `backend/app/services/post_composer.py`: post-tier selection within topics.
+- `backend/app/services/feed.py`: composition, preferences, ranking, and graph
   session/next-post orchestration.
 - `BubblerApp/BubblerApp/Features/Graph/GraphFeedViewModel.swift`: client-side graph
   walk, queue fallback, preference synchronization, and interaction recording.

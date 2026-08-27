@@ -4,17 +4,17 @@ from typing import Literal
 from pydantic import BaseModel, EmailStr, Field, field_serializer, model_validator
 
 from app.db.datetime_utils import ensure_utc, utc_iso_z
+from app.schemas.composition import (
+    DEFAULT_COMPOSITION,
+    CompositionWeights,
+    FeedPresetId,
+    detect_preset,
+    preset_compositions,
+)
 
 UserRole = Literal["user", "staff"]
 DEFAULT_USER_ROLE: UserRole = "user"
 STAFF_ROLE: UserRole = "staff"
-
-DEFAULT_STRATEGY_WEIGHTS: dict[str, float] = {
-    "similar": 0.4,
-    "graph": 0.25,
-    "opposite": 0.2,
-    "random": 0.15,
-}
 
 
 class TopicPreference(BaseModel):
@@ -23,12 +23,13 @@ class TopicPreference(BaseModel):
 
 
 def default_user_prefs(user_id: int = 0) -> "UserProfile":
+    topic, post = preset_compositions("stay_in_lane")
     return UserProfile(
         user_id=user_id,
-        diversity_tolerance=0.4,
-        randomness=0.4,
+        feed_preset="stay_in_lane",
+        topic_composition=CompositionWeights(**topic),
+        post_composition=CompositionWeights(**post),
         topic_preferences=[],
-        strategy_weights=dict(DEFAULT_STRATEGY_WEIGHTS),
     )
 
 
@@ -78,7 +79,7 @@ class BlockedUserInfo(BaseModel):
         return utc_iso_z(value)
 
 
-# Doesnt need ID or Register Time autofilled by DB 
+# Doesnt need ID or Register Time autofilled by DB
 class CreateUser(BaseModel):
     username: str = Field(min_length=1, max_length=20)
     email: EmailStr = Field(max_length=80)
@@ -105,16 +106,35 @@ class PasswordUpdate(BaseModel):
 
 # Shared preference fields — used for both profile load and preference updates
 class PrefsUpdate(BaseModel):
-    diversity_tolerance: float
-    randomness: float
+    feed_preset: FeedPresetId = "stay_in_lane"
+    topic_composition: CompositionWeights = Field(
+        default_factory=lambda: CompositionWeights(**DEFAULT_COMPOSITION)
+    )
+    post_composition: CompositionWeights = Field(
+        default_factory=lambda: CompositionWeights(**DEFAULT_COMPOSITION)
+    )
     topic_preferences: list[TopicPreference]
     use_view_time: bool = False
     view_time_weight: float = 0.1
     use_recency: bool = True
     ai_topic_detection: bool = False
 
-    # feed composition, e.g. {"similar": 0.6, "opposite": 0.2, "random": 0.2}
-    strategy_weights: dict[str, float]
+    @model_validator(mode="after")
+    def sync_preset_and_compositions(self):
+        if self.feed_preset != "custom":
+            topic, post = preset_compositions(self.feed_preset)
+            self.topic_composition = CompositionWeights(**topic)
+            self.post_composition = CompositionWeights(**post)
+        else:
+            self.topic_composition = self.topic_composition.normalized()
+            self.post_composition = self.post_composition.normalized()
+            detected = detect_preset(
+                self.topic_composition.as_dict(),
+                self.post_composition.as_dict(),
+            )
+            if detected != "custom":
+                self.feed_preset = detected
+        return self
 
 
 class UserProfile(PrefsUpdate):

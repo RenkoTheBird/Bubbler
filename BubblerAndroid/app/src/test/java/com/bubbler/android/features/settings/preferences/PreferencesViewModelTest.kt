@@ -5,7 +5,8 @@ import com.bubbler.android.core.auth.AuthSession
 import com.bubbler.android.core.auth.TokenStore
 import com.bubbler.android.core.network.ApiClient
 import com.bubbler.android.core.network.ApiException
-import com.bubbler.android.data.model.FeedStrategyWeights
+import com.bubbler.android.data.model.CompositionWeights
+import com.bubbler.android.data.model.FeedPreset
 import com.bubbler.android.data.model.PreferencesUpdatePayload
 import com.bubbler.android.data.model.UserPreferences
 import com.bubbler.android.data.repository.AuthRepository
@@ -37,34 +38,34 @@ class PreferencesViewModelTest {
     @Test
     fun refreshFromServer_loadsPreferences() = runTest {
         preferencesRepository.stored = UserPreferences.systemDefaults(42).copy(
-            diversityTolerance = 0.7,
-            randomness = 0.2,
+            feedPreset = FeedPreset.WILD_WALK,
+            topicComposition = CompositionWeights(
+                similar = 0.15,
+                opposite = 0.25,
+                surprise = 0.60,
+            ),
         )
 
         viewModel.refreshFromServerAwait()
 
-        assertEquals(0.7, viewModel.preferences.value.diversityTolerance, 0.0)
-        assertEquals(0.2, viewModel.preferences.value.randomness, 0.0)
+        assertEquals(FeedPreset.WILD_WALK, viewModel.preferences.value.feedPreset)
+        assertEquals(0.60, viewModel.preferences.value.topicComposition.surprise, 0.0)
         assertFalse(viewModel.isLoading.value)
         assertNull(viewModel.errorMessage.value)
     }
 
     @Test
-    fun savePreferences_sanitizesAndNormalizesStrategyWeights() = runTest {
+    fun savePreferences_sanitizesAndNormalizesComposition() = runTest {
         preferencesRepository.stored = UserPreferences.systemDefaults(42)
         viewModel.refreshFromServerAwait()
 
-        viewModel.updateStrategyWeights {
-            FeedStrategyWeights(similar = 2.0, graph = 2.0, opposite = 0.0, random = 0.0)
-        }
-        viewModel.updateDiversity(1.5)
+        viewModel.updateTopicComposition(similar = 2.0, opposite = 2.0, surprise = 0.0)
         preferencesRepository.stored = UserPreferences.systemDefaults(42).copy(
-            diversityTolerance = 1.0,
-            strategyWeights = FeedStrategyWeights(
+            feedPreset = FeedPreset.CUSTOM,
+            topicComposition = CompositionWeights(
                 similar = 0.5,
-                graph = 0.5,
-                opposite = 0.0,
-                random = 0.0,
+                opposite = 0.5,
+                surprise = 0.0,
             ),
         )
 
@@ -72,11 +73,9 @@ class PreferencesViewModelTest {
 
         val payload = preferencesRepository.lastUpdatePayload
             ?: error("expected update payload")
-        assertEquals(1.0, payload.diversityTolerance, 0.0)
-        assertEquals(0.5, payload.strategyWeights.similar, 1e-9)
-        assertEquals(0.5, payload.strategyWeights.graph, 1e-9)
-        assertEquals(0.0, payload.strategyWeights.opposite, 0.0)
-        assertEquals(0.0, payload.strategyWeights.random, 0.0)
+        assertEquals(FeedPreset.CUSTOM, payload.feedPreset)
+        assertEquals(0.5, payload.topicComposition.similar, 1e-9)
+        assertEquals(0.5, payload.topicComposition.opposite, 1e-9)
         assertEquals(
             "Your recommendation settings were saved successfully.",
             viewModel.successMessage.value,
@@ -84,16 +83,26 @@ class PreferencesViewModelTest {
     }
 
     @Test
+    fun selectPreset_updatesCompositions() = runTest {
+        preferencesRepository.stored = UserPreferences.systemDefaults(42)
+        viewModel.refreshFromServerAwait()
+
+        viewModel.selectPreset(FeedPreset.CROSS_POLLINATE)
+
+        assertEquals(FeedPreset.CROSS_POLLINATE, viewModel.preferences.value.feedPreset)
+        assertEquals(0.55, viewModel.preferences.value.topicComposition.opposite, 0.0)
+        assertEquals(0.55, viewModel.preferences.value.postComposition.similar, 0.0)
+    }
+
+    @Test
     fun restoreDefaults_resetsLocallyWithoutSaving() = runTest {
-        preferencesRepository.stored = UserPreferences.systemDefaults(42).copy(
-            diversityTolerance = 0.9,
-            randomness = 0.9,
+        preferencesRepository.stored = UserPreferences.systemDefaults(42).applyPreset(
+            FeedPreset.WILD_WALK,
         )
         viewModel.refreshFromServerAwait()
         viewModel.restoreDefaults()
 
-        assertEquals(0.4, viewModel.preferences.value.diversityTolerance, 0.0)
-        assertEquals(0.4, viewModel.preferences.value.randomness, 0.0)
+        assertEquals(FeedPreset.STAY_IN_LANE, viewModel.preferences.value.feedPreset)
         assertNull(preferencesRepository.lastUpdatePayload)
         assertTrue(viewModel.successMessage.value?.contains("Defaults restored") == true)
     }

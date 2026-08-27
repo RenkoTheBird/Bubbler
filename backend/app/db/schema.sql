@@ -177,17 +177,18 @@ CREATE TABLE edges (
 
 CREATE INDEX edges_from_post_id_idx ON edges (from_post_id);
 
--- USER PROFILES (vector preferences)
+-- USER PROFILES (two-tier feed composition preferences)
 CREATE TABLE user_profiles (
     user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    diversity_tolerance FLOAT CHECK (diversity_tolerance BETWEEN 0 AND 1),
-    randomness FLOAT,
+    feed_preset TEXT NOT NULL DEFAULT 'stay_in_lane',
+    topic_composition JSONB NOT NULL DEFAULT
+        '{"similar":0.55,"opposite":0.15,"surprise":0.30}',
+    post_composition JSONB NOT NULL DEFAULT
+        '{"similar":0.55,"opposite":0.15,"surprise":0.30}',
     use_view_time BOOLEAN NOT NULL DEFAULT FALSE,
     view_time_weight FLOAT DEFAULT 0.1,
     use_recency BOOLEAN NOT NULL DEFAULT TRUE,
-    ai_topic_detection BOOLEAN NOT NULL DEFAULT FALSE,
-    strategy_weights JSONB NOT NULL DEFAULT
-        '{"similar":0.4,"graph":0.25,"opposite":0.2,"random":0.15}'
+    ai_topic_detection BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 -- USER TOPIC PREFERENCES (normalized; replaces preferred_topics/blacklisted_topics arrays)

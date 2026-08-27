@@ -7,6 +7,7 @@ import com.bubbler.android.core.network.ApiException
 import com.bubbler.android.core.network.Endpoints
 import com.bubbler.android.data.model.GraphInteractionPayload
 import com.bubbler.android.data.model.GraphInteractionType
+import com.bubbler.android.data.model.FeedPreset
 import com.bubbler.android.data.model.PreferenceType
 import com.bubbler.android.data.model.PreferencesUpdatePayload
 import com.bubbler.android.data.model.TopicPreference
@@ -206,22 +207,27 @@ class RepositoryIntegrationTest {
                 """
                 {
                   "user_id": 1,
-                  "diversity_tolerance": 0.5,
-                  "randomness": 0.4,
+                  "feed_preset": "custom",
+                  "topic_composition": {
+                    "similar": 0.55,
+                    "opposite": 0.15,
+                    "surprise": 0.30
+                  },
+                  "post_composition": {
+                    "similar": 0.55,
+                    "opposite": 0.15,
+                    "surprise": 0.30
+                  },
                   "topic_preferences": [
                     {"topic":"science","preference_type":"preferred"}
-                  ],
-                  "strategy_weights": {
-                    "similar": 0.4, "graph": 0.25, "opposite": 0.2, "random": 0.15
-                  }
+                  ]
                 }
                 """.trimIndent(),
             ),
         )
         val updated = preferencesRepository.updatePreferences(
             PreferencesUpdatePayload(
-                diversityTolerance = 0.5,
-                randomness = 0.4,
+                feedPreset = FeedPreset.CUSTOM,
                 topicPreferences = listOf(
                     TopicPreference("science", PreferenceType.PREFERRED),
                 ),
@@ -315,12 +321,18 @@ class RepositoryIntegrationTest {
             """
             {
               "user_id": 1,
-              "diversity_tolerance": 0.4,
-              "randomness": 0.4,
-              "topic_preferences": [],
-              "strategy_weights": {
-                "similar": 0.4, "graph": 0.25, "opposite": 0.2, "random": 0.15
-              }
+              "feed_preset": "stay_in_lane",
+              "topic_composition": {
+                "similar": 0.55,
+                "opposite": 0.15,
+                "surprise": 0.30
+              },
+              "post_composition": {
+                "similar": 0.55,
+                "opposite": 0.15,
+                "surprise": 0.30
+              },
+              "topic_preferences": []
             }
             """.trimIndent(),
         )

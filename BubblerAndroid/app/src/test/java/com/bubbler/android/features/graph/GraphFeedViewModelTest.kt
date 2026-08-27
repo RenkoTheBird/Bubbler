@@ -438,14 +438,14 @@ class GraphFeedViewModelTest {
         override suspend fun updatePreferences(payload: PreferencesUpdatePayload): UserPreferences {
             failWith?.let { throw it }
             preferences = preferences.copy(
-                diversityTolerance = payload.diversityTolerance,
-                randomness = payload.randomness,
+                feedPreset = payload.feedPreset,
+                topicComposition = payload.topicComposition,
+                postComposition = payload.postComposition,
                 topicPreferences = payload.topicPreferences,
                 useViewTime = payload.useViewTime,
                 viewTimeWeight = payload.viewTimeWeight,
                 useRecency = payload.useRecency,
                 aiTopicDetection = payload.aiTopicDetection,
-                strategyWeights = payload.strategyWeights,
             ).sanitized()
             return preferences
         }

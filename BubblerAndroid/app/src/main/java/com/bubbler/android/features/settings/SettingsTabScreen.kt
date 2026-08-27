@@ -27,7 +27,11 @@ import com.bubbler.android.features.settings.account.EmailSettingsScreen
 import com.bubbler.android.features.settings.account.PasswordSecurityScreen
 import com.bubbler.android.features.settings.account.ProfileInfoScreen
 import com.bubbler.android.features.settings.blocks.BlockedUsersScreen
+import com.bubbler.android.features.settings.preferences.PreferencesAdvancedScreen
 import com.bubbler.android.features.settings.preferences.PreferencesScreen
+import com.bubbler.android.features.settings.preferences.PreferencesViewModel
+import com.bubbler.android.features.settings.preferences.PreferencesViewModelFactory
+import com.bubbler.android.data.repository.PreferencesRepository
 import com.bubbler.android.features.settings.staff.StaffReportDetailScreen
 import com.bubbler.android.features.settings.staff.StaffReportsScreen
 import java.net.URLDecoder
@@ -122,10 +126,49 @@ fun SettingsTabScreen(
                 onBack = { navController.popBackStack() },
             )
         }
-        composable(Routes.SETTINGS_PREFERENCES) {
+        composable(Routes.SETTINGS_PREFERENCES) { backStackEntry ->
+            val context = LocalContext.current
+            val preferencesFactory = remember(authSession, apiClient, context) {
+                PreferencesViewModelFactory(
+                    authSession = authSession,
+                    preferencesRepository = PreferencesRepository(
+                        apiClient = apiClient,
+                        tokenStore = TokenStore(context.applicationContext),
+                    ),
+                )
+            }
+            val preferencesViewModel: PreferencesViewModel = viewModel(
+                backStackEntry,
+                factory = preferencesFactory,
+            )
             PreferencesScreen(
                 authSession = authSession,
                 apiClient = apiClient,
+                onBack = { navController.popBackStack() },
+                onOpenAdvanced = { navController.navigate(Routes.SETTINGS_PREFERENCES_ADVANCED) },
+                sharedViewModel = preferencesViewModel,
+            )
+        }
+        composable(Routes.SETTINGS_PREFERENCES_ADVANCED) { backStackEntry ->
+            val parentEntry = remember(backStackEntry) {
+                navController.getBackStackEntry(Routes.SETTINGS_PREFERENCES)
+            }
+            val context = LocalContext.current
+            val preferencesFactory = remember(authSession, apiClient, context) {
+                PreferencesViewModelFactory(
+                    authSession = authSession,
+                    preferencesRepository = PreferencesRepository(
+                        apiClient = apiClient,
+                        tokenStore = TokenStore(context.applicationContext),
+                    ),
+                )
+            }
+            val preferencesViewModel: PreferencesViewModel = viewModel(
+                parentEntry,
+                factory = preferencesFactory,
+            )
+            PreferencesAdvancedScreen(
+                viewModel = preferencesViewModel,
                 onBack = { navController.popBackStack() },
             )
         }

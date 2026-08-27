@@ -465,19 +465,24 @@ def post_ids(posts: list[dict[str, Any]]) -> list[str]:
 def preferences_payload(body: Any, **overrides: Any) -> dict[str, Any]:
     data = body if isinstance(body, dict) else {}
     payload = {
-        "diversity_tolerance": float(data.get("diversity_tolerance", 0.4)),
-        "randomness": float(data.get("randomness", 0.4)),
+        "feed_preset": str(data.get("feed_preset", "stay_in_lane")),
+        "topic_composition": dict(
+            data.get(
+                "topic_composition",
+                {"similar": 0.55, "opposite": 0.15, "surprise": 0.30},
+            )
+        ),
+        "post_composition": dict(
+            data.get(
+                "post_composition",
+                {"similar": 0.55, "opposite": 0.15, "surprise": 0.30},
+            )
+        ),
         "topic_preferences": list(data.get("topic_preferences", [])),
         "use_view_time": bool(data.get("use_view_time", False)),
         "view_time_weight": float(data.get("view_time_weight", 0.1)),
         "use_recency": bool(data.get("use_recency", True)),
         "ai_topic_detection": bool(data.get("ai_topic_detection", False)),
-        "strategy_weights": dict(
-            data.get(
-                "strategy_weights",
-                {"similar": 0.4, "graph": 0.25, "opposite": 0.2, "random": 0.15},
-            )
-        ),
     }
     payload.update(overrides)
     return payload
@@ -1029,50 +1034,47 @@ async def run_phase_5(ctx: Context) -> None:
 
 
 async def run_phase_6(ctx: Context) -> None:
-    """Phase 6 — randomness + blacklisted topics runtime and settings checks."""
+    """Phase 6 — composition prefs + blacklisted topics runtime and settings checks."""
     ranking_service = RankingService()
     ranking_posts = [
-        {"id": "alpha", "topic": "technology", "similarity": 0.5},
-        {"id": "beta", "topic": "health", "similarity": 0.5},
-        {"id": "gamma", "topic": "business", "similarity": 0.5},
-        {"id": "delta", "topic": "entertainment", "similarity": 0.5},
+        {"id": "alpha", "topic": "technology", "score": 0.5},
+        {"id": "beta", "topic": "health", "score": 0.5},
+        {"id": "gamma", "topic": "business", "score": 0.5},
+        {"id": "delta", "topic": "entertainment", "score": 0.5},
     ]
 
     deterministic_order = post_ids(
         ranking_service.apply_preferences(
             SimpleNamespace(
-                randomness=0.0,
                 topic_preferences=[],
+                use_recency=False,
             ),
             [dict(post) for post in ranking_posts],
         )
     )
     ok(
         ctx,
-        "6.1 Zero randomness keeps equal-score ranking stable",
+        "6.1 Equal-score ranking stays stable without preference boosts",
         deterministic_order == ["alpha", "beta", "gamma", "delta"],
         str(deterministic_order),
     )
 
-    randomized_orders = {
-        tuple(
-            post_ids(
-                ranking_service.apply_preferences(
-                    SimpleNamespace(
-                        randomness=1.0,
-                        topic_preferences=[],
-                    ),
-                    [dict(post) for post in ranking_posts],
-                )
-            )
+    preferred_order = post_ids(
+        ranking_service.apply_preferences(
+            SimpleNamespace(
+                topic_preferences=[
+                    SimpleNamespace(topic="health", preference_type="preferred"),
+                ],
+                use_recency=False,
+            ),
+            [dict(post) for post in ranking_posts],
         )
-        for _ in range(8)
-    }
+    )
     ok(
         ctx,
-        "6.1 Randomness can reshuffle ranked results",
-        len(randomized_orders) > 1,
-        f"unique_orders={len(randomized_orders)}",
+        "6.1 Preferred topic is promoted in ranked results",
+        preferred_order[0] == "beta",
+        str(preferred_order),
     )
 
     if not ctx.token:
@@ -1096,14 +1098,8 @@ async def run_phase_6(ctx: Context) -> None:
         if candidate_topic:
             tuned_payload = preferences_payload(
                 pref_body,
-                randomness=0.0,
+                feed_preset="stay_in_lane",
                 topic_preferences=[],
-                strategy_weights={
-                    "similar": 1.0,
-                    "graph": 0.0,
-                    "opposite": 0.0,
-                    "random": 0.0,
-                },
                 use_view_time=False,
             )
             status, tuned_body, raw = ctx.api.request(
@@ -1114,7 +1110,11 @@ async def run_phase_6(ctx: Context) -> None:
             )
             ok(ctx, "6.2 PUT /user/me/preferences saves baseline algorithm settings", status == 200, raw[:200])
             if isinstance(tuned_body, dict):
-                ok(ctx, "6.2 Baseline randomness saved as 0", tuned_body.get("randomness") == 0.0)
+                ok(
+                    ctx,
+                    "6.2 Baseline feed preset saved",
+                    tuned_body.get("feed_preset") == "stay_in_lane",
+                )
 
             blacklisted_payload = preferences_payload(
                 tuned_body if isinstance(tuned_body, dict) else pref_body,
@@ -1169,8 +1169,13 @@ async def run_phase_6(ctx: Context) -> None:
     ok(ctx, "6.5 PreferencesSettingsView.swift exists", bool(settings_view))
     ok(
         ctx,
-        "6.5 Settings exposes a Randomness slider",
-        'title: "Randomness"' in settings_view,
+        "6.5 Settings exposes feed composition presets",
+        'title: "Feed Composition"' in settings_view and "FeedPresetPicker" in settings_view,
+    )
+    ok(
+        ctx,
+        "6.5 Settings exposes Advanced feed settings navigation",
+        "PreferencesAdvancedSettingsView" in settings_view,
     )
     ok(
         ctx,

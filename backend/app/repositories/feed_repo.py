@@ -105,6 +105,222 @@ class FeedRepository:
         )
         return [self._map_similarity_row(r) for r in rows]
 
+    async def _fetch_posts_by_embedding_in_topic(
+        self,
+        conn,
+        embedded_post: List[float],
+        topic: str,
+        limit: int,
+        *,
+        ascending: bool = True,
+        near_target: float | None = None,
+    ) -> list[dict[str, Any]]:
+        params: list[Any] = [to_pgvector(embedded_post), topic.casefold()]
+        where = [
+            "pwt.embedding IS NOT NULL",
+            "LOWER(pwt.topic) = $2",
+        ]
+
+        if near_target is not None:
+            params.append(float(near_target))
+            order_expr = (
+                f"ABS((1 - (pwt.embedding <=> $1::vector)) - ${len(params)})"
+            )
+        else:
+            order = "ASC" if ascending else "DESC"
+            order_expr = f"pwt.embedding <=> $1::vector {order}"
+
+        params.append(limit)
+        rows = await conn.fetch(
+            f"""
+            SELECT {POSTS_WITH_TOPIC_COLUMNS},
+                   1 - (pwt.embedding <=> $1::vector) AS similarity
+            {POSTS_BASE_FROM}
+            WHERE {" AND ".join(where)}
+            ORDER BY {order_expr}, pwt.created_at DESC
+            LIMIT ${len(params)}
+            """,
+            *params,
+        )
+        return [self._map_similarity_row(r) for r in rows]
+
+    async def _fetch_random_posts_in_topic(
+        self,
+        conn,
+        topic: str,
+        limit: int,
+    ) -> list[dict[str, Any]]:
+        rows = await conn.fetch(
+            f"""
+            SELECT {POSTS_WITH_TOPIC_COLUMNS}
+            {POSTS_TABLESAMPLE_FROM.format(sample_percent=_RANDOM_SAMPLE_PERCENT)}
+            WHERE p.embedding IS NOT NULL
+              AND LOWER(pwt.topic) = $1
+            LIMIT $2
+            """,
+            topic.casefold(),
+            limit,
+        )
+        if len(rows) < limit:
+            rows = await conn.fetch(
+                f"""
+                SELECT {POSTS_WITH_TOPIC_COLUMNS}
+                {POSTS_BASE_FROM}
+                WHERE pwt.embedding IS NOT NULL
+                  AND LOWER(pwt.topic) = $1
+                LIMIT $2
+                """,
+                topic.casefold(),
+                limit,
+            )
+        return [self._map_post_row(r) for r in rows]
+
+    async def get_topic_embedding(
+        self, topic_name: str, *, conn=None
+    ) -> list[float] | None:
+        async with acquire_conn(self.pool, conn) as connection:
+            row = await connection.fetchrow(
+                """
+                SELECT embedding
+                FROM topics
+                WHERE LOWER(name) = LOWER($1)
+                """,
+                topic_name,
+            )
+            if row is None or row["embedding"] is None:
+                return None
+            return list(row["embedding"])
+
+    async def get_similar_topics(
+        self,
+        embedding: list[float],
+        limit: int,
+        *,
+        exclude_topics: Sequence[str] | None = None,
+        conn=None,
+    ) -> list[dict[str, Any]]:
+        params: list[Any] = [to_pgvector(embedding)]
+        where = ["embedding IS NOT NULL"]
+        if exclude_topics:
+            params.append([t.casefold() for t in exclude_topics])
+            where.append(f"LOWER(name) != ALL(${len(params)}::text[])")
+        params.append(limit)
+        async with acquire_conn(self.pool, conn) as connection:
+            rows = await connection.fetch(
+                f"""
+                SELECT name,
+                       1 - (embedding <=> $1::vector) AS similarity
+                FROM topics
+                WHERE {" AND ".join(where)}
+                ORDER BY embedding <=> $1::vector ASC
+                LIMIT ${len(params)}
+                """,
+                *params,
+            )
+            return [
+                {"topic": row["name"], "similarity": float(row["similarity"])}
+                for row in rows
+            ]
+
+    async def get_opposite_topics(
+        self,
+        embedding: list[float],
+        limit: int,
+        *,
+        exclude_topics: Sequence[str] | None = None,
+        conn=None,
+    ) -> list[dict[str, Any]]:
+        params: list[Any] = [to_pgvector(embedding)]
+        where = ["embedding IS NOT NULL"]
+        if exclude_topics:
+            params.append([t.casefold() for t in exclude_topics])
+            where.append(f"LOWER(name) != ALL(${len(params)}::text[])")
+        params.append(limit)
+        async with acquire_conn(self.pool, conn) as connection:
+            rows = await connection.fetch(
+                f"""
+                SELECT name,
+                       1 - (embedding <=> $1::vector) AS similarity
+                FROM topics
+                WHERE {" AND ".join(where)}
+                ORDER BY embedding <=> $1::vector DESC
+                LIMIT ${len(params)}
+                """,
+                *params,
+            )
+            return [
+                {"topic": row["name"], "similarity": float(row["similarity"])}
+                for row in rows
+            ]
+
+    async def get_random_topics(
+        self,
+        limit: int,
+        *,
+        exclude_topics: Sequence[str] | None = None,
+        conn=None,
+    ) -> list[dict[str, Any]]:
+        params: list[Any] = []
+        where = ["TRUE"]
+        if exclude_topics:
+            params.append([t.casefold() for t in exclude_topics])
+            where.append(f"LOWER(name) != ALL(${len(params)}::text[])")
+        params.append(limit)
+        async with acquire_conn(self.pool, conn) as connection:
+            rows = await connection.fetch(
+                f"""
+                SELECT name
+                FROM topics
+                WHERE {" AND ".join(where)}
+                ORDER BY RANDOM()
+                LIMIT ${len(params)}
+                """,
+                *params,
+            )
+            return [{"topic": row["name"], "similarity": 0.5} for row in rows]
+
+    async def get_posts_by_embedding_in_topic(
+        self,
+        embedding: list[float],
+        topic: str,
+        limit: int,
+        *,
+        ascending: bool = True,
+        near_target: float | None = None,
+        conn=None,
+    ) -> list[dict[str, Any]]:
+        async with acquire_conn(self.pool, conn) as connection:
+            return await self._fetch_posts_by_embedding_in_topic(
+                connection,
+                embedding,
+                topic,
+                limit,
+                ascending=ascending,
+                near_target=near_target,
+            )
+
+    async def get_random_posts_in_topic(
+        self, topic: str, limit: int = 10, *, conn=None
+    ) -> list[dict[str, Any]]:
+        async with acquire_conn(self.pool, conn) as connection:
+            return await self._fetch_random_posts_in_topic(connection, topic, limit)
+
+    async def get_post_embedding(
+        self, post_id: str, *, conn=None
+    ) -> list[float] | None:
+        async with acquire_conn(self.pool, conn) as connection:
+            row = await connection.fetchrow(
+                """
+                SELECT embedding
+                FROM posts
+                WHERE id = $1::uuid
+                """,
+                post_id,
+            )
+            if row is None or row["embedding"] is None:
+                return None
+            return list(row["embedding"])
+
     async def _fetch_random_posts(self, conn, limit: int) -> list[dict[str, Any]]:
         rows = await conn.fetch(
             f"""

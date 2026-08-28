@@ -194,7 +194,7 @@ CREATE TABLE user_profiles (
         '{"similar":0.55,"opposite":0.15,"surprise":0.30}',
     use_view_time BOOLEAN NOT NULL DEFAULT FALSE,
     view_time_weight FLOAT DEFAULT 0.1,
-    use_recency BOOLEAN NOT NULL DEFAULT TRUE,
+    use_recency BOOLEAN NOT NULL DEFAULT FALSE,
     ai_topic_detection BOOLEAN NOT NULL DEFAULT FALSE
 );
 

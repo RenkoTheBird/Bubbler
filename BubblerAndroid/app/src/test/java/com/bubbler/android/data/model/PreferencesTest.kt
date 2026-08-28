@@ -50,6 +50,17 @@ class PreferencesTest {
     }
 
     @Test
+    fun systemDefaults_matchConservativeLaunchPolicy() {
+        val prefs = UserPreferences.systemDefaults(userId = 1)
+
+        assertEquals(FeedPreset.STAY_IN_LANE, prefs.feedPreset)
+        assertTrue(prefs.topicPreferences.isEmpty())
+        assertFalse(prefs.useViewTime)
+        assertFalse(prefs.useRecency)
+        assertFalse(prefs.aiTopicDetection)
+    }
+
+    @Test
     fun applyPreset_setsCompositionWeights() {
         val prefs = UserPreferences.systemDefaults(1)
             .applyPreset(FeedPreset.WILD_WALK)

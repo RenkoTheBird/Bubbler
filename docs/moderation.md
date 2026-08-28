@@ -161,7 +161,7 @@ As social features land (follows, comments, block users—see [`TODO`](TODO)), h
 
 User chooses roughly **Strict / Balanced / Open**, which adjusts filtering thresholds and risk tolerance on top of prefer/blacklist.
 
-- **Launch:** safe defaults + existing prefer/blacklist; sensitivity can wait if defaults are conservative
+- **Launch:** safe defaults (see § Default protections) + existing prefer/blacklist; sensitivity slider can wait
 - **Soon after topics ML:** global sensitivity, then per-topic overrides if needed
 
 ### 2. “Why am I seeing this?”
@@ -172,9 +172,24 @@ Transparency for a shown Bubble: topic match, preference match, strategy/edge ty
 
 Before publish: “This may violate guidelines” / “Are you sure?” when classifiers flag borderline content. Instagram-style friction reduces harm without full automation. Depends on at least a light classifier or rule layer.
 
-### 4. Default protections
+### 4. Default protections (conservative discovery)
 
-New users start with **safe defaults**, not a blank preference slate—conservative sensitivity, no assumption that “Open” is the product default. Aligns with preference-impact caution in [`TODO`](TODO) (likes, comments, statistics can amplify unintended interpretations).
+New accounts start with **documented conservative defaults** persisted at registration—not an empty or “wide open” slate. Users may change every setting in Settings immediately; defaults only define the starting point.
+
+**Conservative** at launch means:
+
+| Setting | Default | Notes |
+| --- | --- | --- |
+| Feed preset | `stay_in_lane` | Topic/post composition weights for the most topic-focused walk. **Not** a Strict/Balanced/Open sensitivity control—that slider may ship later (F11) as a separate layer on top of prefer/blacklist. |
+| Preferred topics | *(none)* | Users may prefer topics from account creation onward. |
+| Blacklisted topics | *(none)* | No platform-seeded topic blocklist at launch; this may change as new topics are added. Users may blacklist from account creation onward. |
+| Recency boost | **Off** | `use_recency = false` — no age-based ranking bonus until the user opts in. |
+| View-time learning | **Off** | `use_view_time = false` — aligns with preference-impact caution in [`TODO`](TODO). |
+| AI topic detection | **Off** | `ai_topic_detection = false` until product enables the feature. |
+
+**Registration:** `POST /auth/register` inserts `user_profiles` in the same transaction as the new `users` row, using the values above. See [`architecture.md`](architecture.md) · [`api_contracts.md`](api_contracts.md).
+
+**Safety floor (separate):** conservative discovery defaults do **not** replace the global safety overlay—illegal/severe content is removed regardless of preset or topic prefs. There is no user opt-in to bypass that floor (see Layer 2).
 
 ### 5. Cross-topic detection
 
@@ -204,7 +219,7 @@ Minimum viable moderation for production:
 - [ ] Public community guidelines covering hard-removal categories
 - [ ] In-app **report** on posts (and later comments/users as those ship)
 - [ ] Admin/moderator ability to **remove** content and restrict accounts
-- [ ] **Safe defaults** for new accounts (conservative discovery; blacklists/prefs usable immediately)
+- [x] **Safe defaults** for new accounts (conservative discovery per § Default protections; prefer/blacklist usable from account creation)
 - [ ] Preserve existing prefer / blacklist / strategy behavior so users can self-steer
 - [ ] Logging of moderation actions for audit
 - [ ] No “opt-in” path that bypasses the safety floor
@@ -265,7 +280,7 @@ Depends on / continues the FUTURE item in [`TODO`](TODO) (AI/ML topic determinat
 2. **Reuse the ranking path** — visibility shaping is extra modifiers on strategies/preferences/edges, not a second feed product.
 3. **Precision-first automation** — automate hard removal only for high-precision severe classes; send the rest to friction or human queues.
 4. **Topic as the scale unit** — quarantine or tighten a topic instead of linear growth in per-post human review.
-5. **Defaults over configuration** — new users and new topics start constrained; openness is earned or explicit, never the unset state.
+5. **Defaults over configuration** — new accounts start with conservative discovery settings (see § Default protections); openness is explicit in Settings, never the unset state.
 6. **Taxonomy evolution** — AI-generated topics need merge/split tooling so preferences and health metrics remain coherent as the graph grows.
 
 ---

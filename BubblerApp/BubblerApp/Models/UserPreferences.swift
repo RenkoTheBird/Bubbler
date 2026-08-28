@@ -152,7 +152,7 @@ struct UserPreferences: Codable, Equatable {
             topicPreferences: [],
             useViewTime: false,
             viewTimeWeight: 0.1,
-            useRecency: true,
+            useRecency: false,
             aiTopicDetection: false
         )
     }

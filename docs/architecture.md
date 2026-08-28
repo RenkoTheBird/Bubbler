@@ -119,6 +119,23 @@ surprise = 0.30
 
 Presets (`stay_in_lane`, `cross_pollinate`, `wild_walk`) set both tiers; `custom` preserves Advanced slider values.
 
+### New account defaults
+
+Registration persists a `user_profiles` row in the same transaction as the new user. Defaults match the **`stay_in_lane`** preset with behavioral toggles off:
+
+| Field | Default |
+| --- | --- |
+| `feed_preset` | `stay_in_lane` |
+| `topic_composition` / `post_composition` | `similar=0.55`, `opposite=0.15`, `surprise=0.30` |
+| `topic_preferences` | *(empty — no preferred or blacklisted topics)* |
+| `use_recency` | `false` |
+| `use_view_time` | `false` |
+| `ai_topic_detection` | `false` |
+
+There is **no platform-seeded topic blacklist** at launch (may change as topics grow). Users may prefer or blacklist topics from account creation; all settings remain editable in Settings immediately. A future **Strict / Balanced / Open** sensitivity slider (roadmap F11) is a separate control—not the same as `stay_in_lane`.
+
+Policy detail: [`moderation.md`](moderation.md) § Default protections.
+
 The backend selects candidates in two stages:
 
 1. **Topic tier** — using `topics.embedding`, pick topic buckets (same/near, distant, random).

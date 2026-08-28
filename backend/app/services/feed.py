@@ -122,7 +122,7 @@ class RankingService:
     ):
         filtered = []
         preferred_topics, blacklisted_topics = _topic_sets(prefs.topic_preferences)
-        use_recency = getattr(prefs, "use_recency", True)
+        use_recency = getattr(prefs, "use_recency", False)
         view_time_boosts = view_time_boosts or {}
         blocked_user_ids = blocked_user_ids or set()
         feed_preference_signals = feed_preference_signals or []

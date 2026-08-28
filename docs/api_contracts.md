@@ -18,11 +18,13 @@ Frontend should return something like:
   ],
   "use_view_time": false,
   "view_time_weight": 0.1,
-  "use_recency": true,
+  "use_recency": false,
   "ai_topic_detection": false
 }
 
 Preset IDs: `stay_in_lane`, `cross_pollinate`, `wild_walk`, `custom`. When `feed_preset` is not `custom`, the server normalizes `topic_composition` and `post_composition` to the preset values on save.
+
+**New accounts:** `POST /auth/register` inserts `user_profiles` in the same transaction with conservative defaults—`stay_in_lane`, empty `topic_preferences`, and `use_recency`, `use_view_time`, and `ai_topic_detection` all `false`. See [`moderation.md`](moderation.md) § Default protections.
 
 Graph session (`GET /feed/me/session?diversify=true|false`) returns:
 

@@ -323,7 +323,7 @@ async def ensure_schema(pool: asyncpg.Pool) -> None:
             await conn.execute(
                 """
                 ALTER TABLE user_profiles
-                ADD COLUMN use_recency BOOLEAN NOT NULL DEFAULT TRUE
+                ADD COLUMN use_recency BOOLEAN NOT NULL DEFAULT FALSE
                 """
             )
 

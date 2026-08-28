@@ -23,6 +23,7 @@ class TopicPreference(BaseModel):
 
 
 def default_user_prefs(user_id: int = 0) -> "UserProfile":
+    """Conservative launch defaults — see docs/moderation.md § Default protections."""
     topic, post = preset_compositions("stay_in_lane")
     return UserProfile(
         user_id=user_id,
@@ -30,6 +31,10 @@ def default_user_prefs(user_id: int = 0) -> "UserProfile":
         topic_composition=CompositionWeights(**topic),
         post_composition=CompositionWeights(**post),
         topic_preferences=[],
+        use_view_time=False,
+        view_time_weight=0.1,
+        use_recency=False,
+        ai_topic_detection=False,
     )
 
 
@@ -116,7 +121,7 @@ class PrefsUpdate(BaseModel):
     topic_preferences: list[TopicPreference]
     use_view_time: bool = False
     view_time_weight: float = 0.1
-    use_recency: bool = True
+    use_recency: bool = False
     ai_topic_detection: bool = False
 
     @model_validator(mode="after")

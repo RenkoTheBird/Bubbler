@@ -123,7 +123,7 @@ data class UserPreferences(
     @SerialName("view_time_weight")
     val viewTimeWeight: Double = 0.1,
     @SerialName("use_recency")
-    val useRecency: Boolean = true,
+    val useRecency: Boolean = false,
     @SerialName("ai_topic_detection")
     val aiTopicDetection: Boolean = false,
 ) {
@@ -273,7 +273,7 @@ data class UserPreferences(
             topicPreferences = emptyList(),
             useViewTime = false,
             viewTimeWeight = 0.1,
-            useRecency = true,
+            useRecency = false,
             aiTopicDetection = false,
         )
 
@@ -309,7 +309,7 @@ data class PreferencesUpdatePayload(
     @SerialName("view_time_weight")
     val viewTimeWeight: Double = 0.1,
     @SerialName("use_recency")
-    val useRecency: Boolean = true,
+    val useRecency: Boolean = false,
     @SerialName("ai_topic_detection")
     val aiTopicDetection: Boolean = false,
 )

@@ -341,7 +341,12 @@ class RepositoryIntegrationTest {
                 "opposite": 0.15,
                 "surprise": 0.30
               },
-              "topic_preferences": []
+              "topic_preferences": [],
+              "use_view_time": false,
+              "view_time_weight": 0.1,
+              "use_recency": false,
+              "ai_topic_detection": false,
+              "onboarding_completed": true
             }
             """.trimIndent(),
         )

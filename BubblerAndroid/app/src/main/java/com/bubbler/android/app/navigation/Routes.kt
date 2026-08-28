@@ -12,6 +12,7 @@ object Routes {
 
     // Root signed-in shell
     const val MAIN = "main"
+    const val ONBOARDING = "onboarding"
 
     // Feed tab nested stack (graph ↔ ranked home + create post + user profile)
     const val FEED_HOME = "feed_home"

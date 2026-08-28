@@ -27,6 +27,7 @@ import com.bubbler.android.core.auth.AuthSession
 import com.bubbler.android.core.auth.TokenStore
 import com.bubbler.android.core.network.ApiClient
 import com.bubbler.android.data.repository.AuthRepository
+import com.bubbler.android.data.repository.PreferencesRepository
 import com.bubbler.android.data.repository.UserRepository
 import kotlinx.coroutines.delay
 
@@ -42,6 +43,7 @@ fun BubblerApp(
             tokenStore = tokenStore,
             authRepository = AuthRepository(apiClient),
             userRepository = UserRepository(apiClient, tokenStore),
+            preferencesRepository = PreferencesRepository(apiClient, tokenStore),
         )
     }
 
@@ -51,6 +53,7 @@ fun BubblerApp(
     LaunchedEffect(accessToken) {
         if (accessToken != null) {
             session.refreshStaffAccess()
+            session.refreshOnboardingStatus()
         }
     }
 

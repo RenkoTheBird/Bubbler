@@ -187,7 +187,11 @@ New accounts start with **documented conservative defaults** persisted at regist
 | View-time learning | **Off** | `use_view_time = false` — aligns with preference-impact caution in [`TODO`](TODO). |
 | AI topic detection | **Off** | `ai_topic_detection = false` until product enables the feature. |
 
-**Registration:** `POST /auth/register` inserts `user_profiles` in the same transaction as the new `users` row, using the values above. See [`architecture.md`](architecture.md) · [`api_contracts.md`](api_contracts.md).
+**Registration:** `POST /auth/register` inserts `user_profiles` in the same transaction as the new `users` row, using the values above (`onboarding_completed = false`).
+
+**Onboarding UX:** After the first sign-in, iOS and Android show a feed **preset picker** before the main app. `GET /user/me/preferences` exposes `onboarding_completed`; completing onboarding sets it to `true` via `PUT /user/me/preferences` together with the chosen preset (or recommended defaults on skip). Advanced topic/recency/view-time controls are deferred to Settings—onboarding copy says so explicitly.
+
+See [`architecture.md`](architecture.md) · [`api_contracts.md`](api_contracts.md).
 
 **Safety floor (separate):** conservative discovery defaults do **not** replace the global safety overlay—illegal/severe content is removed regardless of preset or topic prefs. There is no user opt-in to bypass that floor (see Layer 2).
 

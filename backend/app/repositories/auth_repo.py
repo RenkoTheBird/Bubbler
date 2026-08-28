@@ -46,9 +46,10 @@ class AuthRepository:
                         use_view_time,
                         view_time_weight,
                         use_recency,
-                        ai_topic_detection
+                        ai_topic_detection,
+                        onboarding_completed
                     )
-                    VALUES ($1, $2, $3::jsonb, $4::jsonb, $5, $6, $7, $8)
+                    VALUES ($1, $2, $3::jsonb, $4::jsonb, $5, $6, $7, $8, $9)
                     """,
                     user_id,
                     prefs.feed_preset,
@@ -58,5 +59,6 @@ class AuthRepository:
                     prefs.view_time_weight,
                     prefs.use_recency,
                     prefs.ai_topic_detection,
+                    prefs.onboarding_completed,
                 )
                 return user_id

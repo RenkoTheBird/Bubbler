@@ -128,6 +128,7 @@ struct UserPreferences: Codable, Equatable {
     var viewTimeWeight: Double
     var useRecency: Bool
     var aiTopicDetection: Bool
+    var onboardingCompleted: Bool
 
     enum CodingKeys: String, CodingKey {
         case userId = "user_id"
@@ -139,6 +140,7 @@ struct UserPreferences: Codable, Equatable {
         case viewTimeWeight = "view_time_weight"
         case useRecency = "use_recency"
         case aiTopicDetection = "ai_topic_detection"
+        case onboardingCompleted = "onboarding_completed"
     }
 
     static let placeholder = systemDefaults(userId: 0)
@@ -153,7 +155,8 @@ struct UserPreferences: Codable, Equatable {
             useViewTime: false,
             viewTimeWeight: 0.1,
             useRecency: false,
-            aiTopicDetection: false
+            aiTopicDetection: false,
+            onboardingCompleted: false
         )
     }
 
@@ -178,7 +181,8 @@ struct UserPreferences: Codable, Equatable {
             useViewTime: useViewTime,
             viewTimeWeight: viewTimeWeight,
             useRecency: useRecency,
-            aiTopicDetection: aiTopicDetection
+            aiTopicDetection: aiTopicDetection,
+            onboardingCompleted: onboardingCompleted
         )
     }
 
@@ -264,7 +268,8 @@ struct UserPreferences: Codable, Equatable {
             useViewTime: useViewTime,
             viewTimeWeight: viewTimeWeight.clamped(to: 0 ... 1),
             useRecency: useRecency,
-            aiTopicDetection: aiTopicDetection
+            aiTopicDetection: aiTopicDetection,
+            onboardingCompleted: onboardingCompleted
         )
         if sanitized.feedPreset != .custom {
             sanitized.applyPreset(sanitized.feedPreset)
@@ -304,6 +309,7 @@ struct PreferencesUpdatePayload: Codable {
     var viewTimeWeight: Double
     var useRecency: Bool
     var aiTopicDetection: Bool
+    var onboardingCompleted: Bool
 
     enum CodingKeys: String, CodingKey {
         case feedPreset = "feed_preset"
@@ -314,6 +320,7 @@ struct PreferencesUpdatePayload: Codable {
         case viewTimeWeight = "view_time_weight"
         case useRecency = "use_recency"
         case aiTopicDetection = "ai_topic_detection"
+        case onboardingCompleted = "onboarding_completed"
     }
 }
 

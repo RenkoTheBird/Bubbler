@@ -3,6 +3,7 @@ package com.bubbler.android.core.auth
 import com.bubbler.android.core.network.ApiException
 import com.bubbler.android.data.repository.AuthRepository
 import com.bubbler.android.data.repository.AuthResponse
+import com.bubbler.android.data.repository.PreferencesRepository
 import com.bubbler.android.data.repository.UserRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -29,6 +30,12 @@ object AgeGate {
         get() = "You must be at least $MINIMUM_AGE years old to use Bubbler."
 }
 
+enum class OnboardingGate {
+    Unknown,
+    Required,
+    Complete,
+}
+
 /**
  * Session gate matching iOS AuthSession: restore token, sign-in/register, sign-out.
  */
@@ -36,6 +43,7 @@ class AuthSession(
     private val tokenStore: TokenStore,
     private val authRepository: AuthRepository,
     private val userRepository: UserRepository? = null,
+    private val preferencesRepository: PreferencesRepository? = null,
 ) {
     private val _accessToken = MutableStateFlow(tokenStore.loadAccessToken())
     val accessToken: StateFlow<String?> = _accessToken.asStateFlow()
@@ -54,6 +62,9 @@ class AuthSession(
 
     private val _isWorking = MutableStateFlow(false)
     val isWorking: StateFlow<Boolean> = _isWorking.asStateFlow()
+
+    private val _onboardingGate = MutableStateFlow(OnboardingGate.Unknown)
+    val onboardingGate: StateFlow<OnboardingGate> = _onboardingGate.asStateFlow()
 
     val isSignedIn: Boolean
         get() = _accessToken.value != null
@@ -147,11 +158,39 @@ class AuthSession(
         }
     }
 
+    suspend fun refreshOnboardingStatus() {
+        if (!isSignedIn) {
+            _onboardingGate.value = OnboardingGate.Unknown
+            return
+        }
+        val repo = preferencesRepository ?: run {
+            _onboardingGate.value = OnboardingGate.Complete
+            return
+        }
+        try {
+            val preferences = repo.getPreferences()
+            _onboardingGate.value = if (preferences.onboardingCompleted) {
+                OnboardingGate.Complete
+            } else {
+                OnboardingGate.Required
+            }
+        } catch (e: ApiException.Unauthorized) {
+            signOut()
+        } catch (_: Exception) {
+            _onboardingGate.value = OnboardingGate.Complete
+        }
+    }
+
+    fun markOnboardingComplete() {
+        _onboardingGate.value = OnboardingGate.Complete
+    }
+
     fun signOut() {
         tokenStore.deleteAccessToken()
         _accessToken.value = null
         _userId.value = null
         _isStaff.value = false
+        _onboardingGate.value = OnboardingGate.Unknown
         _authError.value = null
         _successMessage.value = null
     }

@@ -131,8 +131,13 @@ Registration persists a `user_profiles` row in the same transaction as the new u
 | `use_recency` | `false` |
 | `use_view_time` | `false` |
 | `ai_topic_detection` | `false` |
+| `onboarding_completed` | `false` at register; set `true` after onboarding |
 
 There is **no platform-seeded topic blacklist** at launch (may change as topics grow). Users may prefer or blacklist topics from account creation; all settings remain editable in Settings immediately. A future **Strict / Balanced / Open** sensitivity slider (roadmap F11) is a separate control—not the same as `stay_in_lane`.
+
+### Account onboarding (feed preset)
+
+After signup, clients gate the main app on `onboarding_completed` from `GET /user/me/preferences`. New registrations start with `onboarding_completed = false` and see a short **feed preset picker** (Stay in lane / Cross-pollinate / Wild walk). Copy tells users they can adjust **advanced** topic, recency, and view-time settings later in Settings. Completing onboarding (or choosing **Use recommended settings**) sends `PUT /user/me/preferences` with the chosen preset and `onboarding_completed: true`. Existing accounts migrated with `onboarding_completed = true` skip the gate.
 
 Policy detail: [`moderation.md`](moderation.md) § Default protections.
 

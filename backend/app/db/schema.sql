@@ -195,7 +195,8 @@ CREATE TABLE user_profiles (
     use_view_time BOOLEAN NOT NULL DEFAULT FALSE,
     view_time_weight FLOAT DEFAULT 0.1,
     use_recency BOOLEAN NOT NULL DEFAULT FALSE,
-    ai_topic_detection BOOLEAN NOT NULL DEFAULT FALSE
+    ai_topic_detection BOOLEAN NOT NULL DEFAULT FALSE,
+    onboarding_completed BOOLEAN NOT NULL DEFAULT TRUE
 );
 
 -- USER TOPIC PREFERENCES (normalized; replaces preferred_topics/blacklisted_topics arrays)

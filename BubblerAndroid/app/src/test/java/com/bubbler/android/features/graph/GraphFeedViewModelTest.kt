@@ -446,6 +446,7 @@ class GraphFeedViewModelTest {
                 viewTimeWeight = payload.viewTimeWeight,
                 useRecency = payload.useRecency,
                 aiTopicDetection = payload.aiTopicDetection,
+                onboardingCompleted = payload.onboardingCompleted,
             ).sanitized()
             return preferences
         }

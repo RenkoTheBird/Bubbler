@@ -44,6 +44,7 @@ class UserRepository:
             view_time_weight=row["view_time_weight"],
             use_recency=row["use_recency"],
             ai_topic_detection=row["ai_topic_detection"],
+            onboarding_completed=row["onboarding_completed"],
         )
 
     def _row_to_user_info(self, row) -> UserInfo:
@@ -317,9 +318,10 @@ class UserRepository:
                         use_view_time,
                         view_time_weight,
                         use_recency,
-                        ai_topic_detection
+                        ai_topic_detection,
+                        onboarding_completed
                     )
-                    VALUES ($1, $2, $3::jsonb, $4::jsonb, $5, $6, $7, $8)
+                    VALUES ($1, $2, $3::jsonb, $4::jsonb, $5, $6, $7, $8, $9)
                     ON CONFLICT (user_id) DO UPDATE
                     SET feed_preset = EXCLUDED.feed_preset,
                         topic_composition = EXCLUDED.topic_composition,
@@ -327,7 +329,8 @@ class UserRepository:
                         use_view_time = EXCLUDED.use_view_time,
                         view_time_weight = EXCLUDED.view_time_weight,
                         use_recency = EXCLUDED.use_recency,
-                        ai_topic_detection = EXCLUDED.ai_topic_detection
+                        ai_topic_detection = EXCLUDED.ai_topic_detection,
+                        onboarding_completed = EXCLUDED.onboarding_completed
                     RETURNING *;
                     """,
                     user_id,
@@ -338,6 +341,7 @@ class UserRepository:
                     body.view_time_weight,
                     body.use_recency,
                     body.ai_topic_detection,
+                    body.onboarding_completed,
                 )
                 await self._sync_topic_prefs(conn, user_id, body.topic_preferences)
                 topic_preferences = await self._fetch_topic_prefs(conn, user_id)

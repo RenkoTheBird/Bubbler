@@ -35,6 +35,7 @@ def default_user_prefs(user_id: int = 0) -> "UserProfile":
         view_time_weight=0.1,
         use_recency=False,
         ai_topic_detection=False,
+        onboarding_completed=False,
     )
 
 
@@ -123,6 +124,7 @@ class PrefsUpdate(BaseModel):
     view_time_weight: float = 0.1
     use_recency: bool = False
     ai_topic_detection: bool = False
+    onboarding_completed: bool = False
 
     @model_validator(mode="after")
     def sync_preset_and_compositions(self):

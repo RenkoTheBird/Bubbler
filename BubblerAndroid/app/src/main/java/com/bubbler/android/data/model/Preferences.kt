@@ -126,6 +126,8 @@ data class UserPreferences(
     val useRecency: Boolean = false,
     @SerialName("ai_topic_detection")
     val aiTopicDetection: Boolean = false,
+    @SerialName("onboarding_completed")
+    val onboardingCompleted: Boolean = false,
 ) {
     val preferredTopics: List<String>
         get() = topicPreferences
@@ -147,6 +149,7 @@ data class UserPreferences(
             viewTimeWeight = viewTimeWeight,
             useRecency = useRecency,
             aiTopicDetection = aiTopicDetection,
+            onboardingCompleted = onboardingCompleted,
         )
 
     fun applyPreset(preset: FeedPreset): UserPreferences {
@@ -241,6 +244,7 @@ data class UserPreferences(
             viewTimeWeight = viewTimeWeight.clamped(0.0, 1.0),
             useRecency = useRecency,
             aiTopicDetection = aiTopicDetection,
+            onboardingCompleted = onboardingCompleted,
         )
         result = if (result.feedPreset != FeedPreset.CUSTOM) {
             result.applyPreset(result.feedPreset)
@@ -275,6 +279,7 @@ data class UserPreferences(
             viewTimeWeight = 0.1,
             useRecency = false,
             aiTopicDetection = false,
+            onboardingCompleted = false,
         )
 
         private fun mergeTopicPreferences(
@@ -312,6 +317,8 @@ data class PreferencesUpdatePayload(
     val useRecency: Boolean = false,
     @SerialName("ai_topic_detection")
     val aiTopicDetection: Boolean = false,
+    @SerialName("onboarding_completed")
+    val onboardingCompleted: Boolean = false,
 )
 
 fun FeedPreset.displayTitle(): String = when (this) {

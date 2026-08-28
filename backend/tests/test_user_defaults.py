@@ -17,6 +17,7 @@ class DefaultUserPrefsTests(unittest.TestCase):
         self.assertFalse(prefs.use_view_time)
         self.assertFalse(prefs.use_recency)
         self.assertFalse(prefs.ai_topic_detection)
+        self.assertFalse(prefs.onboarding_completed)
         self.assertAlmostEqual(prefs.topic_composition.similar, 0.55)
         self.assertAlmostEqual(prefs.topic_composition.opposite, 0.15)
         self.assertAlmostEqual(prefs.topic_composition.surprise, 0.30)
@@ -66,3 +67,4 @@ class AuthRepositoryRegistrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(args[4], False)  # use_view_time
         self.assertEqual(args[6], False)  # use_recency
         self.assertEqual(args[7], False)  # ai_topic_detection
+        self.assertEqual(args[8], False)  # onboarding_completed

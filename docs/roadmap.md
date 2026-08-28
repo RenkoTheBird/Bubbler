@@ -65,7 +65,7 @@ Ship before public users. Suggested build order: policies & age → App Privacy 
 
 | #   | Feature                                  | Why                                                                         | Source                                     | Owner                  |
 | --- | ---------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------ | ---------------------- |
-| L8  | Safe discovery defaults for new accounts | Conservative prefs at registration (`stay_in_lane`, recency/view-time/AI off, no topic prefs); no opt-in path around the safety floor. See [`moderation.md`](moderation.md) § Default protections. | moderation Phase 0 · TODO caution          | Product + backend — **defaults documented + persisted at register** |
+| L8  | Safe discovery defaults for new accounts | Conservative prefs at registration + preset onboarding gate; no opt-in path around the safety floor. See [`moderation.md`](moderation.md) § Default protections. | moderation Phase 0 · TODO caution          | Product + backend — **shipped (defaults + onboarding UX)** |
 | L9  | Data export + erasure completeness       | GDPR portability / CCPA know+delete; delete exists, export does not.        | privacy_legal §9 · P0 with UGC             | Backend + iOS + Android |
 | L10 | Retention schedule + breach playbook     | Document + implement TTLs; 72h-ready incident response before public users. | privacy_legal §10 · §12                    | Ops + backend          |
 | L11 | DMCA agent + CSAM / LE runbooks          | US safe harbor + NCMEC / government request processes around UGC.           | privacy_legal §19–21                       | Counsel + T&S          |

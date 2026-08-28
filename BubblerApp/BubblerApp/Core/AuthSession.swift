@@ -23,11 +23,18 @@ enum AgeGate {
     }
 }
 
+enum OnboardingGate: Equatable {
+    case unknown
+    case required
+    case complete
+}
+
 @MainActor
 final class AuthSession: ObservableObject {
     @Published private(set) var accessToken: String?
     @Published private(set) var userId: Int?
     @Published private(set) var isStaff = false
+    @Published private(set) var onboardingGate: OnboardingGate = .unknown
     @Published var authError: String?
     @Published var successMessage: String?
     @Published var isWorking = false
@@ -55,6 +62,27 @@ final class AuthSession: ObservableObject {
         } catch {
             // Keep the last known staff flag on transient failures.
         }
+    }
+
+    func refreshOnboardingStatus() async {
+        guard isSignedIn else {
+            onboardingGate = .unknown
+            return
+        }
+
+        do {
+            let preferences = try await APIClient.getPreferences()
+            onboardingGate = preferences.onboardingCompleted ? .complete : .required
+        } catch APIClientError.unauthorized {
+            signOut()
+        } catch {
+            // Fail open so returning users are not blocked by transient errors.
+            onboardingGate = .complete
+        }
+    }
+
+    func markOnboardingComplete() {
+        onboardingGate = .complete
     }
 
     func signIn(email: String, password: String) async {
@@ -144,6 +172,7 @@ final class AuthSession: ObservableObject {
         accessToken = nil
         userId = nil
         isStaff = false
+        onboardingGate = .unknown
         authError = nil
         successMessage = nil
     }

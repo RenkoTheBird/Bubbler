@@ -483,6 +483,7 @@ def preferences_payload(body: Any, **overrides: Any) -> dict[str, Any]:
         "view_time_weight": float(data.get("view_time_weight", 0.1)),
         "use_recency": bool(data.get("use_recency", False)),
         "ai_topic_detection": bool(data.get("ai_topic_detection", False)),
+        "onboarding_completed": bool(data.get("onboarding_completed", False)),
     }
     payload.update(overrides)
     return payload

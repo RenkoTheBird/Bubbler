@@ -58,6 +58,7 @@ class PreferencesTest {
         assertFalse(prefs.useViewTime)
         assertFalse(prefs.useRecency)
         assertFalse(prefs.aiTopicDetection)
+        assertFalse(prefs.onboardingCompleted)
     }
 
     @Test

@@ -319,6 +319,14 @@ async def ensure_schema(pool: asyncpg.Pool) -> None:
                 """
             )
 
+        if not await _column_exists(conn, "user_profiles", "onboarding_completed"):
+            await conn.execute(
+                """
+                ALTER TABLE user_profiles
+                ADD COLUMN onboarding_completed BOOLEAN NOT NULL DEFAULT TRUE
+                """
+            )
+
         if not await _column_exists(conn, "user_profiles", "use_recency"):
             await conn.execute(
                 """

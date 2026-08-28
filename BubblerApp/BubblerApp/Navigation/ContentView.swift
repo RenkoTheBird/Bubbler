@@ -15,7 +15,14 @@ struct ContentView: View {
     var body: some View {
         Group {
             if authSession.isSignedIn {
-                MainTabView()
+                switch authSession.onboardingGate {
+                case .unknown:
+                    ProgressView("Loading…")
+                case .required:
+                    OnboardingView()
+                case .complete:
+                    MainTabView()
+                }
             } else {
                 NavigationStack {
                     LoginView()
@@ -28,8 +35,10 @@ struct ContentView: View {
         .environmentObject(feedPreferences)
         .task(id: authSession.accessToken) {
             if authSession.isSignedIn {
-                await feedPreferences.refresh()
-                await authSession.refreshStaffAccess()
+                async let feedPrefs: Void = feedPreferences.refresh()
+                async let staff: Void = authSession.refreshStaffAccess()
+                async let onboarding: Void = authSession.refreshOnboardingStatus()
+                _ = await (feedPrefs, staff, onboarding)
             } else {
                 feedPreferences.clear()
             }

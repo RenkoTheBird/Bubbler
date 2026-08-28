@@ -18,8 +18,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Star
@@ -56,9 +54,10 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bubbler.android.app.theme.BubblerTheme
 import com.bubbler.android.core.network.ApiException
-import com.bubbler.android.core.storage.LikedPostsStore
-import com.bubbler.android.data.model.GraphInteractionPayload
-import com.bubbler.android.data.model.GraphInteractionType
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import com.bubbler.android.core.storage.FeedPreferencesStore
+import com.bubbler.android.data.model.FeedPreference
 import com.bubbler.android.data.model.Post
 import com.bubbler.android.data.repository.PostRepository
 import com.bubbler.android.data.repository.PreferencesRepository
@@ -70,6 +69,7 @@ import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.TimeUnit
+import kotlin.math.roundToInt
 
 /**
  * Shared post card — mirrors Swift `PostCardView`.
@@ -86,41 +86,47 @@ fun PostCard(
     isTopicPreferred: Boolean = false,
     isTopicBlacklisted: Boolean = false,
     currentUserId: Int? = null,
-    likedPostsStore: LikedPostsStore? = null,
+    feedPreferencesStore: FeedPreferencesStore? = null,
     userRepository: UserRepository? = null,
     preferencesRepository: PreferencesRepository? = null,
     postRepository: PostRepository? = null,
     onUnauthorized: () -> Unit = {},
     onSuccessMessage: (String) -> Unit = {},
     onSkip: (() -> Unit)? = null,
-    onLikeChanged: ((Boolean) -> Unit)? = null,
+    onFeedPreferenceChanged: ((FeedPreference) -> Unit)? = null,
     onTopicPreferenceChanged: (() -> Unit)? = null,
     onDeleted: (() -> Unit)? = null,
     onEditClick: ((Post) -> Unit)? = null,
     onAuthorClick: ((String) -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
-    val likedIds by (
-        likedPostsStore?.likedPostIds
-            ?: remember { MutableStateFlow(emptySet()) }
-        ).collectAsStateWithLifecycle(emptySet())
+    val preferencesByPostId by (
+        feedPreferencesStore?.preferencesByPostId
+            ?: remember { MutableStateFlow(emptyMap()) }
+        ).collectAsStateWithLifecycle(emptyMap())
 
     var showDeleteConfirmation by remember { mutableStateOf(false) }
     var showOverflowMenu by remember { mutableStateOf(false) }
     var showReportForm by remember { mutableStateOf(false) }
     var isDeleting by remember { mutableStateOf(false) }
-    var isTogglingLike by remember { mutableStateOf(false) }
+    var isSavingFeedPreference by remember { mutableStateOf(false) }
     var isUpdatingTopicPreference by remember { mutableStateOf(false) }
     var preferredLocally by remember(post.id) { mutableStateOf<Boolean?>(null) }
     var blacklistedLocally by remember(post.id) { mutableStateOf<Boolean?>(null) }
+    var localFeedPreference by remember(post.id) {
+        mutableStateOf(
+            feedPreferencesStore?.preferenceFor(post.id) ?: FeedPreference.NEUTRAL,
+        )
+    }
     var actionError by remember(post.id) { mutableStateOf<String?>(null) }
     var appearedAt by remember(post.id) { mutableStateOf(Instant.now()) }
 
-    LaunchedEffect(post.id) {
+    LaunchedEffect(post.id, preferencesByPostId) {
         appearedAt = Instant.now()
         preferredLocally = null
         blacklistedLocally = null
         actionError = null
+        localFeedPreference = feedPreferencesStore?.preferenceFor(post.id) ?: FeedPreference.NEUTRAL
     }
     LaunchedEffect(isTopicPreferred) { preferredLocally = null }
     LaunchedEffect(isTopicBlacklisted) { blacklistedLocally = null }
@@ -129,7 +135,6 @@ fun PostCard(
     val topicName = post.topic?.trim()?.takeIf { it.isNotEmpty() }
     val showsOverflowMenu = topicName != null || !isOwned
     val accentColor = topicName?.let { TopicStyle.color(it) } ?: Color.White
-    val currentlyLiked = post.id in likedIds
     val currentlyPreferred = preferredLocally ?: isTopicPreferred
     val currentlyBlacklisted = blacklistedLocally ?: isTopicBlacklisted
     val corner = if (isCompact) 18.dp else 22.dp
@@ -328,74 +333,93 @@ fun PostCard(
             )
         }
 
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.padding(top = 2.dp),
         ) {
-            ActionChip(
-                label = if (currentlyLiked) "Liked" else "Like",
-                highlighted = currentlyLiked,
-                highlightColor = Color(0xFFE91E63),
-                busy = isTogglingLike,
-                enabled = !isTogglingLike && likedPostsStore != null && userRepository != null,
-                leadingIcon = {
-                    if (isTogglingLike) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(14.dp),
-                            color = Color.White,
-                            strokeWidth = 2.dp,
-                        )
-                    } else {
-                        Icon(
-                            imageVector = if (currentlyLiked) {
-                                Icons.Filled.Favorite
-                            } else {
-                                Icons.Filled.FavoriteBorder
-                            },
-                            contentDescription = null,
-                            tint = if (currentlyLiked) Color(0xFFE91E63) else Color.White,
-                            modifier = Modifier.size(14.dp),
-                        )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Feed preference",
+                    color = Color.White.copy(alpha = 0.85f),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                if (isSavingFeedPreference) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(14.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp,
+                    )
+                }
+            }
+
+            Slider(
+                value = localFeedPreference.rawValue.toFloat(),
+                onValueChange = { raw ->
+                    val snapped = FeedPreference.fromRaw(raw.roundToInt().coerceIn(-2, 2))
+                    if (snapped != localFeedPreference) {
+                        localFeedPreference = snapped
+                        scope.launch {
+                            saveFeedPreference(
+                                postId = post.id,
+                                preference = snapped,
+                                feedPreferencesStore = feedPreferencesStore,
+                                userRepository = userRepository,
+                                onFeedPreferenceChanged = onFeedPreferenceChanged,
+                                onError = { actionError = it },
+                                onUnauthorized = onUnauthorized,
+                                onRevert = {
+                                    localFeedPreference =
+                                        feedPreferencesStore?.preferenceFor(post.id)
+                                            ?: FeedPreference.NEUTRAL
+                                },
+                                setBusy = { isSavingFeedPreference = it },
+                            )
+                        }
                     }
                 },
-                onClick = {
-                    scope.launch {
-                        toggleLike(
-                            postId = post.id,
-                            currentlyLiked = currentlyLiked,
-                            appearedAt = appearedAt,
-                            likedPostsStore = likedPostsStore,
-                            userRepository = userRepository,
-                            onLikeChanged = onLikeChanged,
-                            onError = { actionError = it },
-                            onUnauthorized = onUnauthorized,
-                            setBusy = { isTogglingLike = it },
-                        )
-                    }
-                },
+                valueRange = -2f..2f,
+                steps = 3,
+                enabled = !isSavingFeedPreference &&
+                    feedPreferencesStore != null &&
+                    userRepository != null,
+                colors = SliderDefaults.colors(
+                    thumbColor = accentColor,
+                    activeTrackColor = accentColor,
+                    inactiveTrackColor = Color.White.copy(alpha = 0.25f),
+                ),
+            )
+
+            Text(
+                text = localFeedPreference.label,
+                color = Color.White.copy(alpha = 0.75f),
+                style = MaterialTheme.typography.bodySmall,
             )
 
             if (showsSkip && onSkip != null) {
-                ActionChip(
-                    label = "Skip",
-                    highlighted = false,
-                    highlightColor = Color.White,
-                    busy = false,
-                    enabled = true,
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(14.dp),
-                        )
-                    },
-                    onClick = onSkip,
-                )
+                Row {
+                    ActionChip(
+                        label = "Skip",
+                        highlighted = false,
+                        highlightColor = Color.White,
+                        busy = false,
+                        enabled = true,
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(14.dp),
+                            )
+                        },
+                        onClick = onSkip,
+                    )
+                }
             }
-
-            Spacer(modifier = Modifier.weight(1f))
         }
 
         if (isOwned) {
@@ -447,7 +471,7 @@ fun PostCard(
                             deletePost(
                                 postId = post.id,
                                 postRepository = postRepository,
-                                likedPostsStore = likedPostsStore,
+                                feedPreferencesStore = feedPreferencesStore,
                                 onDeleted = onDeleted,
                                 onSuccessMessage = onSuccessMessage,
                                 onError = { actionError = it },
@@ -561,43 +585,30 @@ private fun OwnerActionButton(
     }
 }
 
-private suspend fun toggleLike(
+private suspend fun saveFeedPreference(
     postId: String,
-    currentlyLiked: Boolean,
-    appearedAt: Instant,
-    likedPostsStore: LikedPostsStore?,
+    preference: FeedPreference,
+    feedPreferencesStore: FeedPreferencesStore?,
     userRepository: UserRepository?,
-    onLikeChanged: ((Boolean) -> Unit)?,
+    onFeedPreferenceChanged: ((FeedPreference) -> Unit)?,
     onError: (String?) -> Unit,
     onUnauthorized: () -> Unit,
+    onRevert: () -> Unit,
     setBusy: (Boolean) -> Unit,
 ) {
-    if (likedPostsStore == null || userRepository == null) return
+    if (feedPreferencesStore == null || userRepository == null) return
     setBusy(true)
     onError(null)
     try {
-        if (currentlyLiked) {
-            userRepository.deleteLike(postId)
-            likedPostsStore.setLiked(postId, liked = false)
-            onLikeChanged?.invoke(false)
-        } else {
-            val viewTime = Duration.between(appearedAt, Instant.now()).seconds
-                .toDouble()
-                .coerceAtLeast(0.0)
-            userRepository.recordInteraction(
-                GraphInteractionPayload(
-                    postId = postId,
-                    type = GraphInteractionType.LIKE,
-                    viewTime = viewTime,
-                ),
-            )
-            likedPostsStore.setLiked(postId, liked = true)
-            onLikeChanged?.invoke(true)
-        }
+        userRepository.setFeedPreference(postId, preference)
+        feedPreferencesStore.setPreference(postId, preference)
+        onFeedPreferenceChanged?.invoke(preference)
     } catch (e: ApiException.Unauthorized) {
         onUnauthorized()
+        onRevert()
         onError(e.message)
     } catch (e: Exception) {
+        onRevert()
         onError(e.message ?: "Something went wrong.")
     } finally {
         setBusy(false)
@@ -691,7 +702,7 @@ private suspend fun toggleBlacklistTopic(
 private suspend fun deletePost(
     postId: String,
     postRepository: PostRepository?,
-    likedPostsStore: LikedPostsStore?,
+    feedPreferencesStore: FeedPreferencesStore?,
     onDeleted: (() -> Unit)?,
     onSuccessMessage: (String) -> Unit,
     onError: (String?) -> Unit,
@@ -703,7 +714,7 @@ private suspend fun deletePost(
     onError(null)
     try {
         postRepository.deletePost(postId)
-        likedPostsStore?.setLiked(postId, liked = false)
+        feedPreferencesStore?.setPreference(postId, FeedPreference.NEUTRAL)
         onSuccessMessage("Post deleted.")
         onDeleted?.invoke()
     } catch (e: ApiException.Unauthorized) {

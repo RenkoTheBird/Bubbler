@@ -38,7 +38,7 @@ Usually **not** a platform breach (handle via normal support):
 | Profile / prefs | `user_profiles`, `user_topic_prefs` | display settings, topic preferences |
 | UGC | `posts`, `post_topics`, `edges` | post text, topic labels, graph edges |
 | Embeddings | `posts.embedding`, `topics.embedding` | derived from content; treat as personal if linkable to users |
-| Interactions | `interactions` | likes, explore/skip, optional `view_time` |
+| Interactions | `interactions` | feed preferences (-2..+2), explore/skip, optional `view_time` |
 | Training events | `topic_training_events` | anonymized after 180 days (`user_id` cleared) |
 | Social controls | `user_blocks` | blocker / blocked user IDs |
 | Moderation | `content_reports` | reporter/reported user IDs, snapshots, staff notes |

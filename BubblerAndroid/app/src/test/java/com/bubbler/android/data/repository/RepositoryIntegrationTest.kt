@@ -5,6 +5,7 @@ import com.bubbler.android.core.auth.TokenStore
 import com.bubbler.android.core.network.ApiClient
 import com.bubbler.android.core.network.ApiException
 import com.bubbler.android.core.network.Endpoints
+import com.bubbler.android.data.model.FeedPreference
 import com.bubbler.android.data.model.GraphInteractionPayload
 import com.bubbler.android.data.model.GraphInteractionType
 import com.bubbler.android.data.model.FeedPreset
@@ -157,7 +158,7 @@ class RepositoryIntegrationTest {
     }
 
     @Test
-    fun user_profileLikesInteractionsAndDelete() = runTest {
+    fun user_profileFeedPreferencesInteractionsAndDelete() = runTest {
         server.enqueue(
             MockResponse().setBody(
                 """
@@ -171,22 +172,30 @@ class RepositoryIntegrationTest {
         assertEquals("wren", userRepository.getProfile().username)
         assertEquals("/user/me/profile", server.takeRequest().path)
 
-        server.enqueue(MockResponse().setBody("""["a","b"]"""))
-        assertEquals(listOf("a", "b"), userRepository.getLikedPostIds())
-        assertEquals("/user/me/likes", server.takeRequest().path)
+        server.enqueue(
+            MockResponse().setBody(
+                """[{"post_id":"a","feed_preference":2},{"post_id":"b","feed_preference":-1}]""",
+            ),
+        )
+        val prefs = userRepository.getFeedPreferences()
+        assertEquals(2, prefs.size)
+        assertEquals("/user/me/feed-preferences", server.takeRequest().path)
+
+        server.enqueue(MockResponse().setBody("null"))
+        userRepository.setFeedPreference("p1", FeedPreference.MORE)
+        val preferenceReq = server.takeRequest()
+        assertEquals("PUT", preferenceReq.method)
+        assertEquals("/user/me/posts/p1/feed-preference", preferenceReq.path)
+        assertTrue(preferenceReq.body.readUtf8().contains("\"feed_preference\":1"))
 
         server.enqueue(MockResponse().setBody("null"))
         userRepository.recordInteraction(
-            GraphInteractionPayload("p1", GraphInteractionType.LIKE, 1.0),
+            GraphInteractionPayload("p1", GraphInteractionType.SKIP, 1.0),
         )
         val interactionReq = server.takeRequest()
         assertEquals("POST", interactionReq.method)
         assertEquals("/user/me/interactions", interactionReq.path)
-        assertTrue(interactionReq.body.readUtf8().contains("\"type\":\"like\""))
-
-        server.enqueue(MockResponse().setResponseCode(204))
-        userRepository.deleteLike("p1")
-        assertEquals("/user/me/interactions/p1/like", server.takeRequest().path)
+        assertTrue(interactionReq.body.readUtf8().contains("\"type\":\"skip\""))
 
         server.enqueue(MockResponse().setResponseCode(204))
         userRepository.deleteAccount()

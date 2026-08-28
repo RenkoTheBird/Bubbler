@@ -39,8 +39,8 @@ data class GraphSessionFeed(
 
 @Serializable
 enum class GraphInteractionType {
-    @SerialName("like")
-    LIKE,
+    @SerialName("preference")
+    PREFERENCE,
 
     @SerialName("skip")
     SKIP,

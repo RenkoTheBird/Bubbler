@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 from app.services.composition_utils import weighted_quotas
 from app.services.feed import FeedService, PreferenceService, RankingService
+from app.services.feed_preference_scoring import FeedPreferenceSignal, weighted_centroid, preference_score_adjustment
 from app.services.post_composer import PostComposer
 
 
@@ -144,6 +145,55 @@ class GraphSelectionTests(unittest.TestCase):
 
         self.assertEqual(quotas["opposite"], 4)
         self.assertEqual(sum(quotas.values()), 4)
+
+
+class FeedPreferenceScoringTests(unittest.TestCase):
+    def _vector(self, value: float) -> list[float]:
+        return [value, 0.0, 0.0]
+
+    def test_weighted_centroid_uses_positive_preferences_only(self):
+        signals = [
+            FeedPreferenceSignal("a", 2, self._vector(1.0)),
+            FeedPreferenceSignal("b", -2, self._vector(-1.0)),
+        ]
+        centroid = weighted_centroid(signals, min_preference=1)
+        self.assertEqual(centroid, self._vector(1.0))
+
+    def test_preference_score_adjustment_boosts_similar_positive_centroid(self):
+        signals = [FeedPreferenceSignal("a", 2, self._vector(1.0))]
+        centroid = weighted_centroid(signals)
+        adjustment = preference_score_adjustment(
+            self._vector(1.0),
+            signals,
+            positive_centroid=centroid,
+        )
+        self.assertGreater(adjustment, 0.0)
+
+    def test_preference_score_adjustment_penalizes_similar_negative_posts(self):
+        signals = [FeedPreferenceSignal("a", -2, self._vector(1.0))]
+        adjustment = preference_score_adjustment(self._vector(1.0), signals)
+        self.assertLess(adjustment, 0.0)
+
+    def test_ranking_service_applies_feed_preference_adjustment(self):
+        signals = [FeedPreferenceSignal("seed", 2, [1.0, 0.0, 0.0])]
+        posts = [
+            {"id": "near", "topic": "science", "score": 0.5},
+            {"id": "far", "topic": "science", "score": 0.5},
+        ]
+        embeddings = {
+            "near": [1.0, 0.0, 0.0],
+            "far": [0.0, 1.0, 0.0],
+        }
+
+        ranked = RankingService().apply_preferences(
+            preferences(),
+            posts,
+            feed_preference_signals=signals,
+            post_embeddings=embeddings,
+        )
+
+        self.assertEqual(ranked[0]["id"], "near")
+        self.assertGreater(ranked[0]["score"], ranked[1]["score"])
 
 
 if __name__ == "__main__":

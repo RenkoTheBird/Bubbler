@@ -20,7 +20,7 @@ This is a **product and engineering gap map**, not legal advice. Have counsel re
 | Ads / ATT tracking SDKs                 | Not present in-repo (simpler posture)                                          |
 
 
-Personal data currently in scope (see `backend/app/db/schema.sql`): username, email, password hash; posts + embeddings; interactions (`like` / `skip` / `explore`, `view_time`); preference profiles and topic prefs; topic training events; planned media attachments.
+Personal data currently in scope (see `backend/app/db/schema.sql`): username, email, password hash; posts + embeddings; interactions (`preference` / `skip` / `explore`, `feed_preference`, `view_time`); preference profiles and topic prefs; topic training events; planned media attachments.
 
 ```mermaid
 %%{init: {"flowchart": {"curve": "linear", "nodeSpacing": 20, "rankSpacing": 28}, "themeVariables": {"fontSize": "12px"}}}%%
@@ -78,7 +78,7 @@ Publish a Privacy Policy that accurately describes what Bubbler collects, why, h
   - **Identity:** email, username, password hash
   - **Content:** posts, topics, future media (`storage_key`, mime, dimensions, alt text)
   - **Derived / ML:** MiniLM embeddings, similarity edges, optional AI topic labels / training events
-  - **Behavioral:** likes, skips, explores, view time; preference weights and blacklists
+  - **Behavioral:** feed preferences (-2..+2), skips, explores, view time; preference weights and blacklists
   - **Technical:** auth tokens (Keychain), server logs if any, IP/device data if collected later
 2. State purposes: account, feed personalization, safety/moderation, security, legal compliance.
 3. List processors (e.g. Supabase/Postgres host, future email provider, CDN for media).

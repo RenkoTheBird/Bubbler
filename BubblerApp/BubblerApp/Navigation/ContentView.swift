@@ -10,7 +10,7 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var authSession = AuthSession()
     @StateObject private var backendConnection = BackendConnection()
-    @StateObject private var likedPosts = LikedPostsStore()
+    @StateObject private var feedPreferences = FeedPreferencesStore()
 
     var body: some View {
         Group {
@@ -25,13 +25,13 @@ struct ContentView: View {
         .id(authSession.isSignedIn)
         .environmentObject(authSession)
         .environmentObject(backendConnection)
-        .environmentObject(likedPosts)
+        .environmentObject(feedPreferences)
         .task(id: authSession.accessToken) {
             if authSession.isSignedIn {
-                await likedPosts.refresh()
+                await feedPreferences.refresh()
                 await authSession.refreshStaffAccess()
             } else {
-                likedPosts.clear()
+                feedPreferences.clear()
             }
         }
         .overlay(alignment: .top) {

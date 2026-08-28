@@ -4,6 +4,9 @@ import com.bubbler.android.core.auth.TokenStore
 import com.bubbler.android.core.network.ApiClient
 import com.bubbler.android.core.network.Endpoints
 import com.bubbler.android.core.storage.DataExportWriter
+import com.bubbler.android.data.model.FeedPreference
+import com.bubbler.android.data.model.FeedPreferenceEntry
+import com.bubbler.android.data.model.FeedPreferenceUpdateBody
 import com.bubbler.android.data.model.GraphInteractionPayload
 import com.bubbler.android.data.model.Interaction
 import com.bubbler.android.data.model.Post
@@ -74,9 +77,23 @@ open class UserRepository(
     open suspend fun getMyInteractions(): List<Interaction> =
         apiClient.get(Endpoints.USER_ME, token = tokenStore.requireAccessToken())
 
-    /** All post IDs the current user has liked (uncapped). */
-    open suspend fun getLikedPostIds(): List<String> =
-        apiClient.get(Endpoints.USER_ME_LIKES, token = tokenStore.requireAccessToken())
+    /** Non-neutral feed preferences for the current user. */
+    open suspend fun getFeedPreferences(): List<FeedPreferenceEntry> =
+        apiClient.get(Endpoints.USER_ME_FEED_PREFERENCES, token = tokenStore.requireAccessToken())
+
+    open suspend fun setFeedPreference(postId: String, preference: FeedPreference) {
+        val body = apiClient.json.encodeToString(
+            FeedPreferenceUpdateBody.serializer(),
+            FeedPreferenceUpdateBody(feedPreference = preference.rawValue),
+        )
+        apiClient.executeIgnoringBody(
+            path = Endpoints.userFeedPreference(postId),
+            method = "PUT",
+            token = tokenStore.requireAccessToken(),
+            body = body.toRequestBody(ApiClient.JSON_MEDIA_TYPE),
+            contentType = "application/json",
+        )
+    }
 
     open suspend fun recordInteraction(payload: GraphInteractionPayload) {
         val body = apiClient.json.encodeToString(
@@ -91,15 +108,6 @@ open class UserRepository(
             contentType = "application/json",
         )
     }
-
-    open suspend fun deleteLike(postId: String) {
-        apiClient.executeIgnoringBody(
-            path = Endpoints.userInteractionLike(postId),
-            method = "DELETE",
-            token = tokenStore.requireAccessToken(),
-        )
-    }
-
     open suspend fun deleteAccount() {
         apiClient.executeIgnoringBody(
             path = Endpoints.USER_ME,

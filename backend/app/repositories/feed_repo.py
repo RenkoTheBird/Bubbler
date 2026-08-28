@@ -321,6 +321,30 @@ class FeedRepository:
                 return None
             return from_pgvector(row["embedding"])
 
+    async def get_embeddings_by_post_ids(
+        self, post_ids: list[str], *, conn=None
+    ) -> dict[str, list[float]]:
+        if not post_ids:
+            return {}
+
+        async with acquire_conn(self.pool, conn) as connection:
+            rows = await connection.fetch(
+                """
+                SELECT id, embedding
+                FROM posts
+                WHERE id = ANY($1::uuid[])
+                  AND embedding IS NOT NULL
+                """,
+                post_ids,
+            )
+
+        embeddings: dict[str, list[float]] = {}
+        for row in rows:
+            vector = from_pgvector(row["embedding"])
+            if vector:
+                embeddings[str(row["id"])] = vector
+        return embeddings
+
     async def _fetch_random_posts(self, conn, limit: int) -> list[dict[str, Any]]:
         rows = await conn.fetch(
             f"""

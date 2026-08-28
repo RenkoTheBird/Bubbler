@@ -13,7 +13,7 @@ Related: [`privacy_legal.md`](privacy_legal.md) §10, [`breach_playbook.md`](bre
 | Accounts, prefs, blocks (live) | `users`, `user_profiles`, `user_topic_prefs`, `user_blocks` | Life of account | `DELETE /user/me` cascades after tombstone write |
 | Deleted-account identity | `deleted_accounts` | **90 days** after `deleted_at` | Snapshot on delete (`DELETED_ACCOUNT_RETENTION_DAYS`); skip `legal_hold` |
 | Posts, topics, edges | `posts`, `post_topics`, `edges`, `media` | Until user deletes or account erasure | FK `ON DELETE CASCADE` |
-| Interactions — likes | `interactions` (`type = 'like'`) | Life of account | Not auto-purged (heart state) |
+| Interactions — feed preferences | `interactions` (`type = 'preference'`) | Life of account | Not auto-purged (slider state) |
 | Interactions — explore/skip + view-time | `interactions` (`type IN ('explore', 'skip')`) | **270 days** rolling | Scheduled job (`INTERACTIONS_RETENTION_DAYS`) |
 | Topic training events | `topic_training_events` | Anonymize after **180 days**; delete anonymized after **365 days** | Job sets `user_id = NULL`, then deletes |
 | Report / export limit counters | `reporter_daily_limits`, `user_report_limits`, `user_data_export_limits` | **90 days** | Scheduled `DELETE` by `day` |
@@ -45,7 +45,7 @@ Reference schema updates in `backend/app/db/schema.sql`:
 
 ### `interactions`
 
-- Partial index `interactions_explore_skip_created_at_idx` on `(created_at)` where `type IN ('explore', 'skip')` for efficient rolling purges. Likes are excluded.
+- Partial index `interactions_explore_skip_created_at_idx` on `(created_at)` where `type IN ('explore', 'skip')` for efficient rolling purges. Feed preferences are excluded.
 
 ### `content_reports`
 

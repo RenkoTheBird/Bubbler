@@ -45,7 +45,7 @@ import com.bubbler.android.app.theme.BubblerTheme
 import com.bubbler.android.core.auth.AuthSession
 import com.bubbler.android.core.auth.TokenStore
 import com.bubbler.android.core.network.ApiClient
-import com.bubbler.android.core.storage.LikedPostsStore
+import com.bubbler.android.core.storage.FeedPreferencesStore
 import com.bubbler.android.data.model.KnownTopics
 import com.bubbler.android.data.model.Post
 import com.bubbler.android.data.repository.FeedRepository
@@ -82,7 +82,7 @@ fun RankedFeedScreen(
     }
     val userRepository = remember(apiClient, tokenStore) { UserRepository(apiClient, tokenStore) }
     val postRepository = remember(apiClient, tokenStore) { PostRepository(apiClient, tokenStore) }
-    val likedPostsStore = remember(userRepository) { LikedPostsStore(userRepository) }
+    val feedPreferencesStore = remember(userRepository) { FeedPreferencesStore(userRepository) }
 
     val viewModel: RankedFeedViewModel = viewModel(
         factory = RankedFeedViewModelFactory(
@@ -94,7 +94,7 @@ fun RankedFeedScreen(
     RankedFeedScreenContent(
         authSession = authSession,
         viewModel = viewModel,
-        likedPostsStore = likedPostsStore,
+        feedPreferencesStore = feedPreferencesStore,
         preferencesRepository = preferencesRepository,
         userRepository = userRepository,
         postRepository = postRepository,
@@ -109,7 +109,7 @@ fun RankedFeedScreen(
 fun RankedFeedScreenContent(
     authSession: AuthSession,
     viewModel: RankedFeedViewModel,
-    likedPostsStore: LikedPostsStore,
+    feedPreferencesStore: FeedPreferencesStore,
     preferencesRepository: PreferencesRepository,
     userRepository: UserRepository,
     postRepository: PostRepository,
@@ -127,10 +127,10 @@ fun RankedFeedScreenContent(
 
     LaunchedEffect(accessToken) {
         if (accessToken != null) {
-            likedPostsStore.refresh()
+            feedPreferencesStore.refresh()
             viewModel.loadFeed()
         } else {
-            likedPostsStore.clear()
+            feedPreferencesStore.clear()
         }
     }
 
@@ -217,7 +217,7 @@ fun RankedFeedScreenContent(
                             PostCard(
                                 post = post,
                                 currentUserId = userId,
-                                likedPostsStore = likedPostsStore,
+                                feedPreferencesStore = feedPreferencesStore,
                                 userRepository = userRepository,
                                 preferencesRepository = preferencesRepository,
                                 postRepository = postRepository,

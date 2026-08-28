@@ -125,7 +125,7 @@ SAMPLE_POSTS = list(SEEDED_SAMPLE_POSTS)
 VIEW_TIME_TOPIC = "health"
 PREFERRED_TOPIC = "science"
 BLACKLIST_TOPIC = "politics"
-YESTERDAY_LIKE_TOPIC = "technology"
+YESTERDAY_PREFERENCE_TOPIC = "technology"
 
 DEFAULT_TOPIC_COMPOSITION = {
     "similar": 0.55,
@@ -848,7 +848,7 @@ async def seed_impact_corpus(pool: asyncpg.Pool, user_id: int) -> dict[str, Any]
     edge_builder = EdgeBuilderRepo(pool)
     meta: dict[str, Any] = {
         "post_count": 0,
-        "yesterday_like_post_id": None,
+        "yesterday_preference_post_id": None,
         "view_time_topic": VIEW_TIME_TOPIC,
         "view_time_post_ids": [],
     }
@@ -895,28 +895,28 @@ async def seed_impact_corpus(pool: asyncpg.Pool, user_id: int) -> dict[str, Any]
         yesterday_mid = (now - datetime.timedelta(days=1)).replace(
             hour=12, minute=0, second=0, microsecond=0
         )
-        like_candidates = [p for p in inserted if p[1] == YESTERDAY_LIKE_TOPIC]
+        like_candidates = [p for p in inserted if p[1] == YESTERDAY_PREFERENCE_TOPIC]
         if not like_candidates:
             like_candidates = inserted[:1]
-        like_post_id = like_candidates[0][0]
+        preference_post_id = like_candidates[0][0]
         await conn.execute(
             """
             DELETE FROM interactions
-            WHERE user_id = $1 AND post_id = $2::uuid AND type = 'like'
+            WHERE user_id = $1 AND post_id = $2::uuid AND type = 'preference'
             """,
             user_id,
-            like_post_id,
+            preference_post_id,
         )
         await conn.execute(
             """
-            INSERT INTO interactions (user_id, post_id, type, view_time, created_at)
-            VALUES ($1, $2::uuid, 'like', 0, $3)
+            INSERT INTO interactions (user_id, post_id, type, feed_preference, view_time, created_at)
+            VALUES ($1, $2::uuid, 'preference', 2, 0, $3)
             """,
             user_id,
-            like_post_id,
+            preference_post_id,
             yesterday_mid,
         )
-        meta["yesterday_like_post_id"] = like_post_id
+        meta["yesterday_preference_post_id"] = preference_post_id
 
         view_posts = [p for p in inserted if p[1] == VIEW_TIME_TOPIC][:5]
         for post_id, _, _ in view_posts:
@@ -1452,7 +1452,7 @@ async def async_main() -> int:
         meta = await seed_impact_corpus(pool, user_id)
         print(
             f"  Seeded {meta['post_count']} posts; "
-            f"yesterday_like={meta['yesterday_like_post_id']}; "
+            f"yesterday_preference={meta['yesterday_preference_post_id']}; "
             f"view_time_posts={len(meta['view_time_post_ids'])} ({meta['view_time_topic']})"
         )
 

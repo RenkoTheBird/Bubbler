@@ -43,7 +43,7 @@ struct GraphSessionFeed: Codable {
 }
 
 enum GraphInteractionType: String, Codable {
-    case like
+    case preference
     case skip
     case explore
 }

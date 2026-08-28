@@ -305,10 +305,10 @@ enum APIClient {
         return try apiJSONDecoder.decode([Interaction].self, from: data)
     }
 
-    /// All post IDs the current user has liked (uncapped).
-    static func getLikedPostIDs() async throws -> [String] {
-        let data = try await authorizedRequest(path: "user/me/likes")
-        return try apiJSONDecoder.decode([String].self, from: data)
+    /// Non-neutral feed preferences for the current user.
+    static func getFeedPreferences() async throws -> [FeedPreferenceEntry] {
+        let data = try await authorizedRequest(path: "user/me/feed-preferences")
+        return try apiJSONDecoder.decode([FeedPreferenceEntry].self, from: data)
     }
 
     static func createPost(content: String, topic: String) async throws -> Post {
@@ -365,10 +365,15 @@ enum APIClient {
         )
     }
 
-    static func deleteLike(postId: String) async throws {
+    static func setFeedPreference(postId: String, value: FeedPreference) async throws {
+        let body = try JSONEncoder().encode(
+            FeedPreferenceUpdateBody(feedPreference: value.rawValue)
+        )
         _ = try await authorizedRequest(
-            path: "user/me/interactions/\(postId)/like",
-            method: "DELETE"
+            path: "user/me/posts/\(postId)/feed-preference",
+            method: "PUT",
+            body: body,
+            contentType: "application/json"
         )
     }
 

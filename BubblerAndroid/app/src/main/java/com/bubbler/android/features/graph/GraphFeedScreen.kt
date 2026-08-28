@@ -48,7 +48,7 @@ import com.bubbler.android.app.theme.BubblerTheme
 import com.bubbler.android.core.auth.AuthSession
 import com.bubbler.android.core.auth.TokenStore
 import com.bubbler.android.core.network.ApiClient
-import com.bubbler.android.core.storage.LikedPostsStore
+import com.bubbler.android.core.storage.FeedPreferencesStore
 import com.bubbler.android.data.model.GraphFeedNode
 import com.bubbler.android.data.model.Post
 import com.bubbler.android.data.repository.FeedRepository
@@ -87,7 +87,7 @@ fun GraphFeedScreen(
     }
     val userRepository = remember(apiClient, tokenStore) { UserRepository(apiClient, tokenStore) }
     val postRepository = remember(apiClient, tokenStore) { PostRepository(apiClient, tokenStore) }
-    val likedPostsStore = remember(userRepository) { LikedPostsStore(userRepository) }
+    val feedPreferencesStore = remember(userRepository) { FeedPreferencesStore(userRepository) }
 
     val viewModel: GraphFeedViewModel = viewModel(
         factory = GraphFeedViewModelFactory(
@@ -103,7 +103,7 @@ fun GraphFeedScreen(
     GraphFeedScreenContent(
         authSession = authSession,
         viewModel = viewModel,
-        likedPostsStore = likedPostsStore,
+        feedPreferencesStore = feedPreferencesStore,
         preferencesRepository = preferencesRepository,
         userRepository = userRepository,
         postRepository = postRepository,
@@ -119,7 +119,7 @@ fun GraphFeedScreen(
 fun GraphFeedScreenContent(
     authSession: AuthSession,
     viewModel: GraphFeedViewModel,
-    likedPostsStore: LikedPostsStore,
+    feedPreferencesStore: FeedPreferencesStore,
     preferencesRepository: PreferencesRepository,
     userRepository: UserRepository,
     postRepository: PostRepository,
@@ -144,10 +144,10 @@ fun GraphFeedScreenContent(
 
     LaunchedEffect(accessToken) {
         if (accessToken != null) {
-            likedPostsStore.refresh()
+            feedPreferencesStore.refresh()
             viewModel.load()
         } else {
-            likedPostsStore.clear()
+            feedPreferencesStore.clear()
         }
     }
 
@@ -227,7 +227,7 @@ fun GraphFeedScreenContent(
                     isSubmitting = isSubmitting,
                     authSession = authSession,
                     viewModel = viewModel,
-                    likedPostsStore = likedPostsStore,
+                    feedPreferencesStore = feedPreferencesStore,
                     preferencesRepository = preferencesRepository,
                     userRepository = userRepository,
                     postRepository = postRepository,
@@ -241,7 +241,7 @@ fun GraphFeedScreenContent(
                 StickyCurrentPost(
                     node = node,
                     currentUserId = userId,
-                    likedPostsStore = likedPostsStore,
+                    feedPreferencesStore = feedPreferencesStore,
                     preferencesRepository = preferencesRepository,
                     userRepository = userRepository,
                     postRepository = postRepository,
@@ -336,7 +336,7 @@ private fun MiddleSection(
     isSubmitting: Boolean,
     authSession: AuthSession,
     viewModel: GraphFeedViewModel,
-    likedPostsStore: LikedPostsStore,
+    feedPreferencesStore: FeedPreferencesStore,
     preferencesRepository: PreferencesRepository,
     userRepository: UserRepository,
     postRepository: PostRepository,
@@ -360,7 +360,7 @@ private fun MiddleSection(
                     node = previewedChoice,
                     isSubmitting = isSubmitting,
                     currentUserId = currentUserId,
-                    likedPostsStore = likedPostsStore,
+                    feedPreferencesStore = feedPreferencesStore,
                     preferencesRepository = preferencesRepository,
                     userRepository = userRepository,
                     postRepository = postRepository,
@@ -413,7 +413,7 @@ private fun PreviewSection(
     node: GraphFeedNode,
     isSubmitting: Boolean,
     currentUserId: Int?,
-    likedPostsStore: LikedPostsStore,
+    feedPreferencesStore: FeedPreferencesStore,
     preferencesRepository: PreferencesRepository,
     userRepository: UserRepository,
     postRepository: PostRepository,
@@ -478,7 +478,7 @@ private fun PreviewSection(
                 isTopicPreferred = node.isPreferredTopic,
                 isTopicBlacklisted = node.isBlacklistedTopic,
                 currentUserId = currentUserId,
-                likedPostsStore = likedPostsStore,
+                feedPreferencesStore = feedPreferencesStore,
                 userRepository = userRepository,
                 preferencesRepository = preferencesRepository,
                 postRepository = postRepository,
@@ -494,7 +494,7 @@ private fun PreviewSection(
 private fun StickyCurrentPost(
     node: GraphFeedNode,
     currentUserId: Int?,
-    likedPostsStore: LikedPostsStore,
+    feedPreferencesStore: FeedPreferencesStore,
     preferencesRepository: PreferencesRepository,
     userRepository: UserRepository,
     postRepository: PostRepository,
@@ -524,7 +524,7 @@ private fun StickyCurrentPost(
             isTopicPreferred = node.isPreferredTopic,
             isTopicBlacklisted = node.isBlacklistedTopic,
             currentUserId = currentUserId,
-            likedPostsStore = likedPostsStore,
+            feedPreferencesStore = feedPreferencesStore,
             userRepository = userRepository,
             preferencesRepository = preferencesRepository,
             postRepository = postRepository,

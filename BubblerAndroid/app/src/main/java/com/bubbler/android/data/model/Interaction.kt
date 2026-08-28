@@ -19,7 +19,8 @@ data class Interaction(
     val topic: String,
     @SerialName("view_time")
     val viewTime: Double,
-    val liked: Boolean,
+    @SerialName("feed_preference")
+    val feedPreference: Int? = null,
 ) {
     /** Short copy for the profile Bubble Trail row. */
     val trailSummary: String
@@ -31,7 +32,10 @@ data class Interaction(
                 "a ${KnownTopics.displayName(trimmed)} post"
             }
             return when (type) {
-                GraphInteractionType.LIKE -> "Liked $topicLabel"
+                GraphInteractionType.PREFERENCE -> {
+                    val label = FeedPreference.fromRaw(feedPreference ?: 0).shortLabel
+                    "$label for $topicLabel"
+                }
                 GraphInteractionType.SKIP -> "Skipped $topicLabel"
                 GraphInteractionType.EXPLORE -> "Explored $topicLabel"
             }

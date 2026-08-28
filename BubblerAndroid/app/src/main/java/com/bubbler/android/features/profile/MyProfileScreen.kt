@@ -57,7 +57,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.bubbler.android.core.auth.AuthSession
 import com.bubbler.android.core.auth.TokenStore
 import com.bubbler.android.core.network.ApiClient
-import com.bubbler.android.core.storage.LikedPostsStore
+import com.bubbler.android.core.storage.FeedPreferencesStore
 import com.bubbler.android.data.model.Post
 import com.bubbler.android.data.repository.BlocksRepository
 import com.bubbler.android.data.repository.PostRepository
@@ -110,7 +110,7 @@ fun ProfileScreen(
         PreferencesRepository(apiClient, tokenStore)
     }
     val postRepository = remember(apiClient, tokenStore) { PostRepository(apiClient, tokenStore) }
-    val likedPostsStore = remember(userRepository) { LikedPostsStore(userRepository) }
+    val feedPreferencesStore = remember(userRepository) { FeedPreferencesStore(userRepository) }
 
     val viewModelKey = targetUsername?.trim()?.takeIf { it.isNotEmpty() } ?: "me"
     val viewModel: ProfileViewModel = viewModel(
@@ -142,7 +142,7 @@ fun ProfileScreen(
         ProfileScreenContent(
             authSession = authSession,
             viewModel = viewModel,
-            likedPostsStore = likedPostsStore,
+            feedPreferencesStore = feedPreferencesStore,
             preferencesRepository = preferencesRepository,
             userRepository = userRepository,
             postRepository = postRepository,
@@ -160,7 +160,7 @@ fun ProfileScreen(
 fun ProfileScreenContent(
     authSession: AuthSession,
     viewModel: ProfileViewModel,
-    likedPostsStore: LikedPostsStore,
+    feedPreferencesStore: FeedPreferencesStore,
     preferencesRepository: PreferencesRepository,
     userRepository: UserRepository,
     postRepository: PostRepository,
@@ -188,10 +188,10 @@ fun ProfileScreenContent(
 
     LaunchedEffect(accessToken) {
         if (accessToken != null) {
-            likedPostsStore.refresh()
+            feedPreferencesStore.refresh()
             viewModel.refreshPosts()
         } else {
-            likedPostsStore.clear()
+            feedPreferencesStore.clear()
         }
     }
 
@@ -363,7 +363,7 @@ fun ProfileScreenContent(
                                         post = post,
                                         isCompact = true,
                                         currentUserId = sessionUserId,
-                                        likedPostsStore = likedPostsStore,
+                                        feedPreferencesStore = feedPreferencesStore,
                                         userRepository = userRepository,
                                         preferencesRepository = preferencesRepository,
                                         postRepository = postRepository,

@@ -3,7 +3,13 @@ from app.services.user import UserService
 from app.services.interaction import InteractionService
 from app.services.post import PostService
 from app.services.report import ReportService
-from app.schemas.post import InteractionCreate, PostCreate, PostTopicMutation, PostUpdate
+from app.schemas.post import (
+    FeedPreferenceUpdate,
+    InteractionCreate,
+    PostCreate,
+    PostTopicMutation,
+    PostUpdate,
+)
 from app.schemas.report import ReportCreate
 from app.schemas.user import EmailUpdate, PasswordUpdate, PrefsUpdate
 from app.db.topics import normalize_known_topic
@@ -42,9 +48,9 @@ def create_user_router(
     async def get_user_interactions(user_id: int = Depends(get_current_user_id)):
         return await interaction_service.get_user_interactions(user_id)
 
-    @router.get("/me/likes")
-    async def get_liked_post_ids(user_id: int = Depends(get_current_user_id)):
-        return await interaction_service.get_liked_post_ids(user_id)
+    @router.get("/me/feed-preferences")
+    async def get_feed_preferences(user_id: int = Depends(get_current_user_id)):
+        return await interaction_service.get_feed_preferences(user_id)
 
     @router.get("/me/posts")
     async def get_user_posts(user_id: int = Depends(get_current_user_id)):
@@ -88,9 +94,14 @@ def create_user_router(
     async def record_interaction(body: InteractionCreate, user_id: int = Depends(require_write_access)):
         return await interaction_service.record(user_id, body)
 
-    @router.delete("/me/interactions/{post_id}/like", status_code=204)
-    async def delete_like(post_id: str, user_id: int = Depends(require_write_access)):
-        await interaction_service.delete_like(user_id, post_id)
+    @router.put("/me/posts/{post_id}/feed-preference")
+    async def set_feed_preference(
+        post_id: str,
+        body: FeedPreferenceUpdate,
+        user_id: int = Depends(require_write_access),
+    ):
+        await interaction_service.set_feed_preference(user_id, post_id, body)
+        return {"post_id": post_id, "feed_preference": body.feed_preference}
 
     @router.get("/me/preferences")
     async def get_preferences(user_id: int = Depends(get_current_user_id)):

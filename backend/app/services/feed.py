@@ -5,6 +5,11 @@ from typing import List
 from app.db.datetime_utils import with_utc_created_at
 from app.schemas.user import TopicPreference
 from app.services.composition_utils import weighted_quotas
+from app.services.feed_preference_scoring import (
+    FeedPreferenceSignal,
+    preference_score_adjustment,
+    weighted_centroid,
+)
 from app.services.post_composer import PostComposer
 from app.services.topic_composer import TopicComposer
 
@@ -112,12 +117,17 @@ class RankingService:
         *,
         view_time_boosts: dict[str, float] | None = None,
         blocked_user_ids: set[int] | None = None,
+        feed_preference_signals: list[FeedPreferenceSignal] | None = None,
+        post_embeddings: dict[str, list[float]] | None = None,
     ):
         filtered = []
         preferred_topics, blacklisted_topics = _topic_sets(prefs.topic_preferences)
         use_recency = getattr(prefs, "use_recency", True)
         view_time_boosts = view_time_boosts or {}
         blocked_user_ids = blocked_user_ids or set()
+        feed_preference_signals = feed_preference_signals or []
+        post_embeddings = post_embeddings or {}
+        positive_centroid = weighted_centroid(feed_preference_signals, min_preference=1)
 
         for post in posts:
             if post.get("user_id") in blocked_user_ids:
@@ -138,6 +148,14 @@ class RankingService:
                 score += 0.3
             if normalized_topic:
                 score += view_time_boosts.get(normalized_topic, 0.0)
+
+            post_embedding = post_embeddings.get(post["id"])
+            if feed_preference_signals and post_embedding:
+                score += preference_score_adjustment(
+                    post_embedding,
+                    feed_preference_signals,
+                    positive_centroid=positive_centroid,
+                )
 
             post["score"] = score
             filtered.append(post)
@@ -171,27 +189,52 @@ class FeedService:
         self.preference_service = preference_service
         self.user_repo = user_repo
         self.interaction_repo = interaction_repo
-        self._yesterday_liked: dict[
+        self._preference_seed_cache: dict[
             int, tuple[datetime.date, list[float] | None, str | None]
         ] = {}
 
-    async def _yesterday_liked_signal(
+    async def _preference_seed_signal(
         self, user_id: int
     ) -> tuple[list[float] | None, str | None]:
         today = datetime.datetime.now(datetime.timezone.utc).date()
-        cached = self._yesterday_liked.get(user_id)
+        cached = self._preference_seed_cache.get(user_id)
         if cached is not None and cached[0] == today:
             return cached[1], cached[2]
 
-        self._yesterday_liked = {
+        self._preference_seed_cache = {
             uid: entry
-            for uid, entry in self._yesterday_liked.items()
+            for uid, entry in self._preference_seed_cache.items()
             if entry[0] == today
         }
 
-        embedding, topic = await self.interaction_repo.get_yesterday_liked_post(user_id)
-        self._yesterday_liked[user_id] = (today, embedding, topic)
+        embedding, topic = await self.interaction_repo.get_preference_session_seed(
+            user_id
+        )
+        self._preference_seed_cache[user_id] = (today, embedding, topic)
         return embedding, topic
+
+    async def _feed_preference_ranking_context(
+        self,
+        user_id: int,
+        posts: list[dict],
+        *,
+        conn=None,
+    ) -> tuple[list[FeedPreferenceSignal], dict[str, list[float]]]:
+        signals = await self.interaction_repo.get_feed_preference_signals(user_id)
+        if not signals:
+            return [], {}
+
+        signal_embeddings = {
+            signal.post_id: signal.embedding for signal in signals
+        }
+        missing_ids = [
+            post["id"]
+            for post in posts
+            if post["id"] not in signal_embeddings
+        ]
+        fetched = await self.repo.get_embeddings_by_post_ids(missing_ids, conn=conn)
+        post_embeddings = {**signal_embeddings, **fetched}
+        return signals, post_embeddings
 
     async def _compose_candidates(
         self,
@@ -292,18 +335,26 @@ class FeedService:
             all_ids = set(p["id"] for p in seed_posts) | set(expanded_ids)
             expanded_posts = await self.repo.get_posts_by_ids(list(all_ids), conn=conn)
 
-        seed_scores = {post["id"]: post.get("score", 0.0) for post in seed_posts}
-        for post in expanded_posts:
-            if post["id"] in seed_scores:
-                post["score"] = seed_scores[post["id"]]
-            else:
-                post["score"] = 0.3
+            seed_scores = {post["id"]: post.get("score", 0.0) for post in seed_posts}
+            for post in expanded_posts:
+                if post["id"] in seed_scores:
+                    post["score"] = seed_scores[post["id"]]
+                else:
+                    post["score"] = 0.3
+
+            preference_signals, post_embeddings = await self._feed_preference_ranking_context(
+                user_id,
+                expanded_posts,
+                conn=conn,
+            )
 
         ranked = self.ranking_service.apply_preferences(
             prefs,
             expanded_posts,
             view_time_boosts=view_time_boosts,
             blocked_user_ids=blocked_user_ids,
+            feed_preference_signals=preference_signals,
+            post_embeddings=post_embeddings,
         )
 
         return [with_utc_created_at(post) for post in ranked[:20]]
@@ -312,7 +363,7 @@ class FeedService:
         prefs = await self.user_repo.get_prefs(user_id)
         blocked_user_ids = await self.user_repo.get_blocked_user_ids(user_id)
         preferred_topics, blacklisted_topics = _topic_sets(prefs.topic_preferences)
-        yesterday_post, liked_topic = await self._yesterday_liked_signal(user_id)
+        seed_post, seed_topic = await self._preference_seed_signal(user_id)
         interactions = await self.interaction_repo.get_recent_interactions(user_id)
         view_time_boosts = self.preference_service.view_time_topic_boosts(
             prefs, interactions
@@ -323,16 +374,16 @@ class FeedService:
         if diversify:
             topic_comp = {"similar": 0.10, "opposite": 0.25, "surprise": 0.65}
             seed_strategy = "diversify"
-        elif yesterday_post:
+        elif seed_post:
             seed_strategy = "soft_prior"
         else:
             seed_strategy = "random"
 
         max_per_topic = _max_per_topic_from_composition(topic_comp)
-        anchor_embedding = yesterday_post or self.embedding_service.embed_text(
-            liked_topic or "general"
+        anchor_embedding = seed_post or self.embedding_service.embed_text(
+            seed_topic or "general"
         )
-        anchor_topic = liked_topic
+        anchor_topic = seed_topic
 
         async with self.repo.acquire() as conn:
             candidates = await self._compose_candidates(
@@ -360,14 +411,22 @@ class FeedService:
                 ]
                 if diversify:
                     seed_strategy = "diversify_fallback"
-                elif yesterday_post:
+                elif seed_post:
                     seed_strategy = "soft_prior_fallback"
+
+            preference_signals, post_embeddings = await self._feed_preference_ranking_context(
+                user_id,
+                candidates,
+                conn=conn,
+            )
 
         ranked = self.ranking_service.apply_preferences(
             prefs,
             candidates,
             view_time_boosts=view_time_boosts,
             blocked_user_ids=blocked_user_ids,
+            feed_preference_signals=preference_signals,
+            post_embeddings=post_embeddings,
         )
         selected = self._select_topic_diverse(
             ranked,
@@ -460,11 +519,19 @@ class FeedService:
                 conn=conn,
             )
 
+            preference_signals, post_embeddings = await self._feed_preference_ranking_context(
+                user_id,
+                candidates,
+                conn=conn,
+            )
+
         ranked = self.ranking_service.apply_preferences(
             prefs,
             candidates,
             view_time_boosts=view_time_boosts,
             blocked_user_ids=blocked_user_ids,
+            feed_preference_signals=preference_signals,
+            post_embeddings=post_embeddings,
         )
         selected = self._select_next_composition(
             ranked,

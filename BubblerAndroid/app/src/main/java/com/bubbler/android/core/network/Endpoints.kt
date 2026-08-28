@@ -19,7 +19,7 @@ object Endpoints {
     const val USER_ME_PROFILE_PASSWORD = "user/me/profile/password"
     const val USER_ME_PREFERENCES = "user/me/preferences"
     const val USER_ME_POSTS = "user/me/posts"
-    const val USER_ME_LIKES = "user/me/likes"
+    const val USER_ME_FEED_PREFERENCES = "user/me/feed-preferences"
     const val USER_ME_INTERACTIONS = "user/me/interactions"
     const val USER_ME_BLOCKS = "user/me/blocks"
     const val USER_ME_EXPORT = "user/me/export"
@@ -53,8 +53,8 @@ object Endpoints {
     fun userPostTopic(postId: String, topic: String): String =
         "user/me/posts/${encodePathSegment(postId)}/topics/${encodePathSegment(topic)}"
 
-    fun userInteractionLike(postId: String): String =
-        "user/me/interactions/${encodePathSegment(postId)}/like"
+    fun userFeedPreference(postId: String): String =
+        "user/me/posts/${encodePathSegment(postId)}/feed-preference"
 
     fun userBlock(username: String): String =
         "user/me/blocks/${encodePathSegment(username)}"

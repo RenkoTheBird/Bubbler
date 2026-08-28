@@ -9,7 +9,7 @@ struct Interaction: Codable, Identifiable {
     let createdAt: Date
     let topic: String
     let viewTime: Double
-    let liked: Bool
+    let feedPreference: Int?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -19,7 +19,7 @@ struct Interaction: Codable, Identifiable {
         case createdAt = "created_at"
         case topic
         case viewTime = "view_time"
-        case liked
+        case feedPreference = "feed_preference"
     }
 
     /// Short copy for the profile Bubble Trail row.
@@ -33,8 +33,9 @@ struct Interaction: Codable, Identifiable {
         }
 
         switch type {
-        case .like:
-            return "Liked \(topicLabel)"
+        case .preference:
+            let label = FeedPreference(rawValueOrZero: feedPreference ?? 0).shortLabel
+            return "\(label) for \(topicLabel)"
         case .skip:
             return "Skipped \(topicLabel)"
         case .explore:

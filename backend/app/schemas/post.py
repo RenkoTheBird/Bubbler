@@ -52,7 +52,7 @@ class Interaction(BaseModel):
     topic: str
     
     view_time: float
-    liked: bool
+    feed_preference: int | None = None
 
     def model_post_init(self, __context) -> None:
         object.__setattr__(self, "created_at", ensure_utc(self.created_at))
@@ -63,8 +63,17 @@ class Interaction(BaseModel):
 
 class InteractionCreate(BaseModel):
     post_id: str 
-    type: Literal['like', 'skip', 'explore']
+    type: Literal['skip', 'explore']
     view_time: float = Field(default=0.0, ge=0)
+
+
+class FeedPreferenceUpdate(BaseModel):
+    feed_preference: int = Field(ge=-2, le=2)
+
+
+class FeedPreferenceEntry(BaseModel):
+    post_id: str
+    feed_preference: int = Field(ge=-2, le=2)
 
 class Topic(BaseModel):
     id: str

@@ -195,7 +195,7 @@ private fun TrailRowPreview() {
                 .padding(vertical = 16.dp),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                TrailRow(text = "Liked a Technology post")
+                TrailRow(text = "Much more for a Technology post")
                 TrailRow(text = "Skipped a post")
                 Spacer(modifier = Modifier.height(8.dp))
             }

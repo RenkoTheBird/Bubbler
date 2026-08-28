@@ -480,7 +480,7 @@ class UserRepository:
             )
             interaction_rows = await conn.fetch(
                 """
-                SELECT id, post_id, type, view_time, created_at
+                SELECT id, post_id, type, feed_preference, view_time, created_at
                 FROM interactions
                 WHERE user_id = $1
                 ORDER BY created_at DESC, id
@@ -580,6 +580,9 @@ class UserRepository:
                     "id": str(row["id"]),
                     "post_id": str(row["post_id"]),
                     "type": row["type"],
+                    "feed_preference": int(row["feed_preference"])
+                    if row["feed_preference"] is not None
+                    else None,
                     "view_time": float(row["view_time"] or 0.0),
                     "created_at": utc_iso_z(row["created_at"]),
                 }

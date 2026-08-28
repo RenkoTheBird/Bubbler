@@ -38,14 +38,14 @@ class BubbleTrailViewModelTest {
     @Test
     fun load_populatesInteractions() = runTest {
         userRepository.interactions = listOf(
-            interaction(id = "1", type = GraphInteractionType.LIKE, topic = "technology"),
+            interaction(id = "1", type = GraphInteractionType.PREFERENCE, topic = "technology", feedPreference = 2),
             interaction(id = "2", type = GraphInteractionType.SKIP, topic = ""),
         )
 
         viewModel.loadAwait()
 
         assertEquals(2, viewModel.interactions.value.size)
-        assertEquals("Liked a Technology post", viewModel.interactions.value[0].trailSummary)
+        assertEquals("Much more for a Technology post", viewModel.interactions.value[0].trailSummary)
         assertEquals("Skipped a post", viewModel.interactions.value[1].trailSummary)
         assertNull(viewModel.errorMessage.value)
         assertFalse(viewModel.isLoading.value)
@@ -80,6 +80,7 @@ class BubbleTrailViewModelTest {
         id: String,
         type: GraphInteractionType,
         topic: String,
+        feedPreference: Int? = null,
     ) = Interaction(
         id = id,
         userId = "42",
@@ -88,7 +89,7 @@ class BubbleTrailViewModelTest {
         createdAt = now,
         topic = topic,
         viewTime = 1.0,
-        liked = type == GraphInteractionType.LIKE,
+        feedPreference = feedPreference,
     )
 
     private fun signedInSession(userId: Int): AuthSession {

@@ -42,7 +42,7 @@ class RetentionConfig:
     """Beta retention windows (days). Override via env; consumed by the retention job."""
 
     def __init__(self):
-        # Rolling purge: explore/skip interactions only (likes kept for heart state).
+        # Rolling purge: explore/skip interactions only (feed preferences kept for slider state).
         self.interactions_retention_days = _int_env("INTERACTIONS_RETENTION_DAYS", 270)
         self.interactions_purge_types = ("explore", "skip")
 

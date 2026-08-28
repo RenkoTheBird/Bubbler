@@ -144,19 +144,26 @@ LEFT JOIN LATERAL (
 ) pt ON true;
 
 -- INTERACTIONS
--- explore/skip may repeat for the same user+post; likes stay unique.
+-- explore/skip may repeat for the same user+post; feed preferences stay unique.
 CREATE TABLE interactions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
-    type TEXT NOT NULL CHECK (type IN ('like', 'skip', 'explore')),
+    type TEXT NOT NULL CHECK (type IN ('preference', 'skip', 'explore')),
+    feed_preference INTEGER CHECK (
+        feed_preference IS NULL OR feed_preference BETWEEN -2 AND 2
+    ),
     created_at TIMESTAMP DEFAULT NOW(),
-    view_time FLOAT
+    view_time FLOAT,
+    CONSTRAINT interactions_preference_value_check CHECK (
+        (type = 'preference' AND feed_preference IS NOT NULL AND feed_preference <> 0)
+        OR (type <> 'preference' AND feed_preference IS NULL)
+    )
 );
 
-CREATE UNIQUE INDEX interactions_user_id_post_id_like_uidx
+CREATE UNIQUE INDEX interactions_user_id_post_id_preference_uidx
 ON interactions (user_id, post_id)
-WHERE type = 'like';
+WHERE type = 'preference';
 
 CREATE INDEX interactions_user_id_created_at_idx ON interactions (user_id, created_at DESC);
 

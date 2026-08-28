@@ -151,7 +151,7 @@ For `GET /graph/posts/{post_id}/next`, the backend:
 
 ## Session seeding and escape behavior
 
-A graph session returns six posts before the user starts choosing neighbors. The backend uses two-tier composition seeded from yesterday's liked post/topic when available. `?diversify=true` forces a high topic-surprise mix to escape stale regions.
+A graph session returns six posts before the user starts choosing neighbors. The backend uses two-tier composition seeded from recent positive feed preferences when available. `?diversify=true` forces a high topic-surprise mix to escape stale regions.
 
 Blacklisted topics are excluded before ranking. Preferred topics, view time, and recency then rank session candidates. Topic surprise controls per-topic spread in the six-post session. If candidate pools are empty, the service falls back to random posts while preserving blacklist filtering.
 
@@ -189,10 +189,10 @@ callers convert IDs to a set or otherwise deduplicate before returning posts.
 
 Choosing a bubble records `explore` for the old current post and makes the chosen
 neighbor current. Skipping records `skip` and takes the first usable neighbor, then a
-session fallback. Likes, explores, skips, and view time are stored as interactions;
-view time influences later topic boosts, and yesterday's like can seed the next day's
-session. Blacklisting the current topic records a skip, clears local choices, and
-immediately requests a diversified session.
+session fallback. Feed-preference sliders, explores, skips, and view time are stored as
+interactions; view time influences later topic boosts, and recent positive feed
+preferences can seed the next session. Blacklisting the current topic records a skip,
+clears local choices, and immediately requests a diversified session.
 
 ## Relevant implementation files
 

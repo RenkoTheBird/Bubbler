@@ -416,18 +416,95 @@ async def ensure_schema(pool: asyncpg.Pool) -> None:
                 """
             )
 
-        # explore/skip may repeat; only likes stay unique per user+post.
+        # explore/skip may repeat; feed preferences stay unique per user+post.
         if await _constraint_exists(conn, "interactions_user_id_post_id_key"):
             await conn.execute(
                 "ALTER TABLE interactions DROP CONSTRAINT interactions_user_id_post_id_key"
             )
 
-        if not await _index_exists(conn, "interactions_user_id_post_id_like_uidx"):
+        if not await _column_exists(conn, "interactions", "feed_preference"):
+            await conn.execute(
+                "ALTER TABLE interactions ADD COLUMN feed_preference INTEGER"
+            )
+
+        if await _index_exists(conn, "interactions_user_id_post_id_like_uidx"):
+            await conn.execute("DROP INDEX interactions_user_id_post_id_like_uidx")
+
+        await conn.execute(
+            """
+            UPDATE interactions
+            SET type = 'preference', feed_preference = 1
+            WHERE type = 'like'
+            """
+        )
+
+        await conn.execute(
+            """
+            DO $migrate$
+            DECLARE
+              r RECORD;
+            BEGIN
+              IF to_regclass('public.interactions') IS NULL THEN
+                RETURN;
+              END IF;
+
+              FOR r IN
+                SELECT c.conname, pg_get_constraintdef(c.oid) AS def
+                FROM pg_constraint c
+                WHERE c.conrelid = 'public.interactions'::regclass
+                  AND c.contype = 'c'
+                  AND pg_get_constraintdef(c.oid) LIKE '%type IN%'
+              LOOP
+                IF position('preference' in r.def) = 0 THEN
+                  EXECUTE format(
+                    'ALTER TABLE interactions DROP CONSTRAINT IF EXISTS %I',
+                    r.conname
+                  );
+                END IF;
+              END LOOP;
+
+              IF NOT EXISTS (
+                SELECT 1
+                FROM pg_constraint c
+                WHERE c.conrelid = 'public.interactions'::regclass
+                  AND c.conname = 'interactions_type_check'
+              ) THEN
+                ALTER TABLE interactions
+                ADD CONSTRAINT interactions_type_check
+                CHECK (type IN ('preference', 'skip', 'explore'));
+              END IF;
+            END
+            $migrate$;
+            """
+        )
+
+        if not await _constraint_exists(conn, "interactions_feed_preference_check"):
             await conn.execute(
                 """
-                CREATE UNIQUE INDEX interactions_user_id_post_id_like_uidx
+                ALTER TABLE interactions
+                ADD CONSTRAINT interactions_feed_preference_check
+                CHECK (feed_preference IS NULL OR feed_preference BETWEEN -2 AND 2)
+                """
+            )
+
+        if not await _constraint_exists(conn, "interactions_preference_value_check"):
+            await conn.execute(
+                """
+                ALTER TABLE interactions
+                ADD CONSTRAINT interactions_preference_value_check
+                CHECK (
+                    (type = 'preference' AND feed_preference IS NOT NULL AND feed_preference <> 0)
+                    OR (type <> 'preference' AND feed_preference IS NULL)
+                )
+                """
+            )
+
+        if not await _index_exists(conn, "interactions_user_id_post_id_preference_uidx"):
+            await conn.execute(
+                """
+                CREATE UNIQUE INDEX interactions_user_id_post_id_preference_uidx
                 ON interactions (user_id, post_id)
-                WHERE type = 'like'
+                WHERE type = 'preference'
                 """
             )
 

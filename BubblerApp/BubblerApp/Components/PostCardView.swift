@@ -7,21 +7,22 @@ struct PostCardView: View {
     var isTopicPreferred: Bool = false
     var isTopicBlacklisted: Bool = false
     var onSkip: (() -> Void)?
-    var onLikeChanged: ((Bool) -> Void)?
+    var onFeedPreferenceChanged: ((FeedPreference) -> Void)?
     var onTopicPreferenceChanged: (() -> Void)?
     var onDeleted: (() -> Void)?
     var onEdited: ((String) -> Void)?
 
     @EnvironmentObject private var authSession: AuthSession
-    @EnvironmentObject private var likedPosts: LikedPostsStore
+    @EnvironmentObject private var feedPreferences: FeedPreferencesStore
     @State private var showDeleteConfirmation = false
     @State private var showOverflowMenu = false
     @State private var showReportForm = false
     @State private var isDeleting = false
-    @State private var isTogglingLike = false
+    @State private var isSavingFeedPreference = false
     @State private var isUpdatingTopicPreference = false
     @State private var preferredLocally: Bool?
     @State private var blacklistedLocally: Bool?
+    @State private var localFeedPreference: FeedPreference = .neutral
     @State private var actionError: String?
     @State private var appearedAt = Date()
 
@@ -43,16 +44,16 @@ struct PostCardView: View {
         return TopicStyle.color(for: topicName)
     }
 
-    private var currentlyLiked: Bool {
-        likedPosts.isLiked(post.id)
-    }
-
     private var currentlyPreferred: Bool {
         preferredLocally ?? isTopicPreferred
     }
 
     private var currentlyBlacklisted: Bool {
         blacklistedLocally ?? isTopicBlacklisted
+    }
+
+    private var currentFeedPreference: FeedPreference {
+        localFeedPreference
     }
 
     private var contentLineLimit: Int? {
@@ -151,12 +152,14 @@ struct PostCardView: View {
             appearedAt = Date()
             preferredLocally = nil
             blacklistedLocally = nil
+            localFeedPreference = feedPreferences.preference(for: post.id)
         }
         .onChange(of: post.id) { _, _ in
             appearedAt = Date()
             preferredLocally = nil
             blacklistedLocally = nil
             actionError = nil
+            localFeedPreference = feedPreferences.preference(for: post.id)
         }
         .onChange(of: isTopicPreferred) { _, _ in
             preferredLocally = nil
@@ -234,61 +237,64 @@ struct PostCardView: View {
     }
 
     private var actionRow: some View {
-        HStack(spacing: 10) {
-            Button {
-                Task { await toggleLike() }
-            } label: {
-                HStack(spacing: 6) {
-                    if isTogglingLike {
-                        ProgressView()
-                            .tint(.white)
-                            .scaleEffect(0.8)
-                    } else {
-                        Image(systemName: currentlyLiked ? "heart.fill" : "heart")
-                    }
-                    Text(currentlyLiked ? "Liked" : "Like")
-                        .font(.caption.weight(.semibold))
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Feed preference")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(.white.opacity(0.85))
+                Spacer()
+                if isSavingFeedPreference {
+                    ProgressView()
+                        .tint(.white)
+                        .scaleEffect(0.8)
                 }
-                .foregroundColor(currentlyLiked ? .pink : .white)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(
-                    Capsule()
-                        .fill(currentlyLiked ? Color.pink.opacity(0.22) : Color.white.opacity(0.12))
-                        .overlay(
-                            Capsule()
-                                .stroke(
-                                    currentlyLiked ? Color.pink.opacity(0.45) : Color.white.opacity(0.16),
-                                    lineWidth: 1
-                                )
-                        )
-                )
             }
-            .buttonStyle(.plain)
-            .disabled(isTogglingLike)
+
+            Slider(
+                value: Binding(
+                    get: { Double(currentFeedPreference.rawValue) },
+                    set: { newValue in
+                        let snapped = FeedPreference(rawValueOrZero: Int(newValue.rounded()))
+                        guard snapped != localFeedPreference else { return }
+                        localFeedPreference = snapped
+                        Task { await saveFeedPreference(snapped) }
+                    }
+                ),
+                in: -2...2,
+                step: 1
+            )
+            .tint(accentColor)
+            .disabled(isSavingFeedPreference)
+
+            Text(currentFeedPreference.label)
+                .font(.caption)
+                .foregroundColor(.white.opacity(0.75))
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             if showsSkip {
-                Button {
-                    onSkip?()
-                } label: {
-                    Label("Skip", systemImage: "arrow.right.circle")
-                        .font(.caption.weight(.semibold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(
-                            Capsule()
-                                .fill(Color.white.opacity(0.12))
-                                .overlay(
-                                    Capsule()
-                                        .stroke(Color.white.opacity(0.16), lineWidth: 1)
-                                )
-                        )
-                }
-                .buttonStyle(.plain)
-            }
+                HStack {
+                    Button {
+                        onSkip?()
+                    } label: {
+                        Label("Skip", systemImage: "arrow.right.circle")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(
+                                Capsule()
+                                    .fill(Color.white.opacity(0.12))
+                                    .overlay(
+                                        Capsule()
+                                            .stroke(Color.white.opacity(0.16), lineWidth: 1)
+                                    )
+                            )
+                    }
+                    .buttonStyle(.plain)
 
-            Spacer()
+                    Spacer()
+                }
+            }
         }
         .padding(.top, 2)
     }
@@ -338,32 +344,20 @@ struct PostCardView: View {
         .padding(.top, 4)
     }
 
-    private func toggleLike() async {
-        isTogglingLike = true
+    private func saveFeedPreference(_ value: FeedPreference) async {
+        isSavingFeedPreference = true
         actionError = nil
-        defer { isTogglingLike = false }
+        defer { isSavingFeedPreference = false }
 
         do {
-            if currentlyLiked {
-                try await APIClient.deleteLike(postId: post.id)
-                likedPosts.setLiked(post.id, liked: false)
-                onLikeChanged?(false)
-            } else {
-                let viewTime = max(0, Date().timeIntervalSince(appearedAt))
-                try await APIClient.recordInteraction(
-                    GraphInteractionPayload(
-                        postId: post.id,
-                        type: .like,
-                        viewTime: viewTime
-                    )
-                )
-                likedPosts.setLiked(post.id, liked: true)
-                onLikeChanged?(true)
-            }
+            try await APIClient.setFeedPreference(postId: post.id, value: value)
+            feedPreferences.setPreference(value, for: post.id)
+            onFeedPreferenceChanged?(value)
         } catch {
             if case APIClientError.unauthorized = error {
                 authSession.signOut()
             }
+            localFeedPreference = feedPreferences.preference(for: post.id)
             actionError = error.localizedDescription
         }
     }
@@ -427,7 +421,7 @@ struct PostCardView: View {
 
         do {
             try await APIClient.deletePost(id: post.id)
-            likedPosts.setLiked(post.id, liked: false)
+            feedPreferences.setPreference(.neutral, for: post.id)
             authSession.showSuccessMessage("Post deleted.")
             onDeleted?()
         } catch {
@@ -469,6 +463,6 @@ struct PostCardView: View {
             .padding()
         }
         .environmentObject(AuthSession())
-        .environmentObject(LikedPostsStore())
+        .environmentObject(FeedPreferencesStore())
     }
 }

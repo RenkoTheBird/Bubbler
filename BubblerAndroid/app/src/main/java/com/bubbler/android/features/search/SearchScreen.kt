@@ -53,7 +53,7 @@ import com.bubbler.android.app.theme.BubblerTheme
 import com.bubbler.android.core.auth.AuthSession
 import com.bubbler.android.core.auth.TokenStore
 import com.bubbler.android.core.network.ApiClient
-import com.bubbler.android.core.storage.LikedPostsStore
+import com.bubbler.android.core.storage.FeedPreferencesStore
 import com.bubbler.android.data.model.Post
 import com.bubbler.android.data.repository.PostRepository
 import com.bubbler.android.data.repository.PreferencesRepository
@@ -89,7 +89,7 @@ fun SearchScreen(
     }
     val userRepository = remember(apiClient, tokenStore) { UserRepository(apiClient, tokenStore) }
     val postRepository = remember(apiClient, tokenStore) { PostRepository(apiClient, tokenStore) }
-    val likedPostsStore = remember(userRepository) { LikedPostsStore(userRepository) }
+    val feedPreferencesStore = remember(userRepository) { FeedPreferencesStore(userRepository) }
     val prefs = remember(context) {
         context.applicationContext.getSharedPreferences(SEARCH_PREFS_NAME, Context.MODE_PRIVATE)
     }
@@ -139,7 +139,7 @@ fun SearchScreen(
             SearchScreenContent(
                 authSession = authSession,
                 viewModel = viewModel,
-                likedPostsStore = likedPostsStore,
+                feedPreferencesStore = feedPreferencesStore,
                 preferencesRepository = preferencesRepository,
                 userRepository = userRepository,
                 postRepository = postRepository,
@@ -155,7 +155,7 @@ fun SearchScreen(
 fun SearchScreenContent(
     authSession: AuthSession,
     viewModel: SearchViewModel,
-    likedPostsStore: LikedPostsStore,
+    feedPreferencesStore: FeedPreferencesStore,
     preferencesRepository: PreferencesRepository,
     userRepository: UserRepository,
     postRepository: PostRepository,
@@ -182,9 +182,9 @@ fun SearchScreenContent(
 
     LaunchedEffect(accessToken) {
         if (accessToken != null) {
-            likedPostsStore.refresh()
+            feedPreferencesStore.refresh()
         } else {
-            likedPostsStore.clear()
+            feedPreferencesStore.clear()
         }
     }
 
@@ -252,7 +252,7 @@ fun SearchScreenContent(
                 exactMatches = exactMatches,
                 related = related,
                 userId = userId,
-                likedPostsStore = likedPostsStore,
+                feedPreferencesStore = feedPreferencesStore,
                 preferencesRepository = preferencesRepository,
                 userRepository = userRepository,
                 postRepository = postRepository,
@@ -387,7 +387,7 @@ private fun ResultsSection(
     exactMatches: List<Post>,
     related: List<Post>,
     userId: Int?,
-    likedPostsStore: LikedPostsStore,
+    feedPreferencesStore: FeedPreferencesStore,
     preferencesRepository: PreferencesRepository,
     userRepository: UserRepository,
     postRepository: PostRepository,
@@ -427,7 +427,7 @@ private fun ResultsSection(
                             subtitle = "Keyword, topic, or username hits",
                             posts = exactMatches,
                             userId = userId,
-                            likedPostsStore = likedPostsStore,
+                            feedPreferencesStore = feedPreferencesStore,
                             preferencesRepository = preferencesRepository,
                             userRepository = userRepository,
                             postRepository = postRepository,
@@ -444,7 +444,7 @@ private fun ResultsSection(
                             subtitle = "Similar meaning and nearby bubbles",
                             posts = related,
                             userId = userId,
-                            likedPostsStore = likedPostsStore,
+                            feedPreferencesStore = feedPreferencesStore,
                             preferencesRepository = preferencesRepository,
                             userRepository = userRepository,
                             postRepository = postRepository,
@@ -467,7 +467,7 @@ private fun PostSection(
     subtitle: String,
     posts: List<Post>,
     userId: Int?,
-    likedPostsStore: LikedPostsStore,
+    feedPreferencesStore: FeedPreferencesStore,
     preferencesRepository: PreferencesRepository,
     userRepository: UserRepository,
     postRepository: PostRepository,
@@ -498,7 +498,7 @@ private fun PostSection(
                 PostCard(
                     post = post,
                     currentUserId = userId,
-                    likedPostsStore = likedPostsStore,
+                    feedPreferencesStore = feedPreferencesStore,
                     userRepository = userRepository,
                     preferencesRepository = preferencesRepository,
                     postRepository = postRepository,

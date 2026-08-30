@@ -3,11 +3,9 @@ import SwiftUI
 
 struct PostCardView: View {
     let post: Post
-    var showsSkip: Bool = false
     var isCompact: Bool = false
     var isTopicPreferred: Bool = false
     var isTopicBlacklisted: Bool = false
-    var onSkip: (() -> Void)?
     var onFeedPreferenceChanged: ((FeedPreference) -> Void)?
     var onTopicPreferenceChanged: (() -> Void)?
     var onDeleted: (() -> Void)?
@@ -271,31 +269,6 @@ struct PostCardView: View {
                 .font(.caption)
                 .foregroundColor(.white.opacity(0.75))
                 .frame(maxWidth: .infinity, alignment: .leading)
-
-            if showsSkip {
-                HStack {
-                    Button {
-                        onSkip?()
-                    } label: {
-                        Label("Skip", systemImage: "arrow.right.circle")
-                            .font(.caption.weight(.semibold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(
-                                Capsule()
-                                    .fill(Color.white.opacity(0.12))
-                                    .overlay(
-                                        Capsule()
-                                            .stroke(Color.white.opacity(0.16), lineWidth: 1)
-                                    )
-                            )
-                    }
-                    .buttonStyle(.plain)
-
-                    Spacer()
-                }
-            }
         }
         .padding(.top, 2)
     }
@@ -458,8 +431,7 @@ struct PostCardView: View {
                     createdAt: .now.addingTimeInterval(-2_700),
                     topic: "technology",
                     embedding: nil
-                ),
-                showsSkip: true
+                )
             )
             .padding()
         }

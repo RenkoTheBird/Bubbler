@@ -61,7 +61,7 @@ struct GraphFeedView: View {
     }
 
     private var topChrome: some View {
-        HStack {
+        HStack(spacing: 8) {
             if viewModel.isLoading || viewModel.isSubmitting {
                 ProgressView()
                     .tint(.white)
@@ -69,29 +69,29 @@ struct GraphFeedView: View {
 
             Spacer()
 
-            Button {
+            chromeCapsule(
+                title: "Skip",
+                systemImage: "arrow.right.circle",
+                accessibilityLabel: "Skip Current Post",
+                enabled: viewModel.hasCurrentPost && !viewModel.isLoading && !viewModel.isSubmitting
+            ) {
+                previewedChoiceID = nil
+                Task {
+                    await viewModel.skipCurrentPost(using: authSession)
+                }
+            }
+
+            chromeCapsule(
+                title: "Refresh",
+                systemImage: "arrow.clockwise",
+                accessibilityLabel: "Refresh Bubbles",
+                enabled: !viewModel.isLoading && !viewModel.isSubmitting
+            ) {
                 previewedChoiceID = nil
                 Task {
                     await viewModel.refreshSession(using: authSession)
                 }
-            } label: {
-                Label("Explore", systemImage: "arrow.triangle.branch")
-                    .font(.caption.weight(.semibold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(
-                        Capsule()
-                            .fill(Color.white.opacity(0.14))
-                            .overlay(
-                                Capsule()
-                                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                            )
-                    )
             }
-            .buttonStyle(.plain)
-            .disabled(viewModel.isLoading || viewModel.isSubmitting)
-            .accessibilityLabel("Explore Other Bubbles")
         }
     }
 
@@ -121,7 +121,7 @@ struct GraphFeedView: View {
         } else if viewModel.nextChoices.isEmpty {
             stateCard(
                 title: "No connected bubbles",
-                message: "Like, skip, or explore to keep walking the graph."
+                message: "Like, skip, or refresh to keep walking the graph."
             )
         } else {
             bubbleField
@@ -198,7 +198,6 @@ struct GraphFeedView: View {
             ScrollView {
                 PostCardView(
                     post: node.post,
-                    showsSkip: false,
                     isCompact: false,
                     isTopicPreferred: node.isPreferredTopic,
                     isTopicBlacklisted: node.isBlacklistedTopic,
@@ -223,16 +222,9 @@ struct GraphFeedView: View {
 
                 PostCardView(
                     post: node.post,
-                    showsSkip: true,
                     isCompact: true,
                     isTopicPreferred: node.isPreferredTopic,
                     isTopicBlacklisted: node.isBlacklistedTopic,
-                    onSkip: {
-                        previewedChoiceID = nil
-                        Task {
-                            await viewModel.skipCurrentPost(using: authSession)
-                        }
-                    },
                     onTopicPreferenceChanged: {
                         Task {
                             await viewModel.syncTopicPreferences(using: authSession)
@@ -257,6 +249,34 @@ struct GraphFeedView: View {
         // Start slightly above horizontal and space evenly around the center.
         let start = -Double.pi / 2
         return start + (Double(index) / Double(total)) * (2 * Double.pi)
+    }
+
+    private func chromeCapsule(
+        title: String,
+        systemImage: String,
+        accessibilityLabel: String,
+        enabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .font(.caption.weight(.semibold))
+                .foregroundColor(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule()
+                        .fill(Color.white.opacity(0.14))
+                        .overlay(
+                            Capsule()
+                                .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                        )
+                )
+                .opacity(enabled ? 1 : 0.45)
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .accessibilityLabel(accessibilityLabel)
     }
 
     private func banner(_ message: String, tint: Color) -> some View {

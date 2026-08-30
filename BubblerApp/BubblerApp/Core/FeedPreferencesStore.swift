@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 
 /// Per-post feed preference scale (-2...2). Zero means neutral (no stored preference).

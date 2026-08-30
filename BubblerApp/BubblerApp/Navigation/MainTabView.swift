@@ -1,5 +1,6 @@
 // Main tab bar
 
+import Combine
 import SwiftUI
 
 struct MainTabView: View {

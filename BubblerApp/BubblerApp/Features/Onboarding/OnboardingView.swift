@@ -3,6 +3,7 @@
 //  BubblerApp
 //
 
+import Combine
 import SwiftUI
 
 struct OnboardingView: View {
@@ -58,7 +59,7 @@ struct OnboardingView: View {
                         FeedPresetPicker(
                             selectedPreset: Binding(
                                 get: { viewModel.preferences.feedPreset },
-                                set: { viewModel.preferences.feedPreset = $0 }
+                                set: { viewModel.selectPreset($0) }
                             ),
                             onSelect: { viewModel.selectPreset($0) }
                         )

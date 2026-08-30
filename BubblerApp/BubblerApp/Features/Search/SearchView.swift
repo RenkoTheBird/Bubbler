@@ -4,6 +4,7 @@
 //
 //  Created by Alyssa Hooper on 6/13/26.
 //
+import Combine
 import SwiftUI
 
 struct SearchView: View {

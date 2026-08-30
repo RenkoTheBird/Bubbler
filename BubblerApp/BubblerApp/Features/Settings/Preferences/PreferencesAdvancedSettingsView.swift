@@ -3,6 +3,7 @@
 //  BubblerApp
 //
 
+import Combine
 import SwiftUI
 
 struct PreferencesAdvancedSettingsView: View {

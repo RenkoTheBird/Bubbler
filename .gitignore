@@ -10,6 +10,12 @@ __pycache__/
 .cursor
 
 docs/TODO
+docs/retention.md
+docs/breach_playbook.md
+docs/moderation.md
+docs/privacy_legal.md
+
+legaldocs/
 
 # Android
 BubblerAndroid/local.properties

@@ -4,8 +4,8 @@ from asyncpg.exceptions import UniqueViolationError
 from fastapi import HTTPException
 from datetime import date, datetime, timedelta, timezone
 
-# Global floor (EU-friendly GDPR Art. 8). Applied in all regions.
-MINIMUM_SIGNUP_AGE = 16
+# Global floor (18+; aligns with ToS / Privacy Policy). Applied in all regions.
+MINIMUM_SIGNUP_AGE = 18
 
 
 def hash_password(password: str) -> str:

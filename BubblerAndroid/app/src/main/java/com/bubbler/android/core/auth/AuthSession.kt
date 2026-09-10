@@ -17,8 +17,8 @@ import java.time.Period
 import java.util.Base64
 
 object AgeGate {
-    /** Global floor (EU-friendly GDPR Art. 8). */
-    const val MINIMUM_AGE: Int = 16
+    /** Global floor (18+; aligns with ToS / Privacy Policy). */
+    const val MINIMUM_AGE: Int = 18
 
     fun age(from: LocalDate, on: LocalDate = LocalDate.now()): Int =
         Period.between(from, on).years

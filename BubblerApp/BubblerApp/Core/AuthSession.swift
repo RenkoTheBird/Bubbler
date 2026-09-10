@@ -7,8 +7,8 @@ import Combine
 import Foundation
 
 enum AgeGate {
-    /// Global floor (EU-friendly GDPR Art. 8).
-    static let minimumAge = 16
+    /// Global floor (18+; aligns with ToS / Privacy Policy).
+    static let minimumAge = 18
 
     static func age(from birthDate: Date, on referenceDate: Date = Date()) -> Int {
         Calendar.current.dateComponents([.year], from: birthDate, to: referenceDate).year ?? 0

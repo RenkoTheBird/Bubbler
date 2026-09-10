@@ -52,7 +52,7 @@ Ship before public users. Suggested build order: policies & age → App Privacy 
 | L1  | Privacy Policy + Terms of Service                     | Store review, GDPR/CCPA notice, and signup acceptance all require accurate public docs. | privacy_legal §1–2 · P0                   | Counsel + founder             |
 | L2  | Community Guidelines                                  | Published hard-removal rules; needed for DSA duties and report UX.                      | privacy_legal §4 · moderation Phase 0     | Product + counsel             |
 | L3  | Signup acceptance + Settings legal links              | Users must see policies before create-account and find them later.                      | privacy_legal §3                          | iOS + Android (+ optional backend) |
-| L4  | Age gate (≥13 / prefer **16+** for EU-friendly floor) | No age collection today; COPPA + GDPR Art. 8 blockers.                                  | privacy_legal §13 · §17                   | iOS + Android + backend       |
+| L4  | Age gate (**18+** global floor)                       | Matches ToS / Privacy Policy; COPPA-safe; stricter than GDPR Art. 8 digital-consent ages. | privacy_legal §13 · §17                   | iOS + Android + backend       |
 | L5  | Apple App Privacy labels + Privacy Manifest           | Hard App Store release requirement; must match real collection.                         | privacy_legal §18                         | iOS                           |
 | L5a | Google Play Data Safety                               | Hard Play Console requirement; must match the same collection inventory as L5.          | privacy_legal §18 (parity) · Play Console | Android                       |
 | L6  | In-app report → review queue                          | Minimum notice-and-action for public UGC; Phase 0 floor.                                | moderation Phase 0 · privacy_legal §14    | iOS + Android + backend       |
@@ -225,7 +225,7 @@ Reports, appeals, low-confidence classifications, and high-risk content enter hu
 
 ### Wave A — Public docs & gates
 
-Privacy Policy, ToS, Community Guidelines → signup accept + age gate (16+ preferred) → App Privacy labels/manifest **and** Play Data Safety → Impressum link if DE/AT offered.
+Privacy Policy, ToS, Community Guidelines → signup accept + age gate (18+) → App Privacy labels/manifest **and** Play Data Safety → Impressum link if DE/AT offered.
 
 ### Wave B — Safety floor
 
@@ -249,7 +249,7 @@ Use this as a pre-production gate. Unchecked items block public launch under the
 
 **Hard blockers**
 
-- [ ] L1 Privacy Policy + Terms of Service
+- [x] L1 Privacy Policy + Terms of Service
 - [ ] L2 Community Guidelines
 - [x] L3 Signup acceptance + Settings legal links
 - [x] L4 Age gate
@@ -278,11 +278,11 @@ Use this as a pre-production gate. Unchecked items block public launch under the
 
 **California**
 
-- [ ] L20 CCPA/CPRA notice + rights fulfillment
+- [x] L20 CCPA/CPRA notice + rights fulfillment
 
 **Tracking posture**
 
-- [ ] L21 No non-essential trackers; Privacy Policy states this
+- [x] L21 No non-essential trackers; Privacy Policy states this
 
 ---
 

@@ -30,7 +30,7 @@ struct BubbleTrailView: View {
                     Spacer()
                         .frame(height: 12)
 
-                    Text("Your recent interactions across Bubbler.")
+                    Text("Your recent interactions across Wubbler.")
                         .font(.subheadline)
                         .foregroundColor(.white.opacity(0.75))
                         .padding(.horizontal, 20)

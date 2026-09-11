@@ -27,7 +27,7 @@ object AgeGate {
         age(from = dateOfBirth, on = on) >= MINIMUM_AGE
 
     val underageMessage: String
-        get() = "You must be at least $MINIMUM_AGE years old to use Bubbler."
+        get() = "You must be at least $MINIMUM_AGE years old to use Wubbler."
 }
 
 enum class OnboardingGate {

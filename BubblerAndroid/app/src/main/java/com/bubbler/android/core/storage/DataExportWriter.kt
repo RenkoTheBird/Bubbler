@@ -24,7 +24,7 @@ object DataExportWriter {
     }
 
     fun suggestedFileName(createdAt: Instant = Instant.now()): String =
-        "bubbler-export-${fileNameFormatter.format(createdAt)}.json"
+        "wubbler-export-${fileNameFormatter.format(createdAt)}.json"
 
     /** Re-encodes compact API JSON as pretty-printed UTF-8 bytes. */
     fun prettyPrintJson(raw: String): ByteArray {

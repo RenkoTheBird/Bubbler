@@ -100,7 +100,7 @@ struct GraphFeedView: View {
         if viewModel.isLoading && !viewModel.hasCurrentPost {
             stateCard(
                 title: "Loading graph feed",
-                message: "Pulling your initial session from Bubbler.",
+                message: "Pulling your initial session from Wubbler.",
                 showsProgress: true
             )
         } else if previewedChoiceID != nil {

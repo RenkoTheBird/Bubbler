@@ -15,7 +15,10 @@ docs/breach_playbook.md
 docs/moderation.md
 docs/privacy_legal.md
 
-legaldocs/
+# Website
+website/node_modules/
+website/dist/
+website/.astro/
 
 # Android
 BubblerAndroid/local.properties

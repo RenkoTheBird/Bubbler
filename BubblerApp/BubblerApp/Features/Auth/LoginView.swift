@@ -41,7 +41,7 @@ struct LoginView: View {
                     BubblerLogoView()
                         .frame(width: 120, height: 120)
                     
-                    Text("Bubbler")
+                    Text("Wubbler")
                         .font(.system(size: 50, weight: .black, design: .rounded))
                         .kerning(2)
                         .foregroundColor(.white)
@@ -121,7 +121,7 @@ struct LoginView: View {
                 
                 // Sign up
                 HStack {
-                    Text("New to Bubbler?")
+                    Text("New to Wubbler?")
                         .foregroundColor(.white.opacity(0.8))
                     
                     NavigationLink {

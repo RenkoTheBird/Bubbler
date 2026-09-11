@@ -1,0 +1,49 @@
+:root {
+  --font-display: 'Bricolage Grotesque', Georgia, serif;
+  --font-body: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+
+  --ink: #132028;
+  --ink-muted: #3a4d57;
+  --ink-faint: #6b7c86;
+  --line: color-mix(in srgb, #132028 12%, transparent);
+  --surface: #edf4f2;
+  --accent: #0f7a6c;
+  --sky-deep: #0c1a1f;
+  --sky-mid: #1a3a42;
+  --mist: #c8ddd6;
+  --glow-warm: #d4a574;
+
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  font-family: var(--font-body);
+  color: var(--ink);
+  background:
+    radial-gradient(ellipse 90% 60% at 10% -10%, color-mix(in srgb, var(--mist) 55%, transparent), transparent 55%),
+    radial-gradient(ellipse 70% 50% at 100% 0%, color-mix(in srgb, var(--glow-warm) 22%, transparent), transparent 50%),
+    linear-gradient(165deg, #e8f1ef 0%, #dfe8e5 45%, #e4ebe8 100%);
+  -webkit-font-smoothing: antialiased;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}

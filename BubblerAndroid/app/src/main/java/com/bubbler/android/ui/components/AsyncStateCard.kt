@@ -74,7 +74,7 @@ private fun AsyncStateCardLoadingPreview() {
     BubblerTheme {
         AsyncStateCard(
             title = "Loading graph feed",
-            message = "Pulling your initial session from Bubbler.",
+            message = "Pulling your initial session from Wubbler.",
             showsProgress = true,
             modifier = Modifier.padding(16.dp),
         )

@@ -86,7 +86,7 @@ fun LoginScreen(
 
             BubblerLogo(size = 120.dp)
             Spacer(modifier = Modifier.height(18.dp))
-            AuthTitle("Bubbler")
+            AuthTitle("Wubbler")
             Spacer(modifier = Modifier.height(8.dp))
             AuthSubtitle("See what you actually care about")
             Spacer(modifier = Modifier.height(12.dp))
@@ -138,7 +138,7 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(16.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "New to Bubbler?",
+                    text = "New to Wubbler?",
                     color = AuthOnGradient.copy(alpha = 0.8f),
                 )
                 TextButton(onClick = onCreateAccount) {

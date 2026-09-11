@@ -66,7 +66,7 @@ struct DeleteAccountView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This will remove your Bubbler account and content. Your email and username can be used again immediately. We may keep a limited identity record for up to 90 days for safety and legal purposes. Moderation tickets and backups may last longer.")
+            Text("This will remove your Wubbler account and content. Your email and username can be used again immediately. We may keep a limited identity record for up to 90 days for safety and legal purposes. Moderation tickets and backups may last longer.")
         }
     }
 
@@ -76,7 +76,7 @@ struct DeleteAccountView: View {
                 .font(.system(size: 30, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
 
-            Text("Permanently close your Bubbler account after confirming your password.")
+            Text("Permanently close your Wubbler account after confirming your password.")
                 .font(.subheadline)
                 .multilineTextAlignment(.center)
                 .foregroundColor(.white.opacity(0.72))

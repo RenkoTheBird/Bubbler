@@ -59,7 +59,7 @@ fun DeleteAccountScreen(
             title = { Text("Delete your account permanently?") },
             text = {
                 Text(
-                    "This will remove your Bubbler account and content. Your email and username can be used again immediately. We may keep a limited identity record for up to 90 days for safety and legal purposes. Moderation tickets and backups may last longer.",
+                    "This will remove your Wubbler account and content. Your email and username can be used again immediately. We may keep a limited identity record for up to 90 days for safety and legal purposes. Moderation tickets and backups may last longer.",
                 )
             },
             confirmButton = {
@@ -87,7 +87,7 @@ fun DeleteAccountScreen(
     ) {
         SettingsHeader(
             title = "Delete Account",
-            subtitle = "Permanently close your Bubbler account after confirming your password.",
+            subtitle = "Permanently close your Wubbler account after confirming your password.",
         )
 
         errorMessage?.let { message ->

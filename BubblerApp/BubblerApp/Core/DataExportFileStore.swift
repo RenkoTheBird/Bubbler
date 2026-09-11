@@ -43,6 +43,6 @@ enum DataExportFileStore {
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = TimeZone(secondsFromGMT: 0)
         formatter.dateFormat = "yyyy-MM-dd'T'HHmmss'Z'"
-        return "bubbler-export-\(formatter.string(from: createdAt)).json"
+        return "wubbler-export-\(formatter.string(from: createdAt)).json"
     }
 }

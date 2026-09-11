@@ -68,7 +68,7 @@ struct EmailSettingsView: View {
                 .font(.system(size: 30, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
 
-            Text("Update the email used to sign in to your Bubbler account.")
+            Text("Update the email used to sign in to your Wubbler account.")
                 .font(.subheadline)
                 .multilineTextAlignment(.center)
                 .foregroundColor(.white.opacity(0.72))

@@ -72,7 +72,7 @@ struct FeedView: View {
                         if viewModel.isLoading && viewModel.posts.isEmpty {
                             stateCard(
                                 title: "Loading your feed",
-                                message: "Pulling the latest posts from Bubbler.",
+                                message: "Pulling the latest posts from Wubbler.",
                                 showsProgress: true
                             )
                         } else if let errorMessage = viewModel.errorMessage {

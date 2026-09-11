@@ -215,16 +215,11 @@ struct ReportPostView: View {
                 .font(.subheadline)
                 .foregroundColor(.white.opacity(0.75))
 
-            NavigationLink {
-                PrivacyPolicyStubView()
-            } label: {
-                Text("Privacy Policy")
-                    .font(.subheadline.weight(.semibold))
-                    .underline()
-                    .foregroundColor(.white)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Privacy Policy")
+            Link("Privacy Policy", destination: LegalURLs.privacy)
+                .font(.subheadline.weight(.semibold))
+                .underline()
+                .foregroundColor(.white)
+                .accessibilityLabel("Privacy Policy")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

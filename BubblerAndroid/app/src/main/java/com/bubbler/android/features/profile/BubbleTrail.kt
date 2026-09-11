@@ -126,7 +126,7 @@ fun BubbleTrailScreenContent(
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 Text(
-                    text = "Your recent interactions across Bubbler.",
+                    text = "Your recent interactions across Wubbler.",
                     color = Color.White.copy(alpha = 0.75f),
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(horizontal = 20.dp),

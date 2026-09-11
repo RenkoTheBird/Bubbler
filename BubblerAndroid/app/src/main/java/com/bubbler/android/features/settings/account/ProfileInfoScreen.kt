@@ -46,7 +46,7 @@ fun ProfileInfoScreen(
     ) {
         SettingsHeader(
             title = "Your Account",
-            subtitle = "Username and account details from your Bubbler profile.",
+            subtitle = "Username and account details from your Wubbler profile.",
         )
 
         errorMessage?.let { message ->

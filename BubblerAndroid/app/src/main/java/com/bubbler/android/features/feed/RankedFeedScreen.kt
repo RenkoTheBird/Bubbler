@@ -192,7 +192,7 @@ fun RankedFeedScreenContent(
                     isLoading && posts.isEmpty() -> {
                         AsyncStateCard(
                             title = "Loading your feed",
-                            message = "Pulling the latest posts from Bubbler.",
+                            message = "Pulling the latest posts from Wubbler.",
                             showsProgress = true,
                         )
                     }
@@ -347,7 +347,7 @@ private fun RankedFeedLoadingPreview() {
                 Spacer(modifier = Modifier.height(40.dp))
                 AsyncStateCard(
                     title = "Loading your feed",
-                    message = "Pulling the latest posts from Bubbler.",
+                    message = "Pulling the latest posts from Wubbler.",
                     showsProgress = true,
                 )
             }

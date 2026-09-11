@@ -10,6 +10,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject private var authSession: AuthSession
+    @Environment(\.openURL) private var openURL
     @StateObject private var dataExport = DataExportViewModel()
 
     var body: some View {
@@ -40,7 +41,7 @@ struct SettingsView: View {
                             .font(.system(size: 34, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
                         
-                        Text("Control your Bubbler experience")
+                        Text("Control your Wubbler experience")
                             .font(.subheadline)
                             .foregroundColor(.white.opacity(0.7))
                     }
@@ -135,21 +136,21 @@ struct SettingsView: View {
                     // about
                     settingsSection(title: "About") {
                         Button {
-                            // Privacy Policy link TBD
+                            openURL(LegalURLs.privacy)
                         } label: {
                             settingsRow(icon: "hand.raised.fill", title: "Privacy Policy")
                         }
                         .buttonStyle(.plain)
 
                         Button {
-                            // Terms of Service link TBD
+                            openURL(LegalURLs.terms)
                         } label: {
                             settingsRow(icon: "doc.text.fill", title: "Terms of Service")
                         }
                         .buttonStyle(.plain)
 
                         Button {
-                            // Community Guidelines link TBD
+                            openURL(LegalURLs.communityGuidelines)
                         } label: {
                             settingsRow(icon: "person.3.fill", title: "Community Guidelines")
                         }

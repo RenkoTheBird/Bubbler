@@ -250,7 +250,7 @@ Use this as a pre-production gate. Unchecked items block public launch under the
 **Hard blockers**
 
 - [x] L1 Privacy Policy + Terms of Service
-- [ ] L2 Community Guidelines
+- [x] L2 Community Guidelines
 - [x] L3 Signup acceptance + Settings legal links
 - [x] L4 Age gate
 - [ ] L5 Apple App Privacy labels + Privacy Manifest

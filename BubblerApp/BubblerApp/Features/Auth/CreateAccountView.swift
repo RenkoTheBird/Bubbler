@@ -235,16 +235,16 @@ struct CreateAccountView: View {
     }
 
     private var agreementText: AttributedString {
-        var text = AttributedString("By signing up, you agree to Bubbler's ")
+        var text = AttributedString("By signing up, you agree to Wubbler's ")
 
         var terms = AttributedString("Terms of Use")
-        terms.link = URL(string: "bubbler://terms")
+        terms.link = LegalURLs.terms
         terms.underlineStyle = .single
 
         let connector = AttributedString(" and ")
 
         var privacy = AttributedString("Privacy Policy")
-        privacy.link = URL(string: "bubbler://privacy")
+        privacy.link = LegalURLs.privacy
         privacy.underlineStyle = .single
 
         text.append(terms)

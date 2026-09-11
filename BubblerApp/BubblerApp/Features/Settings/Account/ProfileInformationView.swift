@@ -67,7 +67,7 @@ struct ProfileInformationView: View {
                 .font(.system(size: 30, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
 
-            Text("Username and account details from your Bubbler profile.")
+            Text("Username and account details from your Wubbler profile.")
                 .font(.subheadline)
                 .multilineTextAlignment(.center)
                 .foregroundColor(.white.opacity(0.72))

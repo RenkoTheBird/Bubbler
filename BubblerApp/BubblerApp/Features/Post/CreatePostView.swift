@@ -127,7 +127,7 @@ struct CreatePostView: View {
         if viewModel.isSubmitting {
             return viewModel.isEditing ? "Saving..." : "Posting..."
         }
-        return viewModel.isEditing ? "Save Changes" : "Post to Bubbler"
+        return viewModel.isEditing ? "Save Changes" : "Post to Wubbler"
     }
 
     private func messageCard(_ text: String, tint: Color) -> some View {

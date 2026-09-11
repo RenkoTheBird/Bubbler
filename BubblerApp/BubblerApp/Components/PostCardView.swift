@@ -202,9 +202,9 @@ struct PostCardView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             if let topicName {
-                Text("Update how Bubbler treats \(KnownTopics.displayName(for: topicName)).")
+                Text("Update how Wubbler treats \(KnownTopics.displayName(for: topicName)).")
             } else {
-                Text("Report this post to Bubbler.")
+                Text("Report this post to Wubbler.")
             }
         }
         .navigationDestination(isPresented: $showReportForm) {

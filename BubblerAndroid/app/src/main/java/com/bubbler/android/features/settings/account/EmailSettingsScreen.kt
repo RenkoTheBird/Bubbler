@@ -49,7 +49,7 @@ fun EmailSettingsScreen(
     ) {
         SettingsHeader(
             title = "Email Address",
-            subtitle = "Update the email used to sign in to your Bubbler account.",
+            subtitle = "Update the email used to sign in to your Wubbler account.",
         )
 
         errorMessage?.let { message ->

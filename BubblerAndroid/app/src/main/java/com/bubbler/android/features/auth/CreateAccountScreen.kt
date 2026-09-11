@@ -31,6 +31,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.text.ClickableText
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -43,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bubbler.android.core.auth.AgeGate
 import com.bubbler.android.core.auth.AuthSession
+import com.bubbler.android.core.config.LegalUrls
 import com.bubbler.android.ui.components.BubblerLogo
 import com.bubbler.android.features.auth.components.AuthErrorText
 import com.bubbler.android.features.auth.components.AuthFieldBg
@@ -76,6 +79,8 @@ fun CreateAccountScreen(
     val authError by authSession.authError.collectAsStateWithLifecycle()
     val isWorking by authSession.isWorking.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
+    val uriHandler = LocalUriHandler.current
+    val agreement = remember { agreementText() }
 
     val isOldEnough = AgeGate.isOldEnough(dateOfBirth)
     val ageGateError = if (isOldEnough) null else AgeGate.underageMessage
@@ -178,11 +183,20 @@ fun CreateAccountScreen(
             }
 
             Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = agreementText(),
-                color = AuthOnGradient.copy(alpha = 0.8f),
-                style = MaterialTheme.typography.bodySmall,
-                textAlign = TextAlign.Center,
+            ClickableText(
+                text = agreement,
+                style = MaterialTheme.typography.bodySmall.copy(
+                    color = AuthOnGradient.copy(alpha = 0.8f),
+                    textAlign = TextAlign.Center,
+                ),
+                onClick = { offset ->
+                    agreement.getStringAnnotations(tag = "terms", start = offset, end = offset)
+                        .firstOrNull()
+                        ?.let { uriHandler.openUri(it.item) }
+                    agreement.getStringAnnotations(tag = "privacy", start = offset, end = offset)
+                        .firstOrNull()
+                        ?.let { uriHandler.openUri(it.item) }
+                },
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -264,7 +278,8 @@ fun CreateAccountScreen(
 }
 
 private fun agreementText() = buildAnnotatedString {
-    append("By signing up, you agree to Bubbler's ")
+    append("By signing up, you agree to Wubbler's ")
+    pushStringAnnotation(tag = "terms", annotation = LegalUrls.TERMS)
     withStyle(
         SpanStyle(
             color = Color.White,
@@ -274,7 +289,9 @@ private fun agreementText() = buildAnnotatedString {
     ) {
         append("Terms of Use")
     }
+    pop()
     append(" and ")
+    pushStringAnnotation(tag = "privacy", annotation = LegalUrls.PRIVACY)
     withStyle(
         SpanStyle(
             color = Color.White,
@@ -284,4 +301,5 @@ private fun agreementText() = buildAnnotatedString {
     ) {
         append("Privacy Policy")
     }
+    pop()
 }

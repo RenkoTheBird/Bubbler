@@ -105,7 +105,7 @@ fun CreatePostScreenContent(
         isSubmitting && viewModel.isEditing -> "Saving..."
         isSubmitting -> "Posting..."
         viewModel.isEditing -> "Save Changes"
-        else -> "Post to Bubbler"
+        else -> "Post to Wubbler"
     }
 
     Scaffold(

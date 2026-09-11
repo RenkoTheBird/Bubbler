@@ -72,7 +72,7 @@ class AuthService:
         if age_on(date_of_birth) < MINIMUM_SIGNUP_AGE:
             raise HTTPException(
                 status_code=403,
-                detail=f"You must be at least {MINIMUM_SIGNUP_AGE} years old to use Bubbler.",
+                detail=f"You must be at least {MINIMUM_SIGNUP_AGE} years old to use Wubbler.",
             )
 
         password_hash = hash_password(password)

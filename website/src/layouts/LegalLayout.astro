@@ -1,0 +1,91 @@
+---
+import BaseLayout from './BaseLayout.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description } = Astro.props;
+---
+
+<BaseLayout title={title} description={description}>
+  <div class="shell">
+    <SiteHeader />
+    <main class="legal-main">
+      <article class="legal-doc">
+        <slot />
+      </article>
+    </main>
+    <SiteFooter />
+  </div>
+</BaseLayout>
+
+<style>
+  .shell {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .legal-main {
+    flex: 1;
+    width: min(42rem, calc(100% - 2.5rem));
+    margin: 0 auto;
+    padding: 2.5rem 0 4rem;
+  }
+
+  .legal-doc :global(h1),
+  .legal-doc :global(h2),
+  .legal-doc :global(h3) {
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    margin: 2rem 0 0.75rem;
+  }
+
+  .legal-doc :global(h1) {
+    font-size: clamp(1.75rem, 4vw, 2.25rem);
+    margin-top: 0;
+  }
+
+  .legal-doc :global(h2) {
+    font-size: 1.25rem;
+  }
+
+  .legal-doc :global(p),
+  .legal-doc :global(li) {
+    font-family: var(--font-body);
+    font-size: 1.05rem;
+    line-height: 1.65;
+    color: var(--ink-muted);
+  }
+
+  .legal-doc :global(p) {
+    margin: 0 0 1rem;
+  }
+
+  .legal-doc :global(ul),
+  .legal-doc :global(ol) {
+    margin: 0 0 1.25rem;
+    padding-left: 1.35rem;
+  }
+
+  .legal-doc :global(li) {
+    margin-bottom: 0.4rem;
+  }
+
+  .legal-doc :global(a) {
+    color: var(--accent);
+    text-underline-offset: 0.15em;
+  }
+
+  .legal-doc :global(hr) {
+    border: none;
+    border-top: 1px solid var(--line);
+    margin: 2rem 0;
+  }
+</style>

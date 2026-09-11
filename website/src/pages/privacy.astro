@@ -1,0 +1,13 @@
+---
+import LegalLayout from '../layouts/LegalLayout.astro';
+import { LEGAL_ROUTES, renderLegalHtml } from '../lib/legal';
+
+const html = renderLegalHtml(LEGAL_ROUTES.privacy.file);
+---
+
+<LegalLayout
+  title={LEGAL_ROUTES.privacy.title}
+  description="How Wubbler collects, uses, and shares personal information."
+>
+  <div class="prose" set:html={html} />
+</LegalLayout>

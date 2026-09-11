@@ -32,16 +32,15 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -57,11 +56,11 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bubbler.android.app.theme.BubblerTheme
 import com.bubbler.android.core.auth.TokenStore
+import com.bubbler.android.core.config.LegalUrls
 import com.bubbler.android.core.network.ApiClient
 import com.bubbler.android.data.model.Post
 import com.bubbler.android.data.model.ReportReason
 import com.bubbler.android.data.repository.BlocksRepository
-import com.bubbler.android.features.legal.PrivacyPolicyStubScreen
 import kotlinx.coroutines.launch
 import java.time.Instant
 
@@ -81,14 +80,7 @@ fun ReportPostScreen(
     onUnauthorized: () -> Unit = {},
 ) {
     val viewModel = remember(post.id) { ReportPostViewModel() }
-    var showPrivacyPolicy by remember { mutableStateOf(false) }
-    if (showPrivacyPolicy) {
-        PrivacyPolicyStubScreen(
-            onBack = { showPrivacyPolicy = false },
-            modifier = modifier,
-        )
-        return
-    }
+    val uriHandler = LocalUriHandler.current
 
     val context = LocalContext.current
     val selectedReason by viewModel.selectedReason.collectAsStateWithLifecycle()
@@ -330,7 +322,7 @@ fun ReportPostScreen(
                         textDecoration = TextDecoration.Underline,
                         modifier = Modifier
                             .semantics { contentDescription = "Privacy Policy" }
-                            .clickable { showPrivacyPolicy = true },
+                            .clickable { uriHandler.openUri(LegalUrls.PRIVACY) },
                     )
                 }
 

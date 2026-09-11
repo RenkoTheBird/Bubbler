@@ -19,7 +19,7 @@ enum AgeGate {
     }
 
     static var underageMessage: String {
-        "You must be at least \(minimumAge) years old to use Bubbler."
+        "You must be at least \(minimumAge) years old to use Wubbler."
     }
 }
 

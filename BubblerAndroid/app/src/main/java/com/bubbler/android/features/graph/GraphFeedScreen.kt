@@ -350,7 +350,7 @@ private fun MiddleSection(
         isLoading && !hasCurrentPost -> {
             AsyncStateCard(
                 title = "Loading graph feed",
-                message = "Pulling your initial session from Bubbler.",
+                message = "Pulling your initial session from Wubbler.",
                 showsProgress = true,
             )
         }
@@ -587,7 +587,7 @@ private fun GraphFeedScreenLoadingPreview() {
         ) {
             AsyncStateCard(
                 title = "Loading graph feed",
-                message = "Pulling your initial session from Bubbler.",
+                message = "Pulling your initial session from Wubbler.",
                 showsProgress = true,
             )
         }

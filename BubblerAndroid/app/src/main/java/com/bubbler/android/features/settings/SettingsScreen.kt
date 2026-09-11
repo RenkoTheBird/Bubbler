@@ -43,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -53,12 +54,13 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bubbler.android.app.theme.BubblerTheme
+import com.bubbler.android.core.config.LegalUrls
 
 /**
  * Settings hub — mirrors Swift `SettingsView`.
  *
  * Subpages (account, preferences, blocks) are reached via [SettingsDestination]
- * callbacks; legal rows stay no-ops until product links land.
+ * callbacks; About legal rows open the hosted docs on wubbler.xyz.
  */
 @Composable
 fun SettingsScreen(
@@ -72,6 +74,8 @@ fun SettingsScreen(
     exportErrorMessage: String? = null,
     onDismissExportError: () -> Unit = {},
 ) {
+    val uriHandler = LocalUriHandler.current
+
     if (exportErrorMessage != null) {
         AlertDialog(
             onDismissRequest = onDismissExportError,
@@ -121,7 +125,7 @@ fun SettingsScreen(
                     letterSpacing = (-0.5).sp,
                 )
                 Text(
-                    text = "Control your Bubbler experience",
+                    text = "Control your Wubbler experience",
                     color = Color.White.copy(alpha = 0.7f),
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center,
@@ -190,21 +194,20 @@ fun SettingsScreen(
             }
 
             SettingsSection(title = "About") {
-                // Privacy / Terms / Guidelines links TBD (same as iOS).
                 SettingsRow(
                     icon = Icons.Filled.PrivacyTip,
                     title = "Privacy Policy",
-                    onClick = { },
+                    onClick = { uriHandler.openUri(LegalUrls.PRIVACY) },
                 )
                 SettingsRow(
                     icon = Icons.Filled.Description,
                     title = "Terms of Service",
-                    onClick = { },
+                    onClick = { uriHandler.openUri(LegalUrls.TERMS) },
                 )
                 SettingsRow(
                     icon = Icons.Filled.Groups,
                     title = "Community Guidelines",
-                    onClick = { },
+                    onClick = { uriHandler.openUri(LegalUrls.COMMUNITY_GUIDELINES) },
                 )
             }
         }
